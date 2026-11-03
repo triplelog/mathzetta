@@ -1,0 +1,23 @@
+{
+  "name": "mathzetta-workspace",
+  "private": true,
+  "description": "MathZetta and the libraries built on it: mathzetta (parse maths written any way, write it out every way), inlinemath (draw it as HTML and CSS) and calcrules (rewrite it with rules; an exact CAS).",
+  "license": "MIT",
+  "author": {
+    "name": "Robert Wilcox",
+    "email": "rwilcox@mathzetta.com",
+    "url": "https://mathzetta.com"
+  },
+  "workspaces": [
+    "packages/mathzetta",
+    "packages/calcrules",
+    "packages/inlinemath"
+  ],
+  "scripts": {
+    "test": "npm run build && npm test --workspaces",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.6"
+  }
+}

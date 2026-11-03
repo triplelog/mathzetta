@@ -1,0 +1,208 @@
+name: Integrals
+
+# mode: integrate. `f v 2 int` is ∫ f dv (MathZetta's postfix; the 2 counts f and v).
+# Each rule turns one integral into smaller ones, or into an answer. The CAS also
+# tries, when no rule fits: multiplying out, a linear substitution (∫ f(ax + b) dx
+# from the rule for ∫ f(u) du), and integration by parts for polynomial × e^, sin,
+# cos, ln, arctan. Definite integrals are the antiderivative between the limits.
+#
+# Patterns see the normal form: 1/x is "1 x /", x^-2 is "1 x 2 ^ /", √x is "x sqrt",
+# 1/√(1 - x²) is "1 x 2 ^ neg 1 + sqrt /".
+
+rules:
+  # ---- splitting -----------------------------------------------------------
+  - id: i-sum
+    name: Sum rule
+    mode: integrate
+    pattern: u w + v 2 int
+    output: u v 2 int w v 2 int +
+    explain: "Integrate {u} and {w} separately, and add."
+    tags: [split]
+
+  - id: i-difference
+    name: Difference rule
+    mode: integrate
+    pattern: u w - v 2 int
+    output: u v 2 int w v 2 int -
+    explain: "Integrate {u} and {w} separately, and subtract."
+    tags: [split]
+
+  - id: i-negate
+    name: A minus sign
+    mode: integrate
+    pattern: u neg v 2 int
+    output: u v 2 int neg
+    explain: "The minus sign comes out of the integral."
+    tags: [split]
+
+  - id: i-constant-multiple
+    name: Constant multiple
+    mode: integrate
+    pattern: c u * v 2 int
+    commutative: true
+    require:
+      - [freeOf, c, v]
+      - [dependsOn, u, v]
+    output: c u v 2 int *
+    priority: 5
+    explain: "{c} doesn't change with {v}, so it comes out of the integral."
+    tags: [split]
+
+  - id: i-constant-divisor
+    name: Dividing by a constant
+    mode: integrate
+    pattern: u c / v 2 int
+    require:
+      - [freeOf, c, v]
+      - [dependsOn, u, v]
+    output: u v 2 int c /
+    priority: 5
+    explain: "Dividing by {c} comes out of the integral."
+    tags: [split]
+
+  - id: i-constant-over
+    name: A constant over something
+    mode: integrate
+    pattern: c u / v 2 int
+    require:
+      - [freeOf, c, v]
+      - [dependsOn, u, v]
+    when:
+      c: [notOne]
+    output: c 1 u / v 2 int *
+    priority: 4
+    explain: "{c} comes out of the integral, leaving ∫ 1/{u}."
+    tags: [split]
+
+  # ---- the table -----------------------------------------------------------
+  - id: i-constant
+    name: Integral of a constant
+    mode: integrate
+    pattern: c v 2 int
+    require:
+      - [freeOf, c, v]
+    output: c v *
+    priority: 10
+    explain: "A constant {c} integrates to {c}·{v}."
+    tags: [base]
+
+  - id: i-variable
+    name: Integral of the variable
+    mode: integrate
+    pattern: u v 2 int
+    require:
+      - [sameAs, u, v]
+    output: v 2 ^ 2 /
+    priority: 10
+    explain: "∫ {v} d{v} = {v}²/2."
+    tags: [base]
+
+  - id: i-power
+    name: Power rule
+    mode: integrate
+    pattern: u n ^ v 2 int
+    require:
+      - [sameAs, u, v]
+      - [freeOf, n, v]
+    when:
+      n: [notMinusOne]
+    output: v n 1 + ^ n 1 + /
+    explain: "Add 1 to the power and divide by the new power: {result}."
+    tags: [power]
+
+  - id: i-reciprocal
+    name: Integral of 1/x
+    mode: integrate
+    pattern: 1 u / v 2 int
+    require:
+      - [sameAs, u, v]
+    output: v abs ln
+    explain: "∫ 1/{v} d{v} = ln|{v}| (the power rule can't divide by 0 here)."
+    tags: [log]
+
+  - id: i-reciprocal-power
+    name: Power rule (a power below)
+    mode: integrate
+    pattern: 1 u n ^ / v 2 int
+    require:
+      - [sameAs, u, v]
+      - [freeOf, n, v]
+    when:
+      n: [notOne]
+    output: v 1 n - ^ 1 n - /
+    explain: "1/{v}^{n} is {v}^(-{n}): add 1 to the power and divide by it."
+    tags: [power]
+
+  - id: i-sqrt
+    name: Integral of a square root
+    mode: integrate
+    pattern: u sqrt v 2 int
+    require:
+      - [sameAs, u, v]
+    output: 2 v 3 2 / ^ * 3 /
+    explain: "√{v} is {v}^(1/2): add 1 to the power and divide by 3/2."
+    tags: [power]
+
+  - id: i-reciprocal-sqrt
+    name: Integral of 1/√x
+    mode: integrate
+    pattern: 1 u sqrt / v 2 int
+    require:
+      - [sameAs, u, v]
+    output: 2 v sqrt *
+    explain: "1/√{v} is {v}^(-1/2): add 1 to the power and divide by 1/2."
+    tags: [power]
+
+  - id: i-root
+    name: Integral of a root
+    mode: integrate
+    pattern: n u root v 2 int
+    require:
+      - [sameAs, u, v]
+    output: v 1 n / 1 + ^ 1 n / 1 + /
+    explain: "The {n}th root of {v} is {v}^(1/{n}): add 1 to the power and divide by it."
+    tags: [power]
+
+  - id: i-exp
+    name: Integral of e^x
+    mode: integrate
+    pattern: =e u ^ v 2 int
+    require:
+      - [sameAs, u, v]
+    output: =e v ^
+    explain: "e^{v} is its own integral."
+    tags: [exp]
+
+  - id: i-exponential
+    name: Integral of a^x
+    mode: integrate
+    pattern: a u ^ v 2 int
+    require:
+      - [sameAs, u, v]
+      - [freeOf, a, v]
+    output: a v ^ a ln /
+    explain: "∫ {a}^{v} d{v} = {a}^{v} / ln {a}."
+    tags: [exp]
+
+  - id: i-ln
+    name: Integral of ln x
+    mode: integrate
+    pattern: u ln v 2 int
+    require:
+      - [sameAs, u, v]
+    output: v v ln * v -
+    explain: "By parts: ∫ ln {v} d{v} = {v} ln {v} - {v}."
+    tags: [log]
+
+  - { id: i-sin, name: Integral of sin, mode: integrate, pattern: u sin v 2 int, require: [[sameAs, u, v]], output: v cos neg, tags: [trig], explain: "The derivative of -cos {v} is sin {v}." }
+  - { id: i-cos, name: Integral of cos, mode: integrate, pattern: u cos v 2 int, require: [[sameAs, u, v]], output: v sin, tags: [trig], explain: "The derivative of sin {v} is cos {v}." }
+  - { id: i-tan, name: Integral of tan, mode: integrate, pattern: u tan v 2 int, require: [[sameAs, u, v]], output: v cos abs ln neg, tags: [trig], explain: "tan = sin/cos, and -ln|cos {v}| differentiates to it." }
+  - { id: i-sec-squared, name: Integral of sec², mode: integrate, pattern: 1 u cos 2 ^ / v 2 int, require: [[sameAs, u, v]], output: v tan, tags: [trig], explain: "The derivative of tan {v} is 1/cos²{v}." }
+  - { id: i-sec-squared-written, name: Integral of sec², mode: integrate, pattern: u sec 2 ^ v 2 int, require: [[sameAs, u, v]], output: v tan, tags: [trig], explain: "The derivative of tan {v} is sec²{v}." }
+  - { id: i-csc-squared, name: Integral of csc², mode: integrate, pattern: 1 u sin 2 ^ / v 2 int, require: [[sameAs, u, v]], output: v cot neg, tags: [trig], explain: "The derivative of -cot {v} is 1/sin²{v}." }
+  - { id: i-sin-squared, name: Integral of sin², mode: integrate, pattern: u sin 2 ^ v 2 int, require: [[sameAs, u, v]], output: v 2 / 2 v * sin 4 / -, tags: [trig], explain: "sin²{v} = (1 - cos 2{v})/2, which integrates term by term." }
+  - { id: i-cos-squared, name: Integral of cos², mode: integrate, pattern: u cos 2 ^ v 2 int, require: [[sameAs, u, v]], output: v 2 / 2 v * sin 4 / +, tags: [trig], explain: "cos²{v} = (1 + cos 2{v})/2, which integrates term by term." }
+  - { id: i-sinh, name: Integral of sinh, mode: integrate, pattern: u sinh v 2 int, require: [[sameAs, u, v]], output: v cosh, tags: [trig], explain: "The derivative of cosh {v} is sinh {v}." }
+  - { id: i-cosh, name: Integral of cosh, mode: integrate, pattern: u cosh v 2 int, require: [[sameAs, u, v]], output: v sinh, tags: [trig], explain: "The derivative of sinh {v} is cosh {v}." }
+  - { id: i-arctan, name: Integral of 1/(1 + x²), mode: integrate, pattern: 1 u 2 ^ 1 + / v 2 int, require: [[sameAs, u, v]], output: v arctan, tags: [trig], explain: "The derivative of arctan {v} is 1/(1 + {v}²)." }
+  - { id: i-arcsin, name: Integral of 1/√(1 - x²), mode: integrate, pattern: 1 u 2 ^ neg 1 + sqrt / v 2 int, require: [[sameAs, u, v]], output: v arcsin, tags: [trig], explain: "The derivative of arcsin {v} is 1/√(1 - {v}²)." }

@@ -1,0 +1,324 @@
+name: Differentiation
+
+# `u v der` means d(u)/dv (MathZetta's postfix: mathzetta/docs/postfix.md). Every rule here rewrites one derivative into smaller
+# derivatives, so differentiating always terminates: the expressions sitting
+# under a `D` get strictly smaller at every step.
+#
+# The variable is a slot, not a fixed letter, so these rules work for d/dx,
+# d/dt or anything else. That is what freeOf and dependsOn are for: they ask
+# whether one operand mentions whatever the variable slot bound to.
+#
+# Where two rules share a structure key, requirements keep them apart and
+# priority picks the one that reads better. The constant-multiple rule outranks
+# the product rule for exactly that reason.
+
+rules:
+  # ---- the two base cases ----------------------------------------------
+  - id: d-constant
+    name: Derivative of a constant
+    mode: differentiate
+    pattern: c v der
+    require:
+      - [freeOf, c, v]
+    output: "0"
+    priority: 10
+    explain: "{c} does not change when {v} changes, so its rate of change is 0."
+    tags: [base]
+
+  - id: d-variable
+    name: Derivative of the variable
+    mode: differentiate
+    pattern: u v der
+    require:
+      - [sameAs, u, v]
+    output: "1"
+    priority: 10
+    explain: "{v} changes exactly as fast as itself, so the rate is 1."
+    tags: [base]
+
+  # ---- splitting a derivative into smaller ones ------------------------
+  - id: d-sum
+    name: Sum rule
+    mode: differentiate
+    pattern: u w + v der
+    output: u v der w v der +
+    explain: "Differentiate {u} and {w} separately, then add the two results."
+    tags: [split]
+
+  - id: d-difference
+    name: Difference rule
+    mode: differentiate
+    pattern: u w - v der
+    output: u v der w v der -
+    explain: "Differentiate {u} and {w} separately, then subtract the second from the first."
+    tags: [split]
+
+  - id: d-negate
+    name: Derivative of a negative
+    mode: differentiate
+    pattern: u neg v der
+    output: u v der neg
+    explain: "The minus sign just carries through to the derivative of {u}."
+    tags: [split]
+
+  - id: d-constant-multiple
+    name: Constant multiple rule
+    mode: differentiate
+    pattern: c u * v der
+    commutative: true
+    require:
+      - [freeOf, c, v]
+      - [dependsOn, u, v]
+    output: c u v der *
+    priority: 5
+    explain: "{c} is only a scale factor, so it comes along unchanged while {u} is differentiated."
+    tags: [split]
+
+  - id: d-constant-divisor
+    name: Dividing by a constant
+    mode: differentiate
+    pattern: u c / v der
+    require:
+      - [freeOf, c, v]
+    output: u v der c /
+    priority: 5
+    explain: "Dividing by {c} is only a scale factor, so differentiate {u} and keep the division."
+    tags: [split]
+
+  - id: d-product
+    name: Product rule
+    mode: differentiate
+    pattern: u w * v der
+    require:
+      - [dependsOn, u, v]
+      - [dependsOn, w, v]
+    output: u v der w * u w v der * +
+    explain: "Differentiate {u} and keep {w}, then keep {u} and differentiate {w}, and add the two."
+    tags: [split]
+
+  - id: d-quotient
+    name: Quotient rule
+    mode: differentiate
+    pattern: u w / v der
+    output: u v der w * u w v der * - w 2 ^ /
+    explain: "Bottom times the derivative of the top, minus top times the derivative of the bottom, all over {w} squared."
+    tags: [split]
+
+  # ---- powers -----------------------------------------------------------
+  - id: d-power-of-variable
+    name: Power rule
+    mode: differentiate
+    pattern: u n ^ v der
+    require:
+      - [sameAs, u, v]
+      - [freeOf, n, v]
+    output: n u n 1 - ^ *
+    fold: true
+    priority: 6
+    explain: "Bring the {n} down in front and drop the power by one."
+    tags: [power]
+
+  - id: d-power-chain
+    name: Power rule with the chain rule
+    mode: differentiate
+    pattern: u n ^ v der
+    require:
+      - [freeOf, n, v]
+      - [dependsOn, u, v]
+    output: n u n 1 - ^ * u v der *
+    fold: true
+    explain: "Bring the {n} down and drop the power by one, then multiply by the derivative of {u}."
+    tags: [power, chain]
+
+  - id: d-exponential-base
+    name: Derivative of a constant to a power
+    mode: differentiate
+    pattern: a u ^ v der
+    require:
+      - [freeOf, a, v]
+      - [dependsOn, u, v]
+    output: a u ^ a ln * u v der *
+    explain: "A constant base gives itself back, multiplied by the natural log of {a} and the derivative of {u}."
+    tags: [power, chain]
+
+  # ---- the standard functions, each with its chain-rule factor ---------
+  # e^u is `=e u ^`: the base is the literal symbol e. Outranks the general
+  # a^u rule (which would give e^u · ln e · u').
+  - id: d-exp
+    name: Derivative of e to a power
+    mode: differentiate
+    pattern: =e u ^ v der
+    require:
+      - [dependsOn, u, v]
+    output: =e u ^ u v der *
+    priority: 7
+    explain: "e to a power is its own derivative, times the derivative of {u}."
+    tags: [chain]
+
+  - id: d-ln
+    name: Derivative of a natural log
+    mode: differentiate
+    pattern: u ln v der
+    output: u v der u /
+    explain: "The derivative of {u} over {u} itself."
+    tags: [chain]
+
+  - id: d-sqrt
+    name: Derivative of a square root
+    mode: differentiate
+    pattern: u sqrt v der
+    output: u v der 2 u sqrt * /
+    explain: "The derivative of {u}, over twice the square root of {u}."
+    tags: [chain]
+
+  - id: d-sin
+    name: Derivative of sine
+    mode: differentiate
+    pattern: u sin v der
+    output: u cos u v der *
+    explain: "Sine differentiates to cosine, times the derivative of {u}."
+    tags: [chain, trig]
+
+  - id: d-cos
+    name: Derivative of cosine
+    mode: differentiate
+    pattern: u cos v der
+    output: u sin u v der * neg
+    explain: "Cosine differentiates to minus sine, times the derivative of {u}."
+    tags: [chain, trig]
+
+  - id: d-tan
+    name: Derivative of tangent
+    mode: differentiate
+    pattern: u tan v der
+    output: u v der u cos 2 ^ /
+    explain: "The derivative of {u}, over cosine squared of {u}."
+    tags: [chain, trig]
+
+  # ---- the rest of the standard functions -----------------------------
+  - id: d-csc
+    name: Derivative of cosecant
+    mode: differentiate
+    pattern: u csc v der
+    output: u csc u cot * u v der * neg
+    explain: "Cosecant differentiates to minus cosecant times cotangent, times the derivative of {u}."
+    tags: [chain, trig]
+
+  - id: d-sec
+    name: Derivative of secant
+    mode: differentiate
+    pattern: u sec v der
+    output: u sec u tan * u v der *
+    explain: "Secant differentiates to secant times tangent, times the derivative of {u}."
+    tags: [chain, trig]
+
+  - id: d-cot
+    name: Derivative of cotangent
+    mode: differentiate
+    pattern: u cot v der
+    output: u v der u sin 2 ^ / neg
+    explain: "Minus the derivative of {u}, over sine squared of {u}."
+    tags: [chain, trig]
+
+  - id: d-arcsin
+    name: Derivative of arcsine
+    mode: differentiate
+    pattern: u arcsin v der
+    output: u v der 1 u 2 ^ - sqrt /
+    explain: "The derivative of {u}, over the square root of 1 minus {u} squared."
+    tags: [chain, trig]
+
+  - id: d-arccos
+    name: Derivative of arccosine
+    mode: differentiate
+    pattern: u arccos v der
+    output: u v der 1 u 2 ^ - sqrt / neg
+    explain: "Minus the derivative of {u}, over the square root of 1 minus {u} squared."
+    tags: [chain, trig]
+
+  - id: d-arctan
+    name: Derivative of arctangent
+    mode: differentiate
+    pattern: u arctan v der
+    output: u v der 1 u 2 ^ + /
+    explain: "The derivative of {u}, over 1 plus {u} squared."
+    tags: [chain, trig]
+
+  - id: d-sinh
+    name: Derivative of hyperbolic sine
+    mode: differentiate
+    pattern: u sinh v der
+    output: u cosh u v der *
+    explain: "Hyperbolic sine differentiates to hyperbolic cosine, times the derivative of {u}."
+    tags: [chain, hyperbolic]
+
+  - id: d-cosh
+    name: Derivative of hyperbolic cosine
+    mode: differentiate
+    pattern: u cosh v der
+    output: u sinh u v der *
+    explain: "Hyperbolic cosine differentiates to hyperbolic sine — no minus sign, unlike cosine — times the derivative of {u}."
+    tags: [chain, hyperbolic]
+
+  - id: d-tanh
+    name: Derivative of hyperbolic tangent
+    mode: differentiate
+    pattern: u tanh v der
+    output: u v der u cosh 2 ^ /
+    explain: "The derivative of {u}, over hyperbolic cosine squared of {u}."
+    tags: [chain, hyperbolic]
+
+  - id: d-arcsinh
+    name: Derivative of inverse hyperbolic sine
+    mode: differentiate
+    pattern: u arcsinh v der
+    output: u v der u 2 ^ 1 + sqrt /
+    explain: "The derivative of {u}, over the square root of {u} squared plus 1."
+    tags: [chain, hyperbolic]
+
+  - id: d-arccosh
+    name: Derivative of inverse hyperbolic cosine
+    mode: differentiate
+    pattern: u arccosh v der
+    output: u v der u 2 ^ 1 - sqrt /
+    explain: "The derivative of {u}, over the square root of {u} squared minus 1."
+    tags: [chain, hyperbolic]
+
+  - id: d-arctanh
+    name: Derivative of inverse hyperbolic tangent
+    mode: differentiate
+    pattern: u arctanh v der
+    output: u v der 1 u 2 ^ - /
+    explain: "The derivative of {u}, over 1 minus {u} squared."
+    tags: [chain, hyperbolic]
+
+  # log base a: `a u log` in MathZetta's postfix
+  - id: d-log
+    name: Derivative of a logarithm
+    mode: differentiate
+    pattern: a u log v der
+    require:
+      - [freeOf, a, v]
+    output: u v der u a ln * /
+    explain: "The derivative of {u}, over {u} times the natural log of {a}."
+    tags: [chain]
+
+  - id: d-abs
+    name: Derivative of an absolute value
+    mode: differentiate
+    pattern: u abs v der
+    output: u u abs / u v der *
+    explain: "The absolute value keeps the sign of {u}: {u} over its absolute value, times the derivative of {u}."
+    tags: [chain]
+
+  # n-th root: `n u root`
+  - id: d-root
+    name: Derivative of a root
+    mode: differentiate
+    pattern: n u root v der
+    require:
+      - [freeOf, n, v]
+    output: u v der n n u root n 1 - ^ * /
+    fold: true
+    explain: "The derivative of {u}, over {n} times the {n}th root of {u} to the power {n} minus 1."
+    tags: [chain]

@@ -1,0 +1,207 @@
+import { suite, test, eq } from '../harness.js';
+import { calculate, calculateBlock, MathError, UnknownError, parse, clean } from '../../src/all.js';
+
+const T = (s, scope, options) => calculate(s, scope, options).text;
+/** Throws an error of this class. */
+const throws = (body, Kind) => {
+    try {
+        body();
+    } catch (error) {
+        if (!(error instanceof Kind)) throw new Error(`threw ${error.constructor.name} "${error.message}", expected ${Kind.name}`);
+        return;
+    }
+    throw new Error('expected an error');
+};
+
+suite('calculate: fixed', () => {
+    test('exactly that many decimals, as text', () => {
+        // a text answer: .value is the text, .text shows it quoted like any string
+        eq(calculate('fixed(2, 3)').value, '2.000');
+        eq(calculate('fixed(2, 3)').text, '"2.000"');
+        eq(calculate('fixed(1/3, 2)').value, '0.33');
+        eq(calculate('fixed(2/3, 2)').value, '0.67');
+        eq(calculate('fixed(-2.5, 0)').value, '-3');
+        eq(calculate('fixed(1234.5678, 1)').value, '1234.6');
+        eq(calculate('fixed(sqrt(2), 4)').value, '1.4142');
+        eq(calculate('fixed(2.5)').value, '2.50');   // one argument: two decimals
+    });
+});
+
+suite('calculate: exact arithmetic', () => {
+    test('fractions stay fractions', () => {
+        eq(T('1/3 + 1/6'), '1/2');
+        eq(T('10/4'), '5/2');
+        eq(T('-7 mod 3'), '2');
+        eq(T('mean(1, 2, 3, 4)'), '5/2');
+    });
+    test('whole numbers of any size', () => {
+        eq(T('2^100'), '1267650600228229401496703205376');
+        eq(T('25!'), '15511210043330985984000000');
+        eq(T('2^200'), '1.60693804426*10^(60)');
+        eq(T('\\binom{50}{25}'), '126410606437752');
+    });
+    test('decimals are read exactly, including repeating ones', () => {
+        eq(T('0.1 + 0.2'), '3/10');
+        eq(T('0.1 + 0.2', {}, { decimal: true }), '0.3');
+        eq(T('1.333..'), '4/3');
+        eq(T('0.1212..'), '4/33');
+        eq(T('0.1666..'), '1/6');
+    });
+    test('surds are simplified', () => {
+        eq(T('sqrt(8)'), '2*sqrt(2)');
+        eq(T('sqrt(12)/sqrt(3)'), '2');
+        eq(T('1/sqrt(2)'), 'sqrt(2)/2');
+        eq(T('root(3, 54)'), '3*root(3, 2)');
+        eq(T('(-8)^(1/3)'), '-2');
+        eq(T('8^(2/3)'), '4');
+        eq(T('4^(-1/2)'), '1/2');
+        eq(T('\\sqrt[4]{9}'), 'sqrt(3)');
+    });
+    test('π and e are kept', () => {
+        eq(T('pi/2 + pi/3'), '(5*pi)/6');
+        eq(T('ln(e^3)'), '3');
+        eq(T('e^2'), 'e^2');
+        eq(T('1/pi'), '1/pi');
+    });
+    test('trig at the standard angles', () => {
+        eq(T('sin(pi/6)'), '1/2');
+        eq(T('cos(pi/4)'), 'sqrt(2)/2');
+        eq(T('tan(pi/3)'), 'sqrt(3)');
+        eq(T('sin(5pi/4)'), '-sqrt(2)/2');
+        eq(T('sec(pi/3)'), '2');
+        eq(T('arcsin(1/2)'), 'pi/6');
+        eq(T('arccos(-sqrt(3)/2)'), '(5*pi)/6');
+        eq(T('arctan(1)'), 'pi/4');
+        eq(T('sin(1)'), '0.841470984808');
+    });
+    test('logs that come out exact', () => {
+        eq(T('log_2(8)'), '3');
+        eq(T('log_4(2)'), '1/2');
+        eq(T('log_{10}(1000)'), '3');
+        eq(T('log_2(3)'), '1.58496250072');
+    });
+    test('comparisons, plus-or-minus and lists', () => {
+        eq(T('1/3 = 2/6'), 'true');
+        eq(T('sqrt(2)^2 = 2'), 'true');
+        eq(T('±sqrt(4)'), '±2');
+        eq(T('(-b ± sqrt(b^2 - 4a c))/(2a)', { a: 1, b: -3, c: 2 }), '{2, 1}');
+    });
+});
+
+suite('calculate: no answer, or none yet', () => {
+    test('maths with no answer throws MathError', () => {
+        for (const s of ['1/0', 'sqrt(-1)', '0^0', 'ln(0)', '(-1)!', 'tan(pi/2)', 'arcsin(2)']) throws(() => calculate(s), MathError);
+    });
+    test('what cannot be worked out throws UnknownError', () => {
+        throws(() => calculate('x + 1'), UnknownError);
+        throws(() => calculate('\\int x^2 dx'), UnknownError);
+        throws(() => calculate('der(x^2, x)'), UnknownError);
+    });
+    test('numbers too big for a double are left alone, not called ∞', () => {
+        throws(() => calculate('10^9!'), UnknownError);
+        throws(() => calculate('3^(10^6)'), UnknownError);
+        eq(T('e^1000'), 'e^1000');
+        eq(parse('{{2^(10^9)}}'), parse('2^(10^9)'));
+    });
+});
+
+suite('calculate: scope', () => {
+    test('numbers, fractions as text, functions, subscripted names', () => {
+        eq(T('x^2 + 1', { x: 3 }), '10');
+        eq(T('a/b', { a: 1, b: 3 }), '1/3');
+        eq(T('2a', { a: '1/3' }), '2/3');
+        eq(T('f(2) + 1', { f: (t) => t * t }), '5');
+        eq(T('x_1 + x_2', { x_1: 1, x_2: 2 }), '3');
+        eq(calculate('x / 4', { x: 2 }).value, 0.5);
+    });
+});
+
+suite('calculate: calculus, numerically', () => {
+    test('definite integrals', () => {
+        eq(T('\\int_0^1 x^2 dx'), '1/3');
+        eq(T('\\int_0^\\pi \\sin x dx'), '2');
+        eq(T('\\int_0^1 \\frac{4}{1+x^2} dx'), 'pi');
+        eq(T('\\int_0^1 \\frac{1}{\\sqrt{x}} dx'), '2');
+        eq(T('\\int_1^\\infty \\frac{1}{x^2} dx'), '1');
+        eq(T('\\int_2^0 x dx'), '-2');
+        throws(() => calculate('\\int_0^1 \\frac{1}{x} dx'), MathError);
+    });
+    test('derivatives at a point', () => {
+        eq(T('der(x^3, x)', { x: 2 }), '12');
+        eq(T('der(sin(x), x)', { x: 'pi/3' }), '1/2');
+        eq(T('der(der(x^3, x), x)', { x: 1 }), '6');
+        throws(() => calculate('der(abs(x), x)', { x: 0 }), MathError);
+    });
+    test('limits', () => {
+        eq(T('\\lim_{x\\to 0}\\frac{\\sin x}{x}'), '1');
+        eq(T('\\lim_{x\\to\\infty}(1+1/x)^x'), 'e');
+        eq(T('\\lim_{x\\to 2}\\frac{x^2-4}{x-2}'), '4');
+        eq(T('\\lim_{x\\to\\infty}\\frac{3x^2+2}{5x^2-x}'), '3/5');
+        eq(T('\\lim_{x\\to 0^-}\\frac{|x|}{x}'), '-1');
+        eq(T('\\lim_{x\\to 0^+}\\ln x'), '-∞');
+        eq(T('\\lim_{x\\to 0}\\frac{1}{x^2}'), '∞');
+        throws(() => calculate('\\lim_{x\\to 0}\\frac{|x|}{x}'), MathError);
+    });
+    test('sums and products', () => {
+        eq(T('\\sum_{i=1}^{10} i^2'), '385');
+        eq(T('\\sum_{k=1}^{100}\\frac{1}{k(k+1)}'), '100/101');
+        eq(T('\\prod_{k=1}^{5} k'), '120');
+        eq(T('\\sum_{n=1}^{\\infty}\\frac{1}{n^2}'), 'pi^2/6');
+        eq(T('\\sum_{n=0}^{\\infty}\\frac{1}{n!}'), 'e');
+        throws(() => calculate('\\sum_{n=1}^{\\infty}\\frac{1}{n}'), MathError);
+    });
+});
+
+suite('{{blocks}}', () => {
+    const P = (s, options) => parse(s, options);
+    test('values replace the block', () => {
+        eq(P('3+4={{3+4}}'), ['3', '4', '+', '7', '=']);
+        eq(P('{{2^100}}'), ['1267650600228229401496703205376']);
+        eq(P('{{0.1+0.2}}'), ['0.3']);
+    });
+    test('answers are bracketed where they would run together', () => {
+        eq(P('2{{1+1}}'), ['2', '2', '*']);
+        eq(P('x^{{1/2}}'), ['x', '1', '2', '/', '^']);
+        eq(P('2{{-1}}'), ['2', '-1', '*']);
+        eq(clean('total={{(2 + 3) * 4}}').cleaned, 'total=20');
+    });
+    test('~ asks for a decimal, ~n for n places', () => {
+        eq(P('{{~ pi}}'), ['3.14159265359']);
+        eq(P('{{~3 sqrt(2)}}'), ['1.414']);
+        eq(P('{{~2 1/3}}'), ['0.33']);
+    });
+    test('no answer reads "undefined"; unknowns stay as written', () => {
+        eq(P('{{1/0}}'), ['"undefined"']);
+        eq(P('{{x+1}}'), ['x', '1', '+']);
+        eq(P('\\frac{1}{0} = {{1/0}}'), ['1', '0', '/', '"undefined"', '=']);
+    });
+    test('scope reaches blocks', () => eq(P('y = {{a/b}}', { scope: { a: 1, b: 3 } }), ['y', '1', '3', '/', '=']));
+    test('calculateBlock on its own', () => {
+        eq(calculateBlock('1/3'), '(1/3)');
+        eq(calculateBlock('7'), '7');
+    });
+});
+
+// ---- added 2026-11-03 ----
+suite('calculate: options and lists', () => {
+    test('digits: significant digits of an inexact answer', () => {
+        eq(calculate('sin(1)', {}, { digits: 4 }).text, '0.8415');
+        eq(calculate('sin(1)').text, '0.841470984808');
+    });
+    test('maxDigits: the longest whole number written out', () => {
+        eq(calculate('2^100').text, '1267650600228229401496703205376');
+        eq(calculate('2^200').text, '1.60693804426*10^(60)');
+        eq(calculate('2^200', {}, { maxDigits: 100 }).text.length, 61);
+    });
+    test('lists work element by element, and must be the same length', () => {
+        eq(calculate('[1, 2] + [3, 4]').text, '[4, 6]');
+        throws(() => calculate('[1, 2] + [3, 4, 5]'), MathError);
+    });
+    test('BigInt values in the scope stay exact', () => {
+        eq(calculate('n + 1', { n: 2n ** 70n }).text, String(2n ** 70n + 1n));
+    });
+    test('a chain of comparisons, as maths', () => {
+        eq(calculate('3 < x < 7', { x: 10 }).value, false);
+        eq(calculate('3 < x < 7', { x: 5 }).value, true);
+    });
+});

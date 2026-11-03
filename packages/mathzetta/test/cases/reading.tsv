@@ -1,0 +1,508 @@
+# reading.tsv — How input is read: plain text, LaTeX, unicode, JavaScript and Python spellings, words and names — the cleaned text, the postfix, and how it is written back as LaTeX and MathML.
+# Columns: Input, Clean, Postfix, Latex, MathML, JavaScript, Evaluated. A blank cell is not checked; a # line is a note.
+Input	Clean	Postfix	Latex	MathML	JavaScript	Evaluated
+\\sqrt{x^2+y^2}	\sqrt{x^{2}+y^{2}}	["x","2","^","y","2","^","+","sqrt"]	\sqrt{x^2 + y^2}	<math><msqrt id="mz-7"><mrow id="mz-6"><msup id="mz-2"><mi id="mz-0">x</mi><mn id="mz-1">2</mn></msup><mo>+</mo><msup id="mz-5"><mi id="mz-3">y</mi><mn id="mz-4">2</mn></msup></mrow></msqrt></math>
+\sqrt{x^2+y^2}	sqrt{x^{2}+y^{2}}	["x","2","^","y","2","^","+","sqrt"]	\sqrt{x^2 + y^2}	<math><msqrt id="mz-7"><mrow id="mz-6"><msup id="mz-2"><mi id="mz-0">x</mi><mn id="mz-1">2</mn></msup><mo>+</mo><msup id="mz-5"><mi id="mz-3">y</mi><mn id="mz-4">2</mn></msup></mrow></msqrt></math>
+sqrt(3^2)	sqrt(3^{2})	["3","2","^","sqrt"]	\sqrt{3^2}	<math><msqrt id="mz-3"><msup id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></msup></msqrt></math>
+sqrt{3+5}	sqrt{3+5}	["3","5","+","sqrt"]	\sqrt{3 + 5}	<math><msqrt id="mz-3"><mrow id="mz-2"><mn id="mz-0">3</mn><mo>+</mo><mn id="mz-1">5</mn></mrow></msqrt></math>
+sqrt(x)	sqrt(x)	["x","sqrt"]	\sqrt{x}	<math><msqrt id="mz-1"><mi id="mz-0">x</mi></msqrt></math>
+root(3^2)	sqrt(3^{2})	["3","2","^","sqrt"]	\sqrt{3^2}	<math><msqrt id="mz-3"><msup id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></msup></msqrt></math>
+\\sqrt[3]{7}	\sqrt{3,7}	["3","7","root"]	\sqrt[3]{7}	<math><mroot id="mz-2"><mn id="mz-1">7</mn><mn id="mz-0">3</mn></mroot></math>
+Math.sqrt(7)	sqrt(7)	["7","sqrt"]	\sqrt{7}	<math><msqrt id="mz-1"><mn id="mz-0">7</mn></msqrt></math>
+math.sqrt(8)	sqrt(8)	["8","sqrt"]	\sqrt{8}	<math><msqrt id="mz-1"><mn id="mz-0">8</mn></msqrt></math>
+Math.SQRT1_2+3	sqrt(1/2)+3	["1","2","/","sqrt","3","+"]	\sqrt{\frac{1}{2}} + 3	<math><mrow><msqrt><mfrac><mn>1</mn><mn>2</mn></mfrac></msqrt><mo>+</mo><mn>3</mn></mrow></math>
+Math.SQRT2+3	sqrt(2)+3	["2","sqrt","3","+"]	\sqrt{2} + 3	<math><mrow id="mz-3"><msqrt id="mz-1"><mn id="mz-0">2</mn></msqrt><mo>+</mo><mn id="mz-2">3</mn></mrow></math>
+Math.cbrt(7)	sqrt(3,7)	["3","7","root"]	\sqrt[3]{7}	<math><mroot id="mz-2"><mn id="mz-1">7</mn><mn id="mz-0">3</mn></mroot></math>
+math.cbrt(7)	sqrt(3,7)	["3","7","root"]	\sqrt[3]{7}	<math><mroot id="mz-2"><mn id="mz-1">7</mn><mn id="mz-0">3</mn></mroot></math>
+cbrt(7)	sqrt(3,7)	["3","7","root"]	\sqrt[3]{7}	<math><mroot id="mz-2"><mn id="mz-1">7</mn><mn id="mz-0">3</mn></mroot></math>
+\sqrt*{x}	sqrt{x}	["x","sqrt"]	\sqrt{x}	<math><msqrt id="mz-1"><mi id="mz-0">x</mi></msqrt></math>
+\sqrt*[4]{x^2}	sqrt{4,x^{2}}	["4","x","2","^","root"]	\sqrt[4]{x^2}	<math><mroot id="mz-4"><msup id="mz-3"><mi id="mz-1">x</mi><mn id="mz-2">2</mn></msup><mn id="mz-0">4</mn></mroot></math>
+\\sqrt*{x}	\sqrt{x}	["x","sqrt"]	\sqrt{x}	<math><msqrt id="mz-1"><mi id="mz-0">x</mi></msqrt></math>
+\\sqrt*[4]{\\sqrt{11}}	sqrt{4,\sqrt{11}}	["4","11","sqrt","root"]	\sqrt[4]{\sqrt{11}}	<math><mroot id="mz-3"><msqrt id="mz-2"><mn id="mz-1">11</mn></msqrt><mn id="mz-0">4</mn></mroot></math>
+\\sqrt{\\sqrt*{11}}	\sqrt{\sqrt{11}}	["11","sqrt","sqrt"]	\sqrt{\sqrt{11}}	<math><msqrt id="mz-2"><msqrt id="mz-1"><mn id="mz-0">11</mn></msqrt></msqrt></math>
+\frac{3}{2}	frac{3}{2}	["3","2","/"]	\frac{3}{2}	<math><mfrac id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></mfrac></math>
+\frac{3/4}{\\frac{5}{4}}	frac{3/4}{\frac{5}{4}}	["3","4","/","5","4","/","/"]	\frac{\frac{3}{4}}{\frac{5}{4}}	<math><mfrac id="mz-6"><mfrac id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">4</mn></mfrac><mfrac id="mz-5"><mn id="mz-3">5</mn><mn id="mz-4">4</mn></mfrac></mfrac></math>
+\\frac{\\frac{1}{2}}{\frac{7}{3}+frac(5)(3)}	\frac{\frac{1}{2}}{frac{7}{3}+frac(5)(3)}	["1","2","/","7","3","/","5","3","/","+","/"]	\frac{\frac{1}{2}}{\frac{7}{3} + \frac{5}{3}}	<math><mfrac id="mz-10"><mfrac id="mz-2"><mn id="mz-0">1</mn><mn id="mz-1">2</mn></mfrac><mrow id="mz-9"><mfrac id="mz-5"><mn id="mz-3">7</mn><mn id="mz-4">3</mn></mfrac><mo>+</mo><mfrac id="mz-8"><mn id="mz-6">5</mn><mn id="mz-7">3</mn></mfrac></mrow></mfrac></math>
+Math.log(3^2)	log_{e}(3^{2})	["3","2","^","ln"]	\ln\left(3^2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><msup id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></msup><mo>)</mo></mrow></math>
+math.log(3^2)	log_{e}(3^{2})	["3","2","^","ln"]	\ln\left(3^2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><msup id="mz-2"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></msup><mo>)</mo></mrow></math>
+math.ln(3+2)	log_{e}(3+2)	["3","2","+","ln"]	\ln\left(3 + 2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">3</mn><mo>+</mo><mn id="mz-1">2</mn></mrow><mo>)</mo></mrow></math>
+Math.ln(7+2)	log_{e}(7+2)	["7","2","+","ln"]	\ln\left(7 + 2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">7</mn><mo>+</mo><mn id="mz-1">2</mn></mrow><mo>)</mo></mrow></math>
+\log[5]{4}	log_[5]{4}	["5","4","log"]	\log_{5}\left(4\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">5</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow></math>
+\log10{5}	log_{10}{5}	["10","5","log"]	\log_{10}\left(5\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">10</mn></msub><mo>(</mo><mn id="mz-1">5</mn><mo>)</mo></mrow></math>
+3Math.log10	3log_{e}10	["3","10","ln","*"]	3\ln\left(10\right)	<math><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>10</mn><mo>)</mo></mrow></mrow></math>
+3Math.LN2+3	3log_{e}(2)+3	["3","2","ln","*","3","+"]	3\ln\left(2\right) + 3	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>2</mn><mo>)</mo></mrow></mrow><mo>+</mo><mn>3</mn></mrow></math>
+3Math.LN10+4	3log_{e}(10)+4	["3","10","ln","*","4","+"]	3\ln\left(10\right) + 4	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>10</mn><mo>)</mo></mrow></mrow><mo>+</mo><mn>4</mn></mrow></math>
+3Math.LOG10E+5	3log_{10}(e)+5	["3","10","e","log","*","5","+"]	3\log_{10}\left(e\right) + 5	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><msub><mi>log</mi><mn>10</mn></msub><mo>(</mo><mi>e</mi><mo>)</mo></mrow></mrow><mo>+</mo><mn>5</mn></mrow></math>
+3Math.LOG2E+7	3log_{2}(e)+7	["3","2","e","log","*","7","+"]	3\log_{2}\left(e\right) + 7	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><msub><mi>log</mi><mn>2</mn></msub><mo>(</mo><mi>e</mi><mo>)</mo></mrow></mrow><mo>+</mo><mn>7</mn></mrow></math>
+Math.log2(3^2)	log_{2}(3^{2})	["2","3","2","^","log"]	\log_{2}\left(3^2\right)	<math><mrow><msub><mi>log</mi><mn>2</mn></msub><mo>(</mo><msup><mn>3</mn><mn>2</mn></msup><mo>)</mo></mrow></math>
+Math.log10(3^2)	log_{10}(3^{2})	["10","3","2","^","log"]	\log_{10}\left(3^2\right)	<math><mrow><msub><mi>log</mi><mn>10</mn></msub><mo>(</mo><msup><mn>3</mn><mn>2</mn></msup><mo>)</mo></mrow></math>
+log(10^2)	log_{e}(10^{2})	["10","2","^","ln"]	\ln\left(10^2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><msup id="mz-2"><mn id="mz-0">10</mn><mn id="mz-1">2</mn></msup><mo>)</mo></mrow></math>
+ln\left(\frac{1}{2}\right)	ln(frac{1}{2})	["1","2","/","ln"]	\ln\left(\frac{1}{2}\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><mfrac id="mz-2"><mn id="mz-0">1</mn><mn id="mz-1">2</mn></mfrac><mo>)</mo></mrow></math>
+math.log(4,2)	log_{2}(4)	["2","4","log"]	\log_{2}\left(4\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">2</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow></math>
+math.log(4+8,2+2)	log_{2+2}(4+8)	["2","2","+","4","8","+","log"]	\log_{2 + 2}\left(4 + 8\right)	<math><mrow id="mz-6"><msub><mi>log</mi><mrow id="mz-2"><mn id="mz-0">2</mn><mo>+</mo><mn id="mz-1">2</mn></mrow></msub><mo>(</mo><mrow id="mz-5"><mn id="mz-3">4</mn><mo>+</mo><mn id="mz-4">8</mn></mrow><mo>)</mo></mrow></math>
+math.log2(4)	log_{2}(4)	["2","4","log"]	\log_{2}\left(4\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">2</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow></math>
+math.log10(5)	log_{10}(5)	["10","5","log"]	\log_{10}\left(5\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">10</mn></msub><mo>(</mo><mn id="mz-1">5</mn><mo>)</mo></mrow></math>
+\ln 5	log_{e}5	["5","ln"]	\ln\left(5\right)	<math><mrow id="mz-1"><mi>ln</mi><mo>(</mo><mn id="mz-0">5</mn><mo>)</mo></mrow></math>
+\ln(5)	log_{e}(5)	["5","ln"]	\ln\left(5\right)	<math><mrow id="mz-1"><mi>ln</mi><mo>(</mo><mn id="mz-0">5</mn><mo>)</mo></mrow></math>
+\ln 6+8	log_{e}6+8	["6","ln","8","+"]	\ln\left(6\right) + 8	<math><mrow id="mz-3"><mrow id="mz-1"><mi>ln</mi><mo>(</mo><mn id="mz-0">6</mn><mo>)</mo></mrow><mo>+</mo><mn id="mz-2">8</mn></mrow></math>
+\ln(6+8)	log_{e}(6+8)	["6","8","+","ln"]	\ln\left(6 + 8\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">6</mn><mo>+</mo><mn id="mz-1">8</mn></mrow><mo>)</mo></mrow></math>
+\log_2 4	log_{2}4	["2","4","log"]	\log_{2}\left(4\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">2</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow></math>
+\log_{2} 4+3	log_{2}4+3	["2","4","log","3","+"]	\log_{2}\left(4\right) + 3	<math><mrow id="mz-4"><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">2</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow><mo>+</mo><mn id="mz-3">3</mn></mrow></math>
+\log_{3} \left(5+3\right)	log_{3}(5+3)	["3","5","3","+","log"]	\log_{3}\left(5 + 3\right)	<math><mrow id="mz-4"><msub><mi>log</mi><mn id="mz-0">3</mn></msub><mo>(</mo><mrow id="mz-3"><mn id="mz-1">5</mn><mo>+</mo><mn id="mz-2">3</mn></mrow><mo>)</mo></mrow></math>
+5Math.pow(2,3)	5pow(2,3)	["5","2","3","^","*"]	5 \cdot 2^3	<math><mrow id="mz-4"><mn id="mz-0">5</mn><mo>⋅</mo><msup id="mz-3"><mn id="mz-1">2</mn><mn id="mz-2">3</mn></msup></mrow></math>
+4*2**3*5	4*2^3*5	["4","2","3","^","*","5","*"]	4 \cdot 2^3 \cdot 5	<math><mrow id="mz-6"><mrow id="mz-4"><mn id="mz-0">4</mn><mo>⋅</mo><msup id="mz-3"><mn id="mz-1">2</mn><mn id="mz-2">3</mn></msup></mrow><mo>⋅</mo><mn id="mz-5">5</mn></mrow></math>
+2^3	2^{3}	["2","3","^"]	2^3	<math><msup id="mz-2"><mn id="mz-0">2</mn><mn id="mz-1">3</mn></msup></math>
+2^31	2^{31}	["2","31","^"]	2^{31}	<math><msup id="mz-2"><mn id="mz-0">2</mn><mn id="mz-1">31</mn></msup></math>
+2^{31}	2^{31}	["2","31","^"]	2^{31}	<math><msup id="mz-2"><mn id="mz-0">2</mn><mn id="mz-1">31</mn></msup></math>
+2x^2	2x^{2}	["2","x","2","^","*"]	2x^2	<math><mrow id="mz-4"><mn id="mz-0">2</mn><mo>⁢</mo><msup id="mz-3"><mi id="mz-1">x</mi><mn id="mz-2">2</mn></msup></mrow></math>
+2**4+3	2^4+3	["2","4","^","3","+"]	2^4 + 3	<math><mrow id="mz-4"><msup id="mz-2"><mn id="mz-0">2</mn><mn id="mz-1">4</mn></msup><mo>+</mo><mn id="mz-3">3</mn></mrow></math>
+5math.pow(2^3,4^5)	5pow(2^{3},4^{5})	["5","2","3","^","4","5","^","^","*"]	5 \cdot \left(2^3\right)^{4^5}	<math><mrow><mn>5</mn><mo>⋅</mo><msup><mrow><mo>(</mo><msup><mn>2</mn><mn>3</mn></msup><mo>)</mo></mrow><msup><mn>4</mn><mn>5</mn></msup></msup></mrow></math>
+5math.exp(1+2)	5(e)^(1+2)	["5","e","1","2","+","^","*"]	5e^{1 + 2}	<math><mrow><mn>5</mn><mo>⁢</mo><msup><mi>e</mi><mrow><mn>1</mn><mo>+</mo><mn>2</mn></mrow></msup></mrow></math>
+5Math.exp(6-2)	5(e)^(6-2)	["5","e","6","2","-","^","*"]	5e^{6 - 2}	<math><mrow><mn>5</mn><mo>⁢</mo><msup><mi>e</mi><mrow><mn>6</mn><mo>−</mo><mn>2</mn></mrow></msup></mrow></math>
+5Math.expm1(5-2)	5expm1(5-2)	["5","5","2","-","expm1","*"]	5\left(e^{5 - 2}-1\right)	<math><mrow><mn>5</mn><mo>⁢</mo><mrow><mo>(</mo><msup><mi>e</mi><mrow><mrow><mn>5</mn><mo>−</mo><mn>2</mn></mrow></mrow></msup><mo>−</mo><mn>1</mn><mo>)</mo></mrow></mrow></math>
+5math.expm1(5-2)	5expm1(5-2)	["5","5","2","-","expm1","*"]	5\left(e^{5 - 2}-1\right)	<math><mrow><mn>5</mn><mo>⁢</mo><mrow><mo>(</mo><msup><mi>e</mi><mrow><mrow><mn>5</mn><mo>−</mo><mn>2</mn></mrow></mrow></msup><mo>−</mo><mn>1</mn><mo>)</mo></mrow></mrow></math>
+5math.exp2(3)	5(2)^(3)	["5","2","3","^","*"]	5 \cdot 2^3	<math><mrow><mn>5</mn><mo>⋅</mo><msup><mn>2</mn><mn>3</mn></msup></mrow></math>
+5pow(2,3)	5pow(2,3)	["5","2","3","^","*"]	5 \cdot 2^3	<math><mrow><mn>5</mn><mo>⋅</mo><msup><mn>2</mn><mn>3</mn></msup></mrow></math>
+5*.3^2	5*.3^{2}	["5",".3","2","^","*"]	5 \cdot .3^2	<math><mrow id="mz-4"><mn id="mz-0">5</mn><mo>⋅</mo><msup id="mz-3"><mn id="mz-1">.3</mn><mn id="mz-2">2</mn></msup></mrow></math>
+5*-4^3	5*-4^{3}	["5","4","3","^","neg","*"]	5 \cdot -4^3	<math><mrow><mn>5</mn><mo>⋅</mo><mrow><mo>−</mo><msup><mn>4</mn><mn>3</mn></msup></mrow></mrow></math>
+sin(3+1)	sin(3+1)	["3","1","+","sin"]	\sin\left(3 + 1\right)	<math><mrow id="mz-3"><mi>sin</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">3</mn><mo>+</mo><mn id="mz-1">1</mn></mrow><mo>)</mo></mrow></math>
+cos(3)+1	cos(3)+1	["3","cos","1","+"]	\cos\left(3\right) + 1	<math><mrow id="mz-3"><mrow id="mz-1"><mi>cos</mi><mo>(</mo><mn id="mz-0">3</mn><mo>)</mo></mrow><mo>+</mo><mn id="mz-2">1</mn></mrow></math>
+tan pi +4	tan pi+4	["pi","tan","4","+"]	\tan\left(\pi\right) + 4	<math><mrow id="mz-3"><mrow id="mz-1"><mi>tan</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow><mo>+</mo><mn id="mz-2">4</mn></mrow></math>
+cot(pi+4)	cot(pi+4)	["pi","4","+","cot"]	\cot\left(\pi + 4\right)	<math><mrow id="mz-3"><mi>cot</mi><mo>(</mo><mrow id="mz-2"><mi id="mz-0">π</mi><mo>+</mo><mn id="mz-1">4</mn></mrow><mo>)</mo></mrow></math>
+\csc pi + tau	csc pi+tau	["pi","csc","tau","+"]	\csc\left(\pi\right) + \tau	<math><mrow><mrow><mi>csc</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow><mo>+</mo><mi>τ</mi></mrow></math>
+Math.sin(pi)	sin(pi)	["pi","sin"]	\sin\left(\pi\right)	<math><mrow id="mz-1"><mi>sin</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow></math>
+Math.cos(pi)	cos(pi)	["pi","cos"]	\cos\left(\pi\right)	<math><mrow id="mz-1"><mi>cos</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow></math>
+Math.tan(pi)	tan(pi)	["pi","tan"]	\tan\left(\pi\right)	<math><mrow id="mz-1"><mi>tan</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow></math>
+Math.sec(pi)	sec(pi)	["pi","sec"]	\sec\left(\pi\right)	<math><mrow id="mz-1"><mi>sec</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow></math>
+Math.csc(pi)	csc(pi)	["pi","csc"]	\csc\left(\pi\right)	<math><mrow><mi>csc</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.cot(pi)	cot(pi)	["pi","cot"]	\cot\left(\pi\right)	<math><mrow><mi>cot</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.sinh(pi)	sinh(pi)	["pi","sinh"]	\sinh\left(\pi\right)	<math><mrow><mi>sinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.cosh(pi)	cosh(pi)	["pi","cosh"]	\cosh\left(\pi\right)	<math><mrow><mi>cosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.tanh(pi)	tanh(pi)	["pi","tanh"]	\tanh\left(\pi\right)	<math><mrow><mi>tanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.asin(pi)	arcsin(pi)	["pi","arcsin"]	\arcsin\left(\pi\right)	<math><mrow><mi>arcsin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.acos(pi)	arccos(pi)	["pi","arccos"]	\arccos\left(\pi\right)	<math><mrow><mi>arccos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.atan(pi)	arctan(pi)	["pi","arctan"]	\arctan\left(\pi\right)	<math><mrow><mi>arctan</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.atan2(x,y)	atan2(x,y)	["x","y","atan2"]	\text{atan2}\left(x, y\right)	<math><mrow><mi>atan2</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>y</mi><mo>)</mo></mrow></math>
+Math.asinh(pi)	arcsinh(pi)	["pi","arcsinh"]	\sinh^{-1}\left(\pi\right)	<math><mrow><mi>arcsinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.acosh(pi)	arccosh(pi)	["pi","arccosh"]	\cosh^{-1}\left(\pi\right)	<math><mrow><mi>arccosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+Math.atanh(pi)	arctanh(pi)	["pi","arctanh"]	\tanh^{-1}\left(\pi\right)	<math><mrow><mi>arctanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.sin(pi)	sin(pi)	["pi","sin"]	\sin\left(\pi\right)	<math><mrow id="mz-1"><mi>sin</mi><mo>(</mo><mi id="mz-0">π</mi><mo>)</mo></mrow></math>
+math.cos(pi)	cos(pi)	["pi","cos"]	\cos\left(\pi\right)	<math><mrow><mi>cos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.tan(pi)	tan(pi)	["pi","tan"]	\tan\left(\pi\right)	<math><mrow><mi>tan</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.sec(pi)	sec(pi)	["pi","sec"]	\sec\left(\pi\right)	<math><mrow><mi>sec</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.csc(pi)	csc(pi)	["pi","csc"]	\csc\left(\pi\right)	<math><mrow><mi>csc</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.cot(pi)	cot(pi)	["pi","cot"]	\cot\left(\pi\right)	<math><mrow><mi>cot</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.sinh(pi)	sinh(pi)	["pi","sinh"]	\sinh\left(\pi\right)	<math><mrow><mi>sinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.cosh(pi)	cosh(pi)	["pi","cosh"]	\cosh\left(\pi\right)	<math><mrow><mi>cosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.tanh(pi)	tanh(pi)	["pi","tanh"]	\tanh\left(\pi\right)	<math><mrow><mi>tanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.asin(pi)	arcsin(pi)	["pi","arcsin"]	\arcsin\left(\pi\right)	<math><mrow><mi>arcsin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.acos(pi)	arccos(pi)	["pi","arccos"]	\arccos\left(\pi\right)	<math><mrow><mi>arccos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.atan(pi)	arctan(pi)	["pi","arctan"]	\arctan\left(\pi\right)	<math><mrow><mi>arctan</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.atan2(x,y)	atan2(x,y)	["x","y","atan2"]	\text{atan2}\left(x, y\right)	<math><mrow><mi>atan2</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>y</mi><mo>)</mo></mrow></math>
+math.asinh(pi)	arcsinh(pi)	["pi","arcsinh"]	\sinh^{-1}\left(\pi\right)	<math><mrow><mi>arcsinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.acosh(pi)	arccosh(pi)	["pi","arccosh"]	\cosh^{-1}\left(\pi\right)	<math><mrow><mi>arccosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+math.atanh(pi)	arctanh(pi)	["pi","arctanh"]	\tanh^{-1}\left(\pi\right)	<math><mrow><mi>arctanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\sin(pi)	sin(pi)	["pi","sin"]	\sin\left(\pi\right)	<math><mrow><mi>sin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\cos(pi)	cos(pi)	["pi","cos"]	\cos\left(\pi\right)	<math><mrow><mi>cos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\tan(pi)	tan(pi)	["pi","tan"]	\tan\left(\pi\right)	<math><mrow><mi>tan</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\sec(pi)	sec(pi)	["pi","sec"]	\sec\left(\pi\right)	<math><mrow><mi>sec</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\csc(pi)	csc(pi)	["pi","csc"]	\csc\left(\pi\right)	<math><mrow><mi>csc</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\cot(pi)	cot(pi)	["pi","cot"]	\cot\left(\pi\right)	<math><mrow><mi>cot</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\sinh(pi)	sinh(pi)	["pi","sinh"]	\sinh\left(\pi\right)	<math><mrow><mi>sinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\cosh(pi)	cosh(pi)	["pi","cosh"]	\cosh\left(\pi\right)	<math><mrow><mi>cosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\tanh(pi)	tanh(pi)	["pi","tanh"]	\tanh\left(\pi\right)	<math><mrow><mi>tanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\asin(pi)	arcsin(pi)	["pi","arcsin"]	\arcsin\left(\pi\right)	<math><mrow><mi>arcsin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\acos(pi)	arccos(pi)	["pi","arccos"]	\arccos\left(\pi\right)	<math><mrow><mi>arccos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\atan(pi)	arctan(pi)	["pi","arctan"]	\arctan\left(\pi\right)	<math><mrow><mi>arctan</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\atan2(x,y)	atan2(x,y)	["x","y","atan2"]	\text{atan2}\left(x, y\right)	<math><mrow><mi>atan2</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>y</mi><mo>)</mo></mrow></math>
+\asinh(pi)	arcsinh(pi)	["pi","arcsinh"]	\sinh^{-1}\left(\pi\right)	<math><mrow><mi>arcsinh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\acosh(pi)	arccosh(pi)	["pi","arccosh"]	\cosh^{-1}\left(\pi\right)	<math><mrow><mi>arccosh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+\atanh(pi)	arctanh(pi)	["pi","arctanh"]	\tanh^{-1}\left(\pi\right)	<math><mrow><mi>arctanh</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow></math>
+sin^2(pi)	sin^{2}(pi)	["pi","sin","2","^"]	\sin\left(\pi\right)^2	<math><msup><mrow><mi>sin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow><mn>2</mn></msup></math>
+cos(pi)^2	cos(pi)^{2}	["pi","cos","2","^"]	\cos\left(\pi\right)^2	<math><msup><mrow><mi>cos</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow><mn>2</mn></msup></math>
+\sin^2{pi}	sin^{2}{pi}	["pi","sin","2","^"]	\sin\left(\pi\right)^2	<math><msup><mrow><mi>sin</mi><mo>(</mo><mi>π</mi><mo>)</mo></mrow><mn>2</mn></msup></math>
+!(true||false)	!(true||false)	["true","false","|","\\not"]	\neg \left(\mathrm{true} \lor \mathrm{false}\right)	<math><mrow><mo>¬</mo><mrow><mo>(</mo><mrow><mi>true</mi><mo>∨</mo><mi>false</mi></mrow><mo>)</mo></mrow></mrow></math>
+Infinity + NaN	∞+NaN	["∞","NaN","+"]
+--x	--x	["x","neg","neg"]	-\left(-x\right)
+x++y	x++y	["x","y","+"]	x + y	<math><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow></math>
+x+-y	x+-y	["x","y","neg","+"]
+z² = z*z	z^2=z*z	["z","2","^","z","z","*","="]	z^2 = zz	<math><mrow><msup><mi>z</mi><mn>2</mn></msup><mo>=</mo><mrow><mi>z</mi><mo>⁢</mo><mi>z</mi></mrow></mrow></math>
+3 ⋅ 4	3*4	["3","4","*"]	3 \cdot 4	<math><mrow><mn>3</mn><mo>⋅</mo><mn>4</mn></mrow></math>
+⅓ + ¼	(1/3)+(1/4)	["1","3","/","1","4","/","+"]	\frac{1}{3} + \frac{1}{4}	<math><mrow><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>+</mo><mfrac><mn>1</mn><mn>4</mn></mfrac></mrow></math>
+true ⊕ FALSE	true \xor false	["true","false","\\xor"]	\mathrm{true} \oplus \mathrm{false}	<math><mrow><mi>true</mi><mo>⊕</mo><mi>false</mi></mrow></math>
+round(|x!|)	round(|x!|)	["x","!","abs","0","round"]	\text{round}\left(\left|x!\right|, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mrow><mo>|</mo><mrow><mi>x</mi><mo>!</mo></mrow><mo>|</mo></mrow><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>
+-2^2	-2^{2}	["2","2","^","neg"]	-2^2	<math><mrow><mo>−</mo><msup><mn>2</mn><mn>2</mn></msup></mrow></math>
+-2 mod -3	-2 mod -3	["-2","-3","mod"]	-2 \bmod -3	<math><mrow><mn>-2</mn><mo>mod</mo><mn>-3</mn></mrow></math>
+x_-2	x_{-2}	["x","-2","_"]	x_{-2}	<math><msub><mi>x</mi><mn>-2</mn></msub></math>
+log(-2)	log_{e}(-2)	["-2","ln"]	\ln\left(-2\right)	<math><mrow><mi>ln</mi><mo>(</mo><mn>-2</mn><mo>)</mo></mrow></math>
+log -2	log-2	["-2","ln"]	\ln\left(-2\right)	<math><mrow><mi>ln</mi><mo>(</mo><mn>-2</mn><mo>)</mo></mrow></math>	Math.log(-2)	NaN
+round(-2)	round(-2)	["-2","0","round"]	\text{round}\left(-2, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>-2</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>
+abs(-2)	abs(-2)	["-2","abs"]	\left|-2\right|	<math><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></math>
+|-2|	|-2|	["-2","abs"]	\left|-2\right|	<math><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></math>
+-|-2|	-|-2|	["-2","abs","neg"]	-\left|-2\right|	<math><mrow><mo>−</mo><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></mrow></math>
+-round(3.3)	-round(3.3)	["3.3","0","round","neg"]	-\text{round}\left(3.3, 0\right)	<math><mrow><mo>−</mo><mrow><mi>round</mi><mo>(</mo><mn>3.3</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></mrow></math>
+-3*5	-3*5	["-3","5","*"]	-3 \cdot 5	<math><mrow><mn>-3</mn><mo>⋅</mo><mn>5</mn></mrow></math>
+-3*-5	-3*-5	["-3","-5","*"]	-3 \cdot -5	<math><mrow><mn>-3</mn><mo>⋅</mo><mn>-5</mn></mrow></math>
+-3+-5	-3+-5	["-3","-5","+"]	-3 + -5	<math><mrow><mn>-3</mn><mo>+</mo><mn>-5</mn></mrow></math>
+-3!	-3!	["3","!","neg"]	-3!	<math><mrow><mo>−</mo><mrow><mn>3</mn><mo>!</mo></mrow></mrow></math>
+!-3	!-3	["-3","\\not"]	\neg -3	<math><mrow><mo>¬</mo><mn>-3</mn></mrow></math>
+!|-3|	!|-3|	["-3","abs","\\not"]	\neg \left|-3\right|	<math><mrow><mo>¬</mo><mrow><mo>|</mo><mn>-3</mn><mo>|</mo></mrow></mrow></math>
+7 \lor 8 \land 9	7∨8&9	["7","8","9","&","|"]	7 \lor 8 \land 9	<math><mrow id="mz-4"><mn id="mz-0">7</mn><mo>∨</mo><mrow id="mz-3"><mn id="mz-1">8</mn><mo>∧</mo><mn id="mz-2">9</mn></mrow></mrow></math>
+7 < 8 > 9	7<8>9	["7","8","<","9",">"]	7 < 8 > 9	<math><mrow id="mz-4"><mrow id="mz-2"><mn id="mz-0">7</mn><mo>&lt;</mo><mn id="mz-1">8</mn></mrow><mo>&gt;</mo><mn id="mz-3">9</mn></mrow></math>
+7 < (8 > 9)	7<(8>9)	["7","8","9",">","<"]	7 < \left(8 > 9\right)	<math><mrow id="mz-4"><mn id="mz-0">7</mn><mo>&lt;</mo><mrow><mo>(</mo><mrow id="mz-3"><mn id="mz-1">8</mn><mo>&gt;</mo><mn id="mz-2">9</mn></mrow><mo>)</mo></mrow></mrow></math>
+x \in \left[1,2\right]	x∈[1,2]	["x","1","2","2","[]","∈"]	x \in [1, 2]	<math><mrow id="mz-5"><mi id="mz-0">x</mi><mo>∈</mo><mrow id="mz-4"><mo>[</mo><mn id="mz-1">1</mn><mo>,</mo><mn id="mz-2">2</mn><mo>]</mo></mrow></mrow></math>
+5 \bmod 3	5 mod 3	["5","3","mod"]	5 \bmod 3	<math><mrow id="mz-2"><mn id="mz-0">5</mn><mo>mod</mo><mn id="mz-1">3</mn></mrow></math>
+sin(x) mod cos(x)	sin(x) mod cos(x)	["x","sin","x","cos","mod"]	\sin\left(x\right) \bmod \cos\left(x\right)	<math><mrow><mrow><mi>sin</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mo>mod</mo><mrow><mi>cos</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow></math>
+sec(x) mod 4	sec(x) mod 4	["x","sec","4","mod"]	\sec\left(x\right) \bmod 4	<math><mrow><mrow><mi>sec</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mo>mod</mo><mn>4</mn></mrow></math>
+5 mod x	5 mod x	["5","x","mod"]	5 \bmod x	<math><mrow id="mz-2"><mn id="mz-0">5</mn><mo>mod</mo><mi id="mz-1">x</mi></mrow></math>
+3 mod tan(x)	3 mod tan(x)	["3","x","tan","mod"]	3 \bmod \tan\left(x\right)	<math><mrow><mn>3</mn><mo>mod</mo><mrow><mi>tan</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow></math>
+3 mod tan(x) + 4	3 mod tan(x)+4	["3","x","tan","mod","4","+"]	3 \bmod \tan\left(x\right) + 4	<math><mrow><mrow><mn>3</mn><mo>mod</mo><mrow><mi>tan</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow><mo>+</mo><mn>4</mn></mrow></math>
+(3 mod tan(x)) + 4	(3 mod tan(x))+4	["3","x","tan","mod","4","+"]	3 \bmod \tan\left(x\right) + 4	<math><mrow><mrow><mn>3</mn><mo>mod</mo><mrow><mi>tan</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow><mo>+</mo><mn>4</mn></mrow></math>
+3 mod (tan(x) + 4)	3 mod (tan(x)+4)	["3","x","tan","4","+","mod"]	3 \bmod \left(\tan\left(x\right) + 4\right)	<math><mrow><mn>3</mn><mo>mod</mo><mrow><mo>(</mo><mrow><mrow><mi>tan</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mo>+</mo><mn>4</mn></mrow><mo>)</mo></mrow></mrow></math>
+3!!	3!!	["3","!","!"]	\left(3!\right)!	<math><mrow><mrow><mo>(</mo><mrow><mn>3</mn><mo>!</mo></mrow><mo>)</mo></mrow><mo>!</mo></mrow></math>
+!!x	!!x	["x","\\not","\\not"]	\neg \neg x	<math><mrow><mo>¬</mo><mrow><mo>¬</mo><mi>x</mi></mrow></mrow></math>
+5!!&!!y	5!!&!!y	["5","!","!","y","\\not","\\not","&"]	\left(5!\right)! \land \neg \neg y	<math><mrow><mrow><mrow><mo>(</mo><mrow><mn>5</mn><mo>!</mo></mrow><mo>)</mo></mrow><mo>!</mo></mrow><mo>∧</mo><mrow><mo>¬</mo><mrow><mo>¬</mo><mi>y</mi></mrow></mrow></mrow></math>
+!6!	!6!	["6","!","\\not"]	\neg 6!	<math><mrow id="mz-2"><mo>¬</mo><mrow id="mz-1"><mn id="mz-0">6</mn><mo>!</mo></mrow></mrow></math>
+|!7|	|!7|	["7","\\not","abs"]	\left|\neg 7\right|	<math><mrow id="mz-2"><mo>|</mo><mrow id="mz-1"><mo>¬</mo><mn id="mz-0">7</mn></mrow><mo>|</mo></mrow></math>
+\asin(1)	arcsin(1)	["1","arcsin"]	\arcsin\left(1\right)	<math><mrow><mi>arcsin</mi><mo>(</mo><mn>1</mn><mo>)</mo></mrow></math>
+|2|&|8|	|2|&|8|	["2","abs","8","abs","&"]	\left|2\right| \land \left|8\right|	<math><mrow id="mz-4"><mrow id="mz-1"><mo>|</mo><mn id="mz-0">2</mn><mo>|</mo></mrow><mo>∧</mo><mrow id="mz-3"><mo>|</mo><mn id="mz-2">8</mn><mo>|</mo></mrow></mrow></math>
+|3||true	|3||true	["3","abs","true","|"]	\left|3\right| \lor \mathrm{true}	<math><mrow id="mz-3"><mrow id="mz-1"><mo>|</mo><mn id="mz-0">3</mn><mo>|</mo></mrow><mo>∨</mo><mi id="mz-2">true</mi></mrow></math>
+true||6|	true||6|	["true","6","abs","|"]	\mathrm{true} \lor \left|6\right|	<math><mrow id="mz-3"><mi id="mz-0">true</mi><mo>∨</mo><mrow id="mz-2"><mo>|</mo><mn id="mz-1">6</mn><mo>|</mo></mrow></mrow></math>
+|4|||5|	|4|||5|	["4","abs","5","abs","|"]	\left|4\right| \lor \left|5\right|	<math><mrow id="mz-4"><mrow id="mz-1"><mo>|</mo><mn id="mz-0">4</mn><mo>|</mo></mrow><mo>∨</mo><mrow id="mz-3"><mo>|</mo><mn id="mz-2">5</mn><mo>|</mo></mrow></mrow></math>
+z \in ((x in y) in x)	z∈((x∈y)∈x)	["z","x","y","∈","x","∈","∈"]	z \in \left(x \in y \in x\right)	<math><mrow><mi>z</mi><mo>∈</mo><mrow><mo>(</mo><mrow><mrow><mi>x</mi><mo>∈</mo><mi>y</mi></mrow><mo>∈</mo><mi>x</mi></mrow><mo>)</mo></mrow></mrow></math>
+\sqrt[x in (0,5] ? 3 : 2]{x}	sqrt{x∈(0,5]?(3)?:2,x}	["x","0","5","2","(]","∈","3","2","?:","x","root"]	\sqrt[\begin{cases}3 & \text{if } x \in (0, 5] \\ 2 & \text{otherwise} \end{cases}]{x}	<math><mroot><mi>x</mi><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>3</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mi>x</mi><mo>∈</mo><mrow><mo>(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></mrow></mtd></mtr><mtr><mtd><mn>2</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mroot></math>
+\left(x \downarrow y ∈ \left(x, \sinh\left(x\right)\right) \right) \downarrow x \bmod y 	(x \nor y∈(x,sinh(x))) \nor x mod y	["x","y","x","x","sinh","2","()","∈","\\nor","x","y","mod","\\nor"]
+\infty \cdot \left|\cos^{-1}\left(x \cdot y\right) \lor \tanh\left(x\right)\right| 	∞*|arccos(x* y)∨tanh(x)|	["∞","x","y","*","arccos","x","tanh","|","abs","*"]
+der(3x^12,x)=der(3x^12)=ddx(3x^12)=36x^11\neqddy(3x^12)	der(3x^{12},x)=der(3x^{12})=der(3x^{12},x)=36x^{11}≠der(3x^{12},y)	["3","x","12","^","*","x","der","3","x","12","^","*","x","der","=","3","x","12","^","*","x","der","=","36","x","11","^","*","=","3","x","12","^","*","y","der","≠"]	\frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = 36x^{11} \neq \frac{\mathrm{d}}{\mathrm{d}y}\left[3x^{12}\right]	<math><mrow><mrow><mrow><mrow><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mn>36</mn><mo>⁢</mo><msup><mi>x</mi><mn>11</mn></msup></mrow></mrow><mo>≠</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>y</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow></math>
+dd\alpha(\alpha)=7	der(α,α)=7	["α","α","der","7","="]	\frac{\mathrm{d}\alpha}{\mathrm{d}\alpha} = 7	<math><mrow><mfrac><mrow><mi>d</mi><mi>α</mi></mrow><mrow><mi>d</mi><mi>α</mi></mrow></mfrac><mo>=</mo><mn>7</mn></mrow></math>
+dd\delta(\delta)=7	der(δ,δ)=7	["δ","δ","der","7","="]	\frac{\mathrm{d}\delta}{\mathrm{d}\delta} = 7	<math><mrow><mfrac><mrow><mi>d</mi><mi>δ</mi></mrow><mrow><mi>d</mi><mi>δ</mi></mrow></mfrac><mo>=</mo><mn>7</mn></mrow></math>
+dd+(x^2)=7	dd+(x^{2})=7	["d","d","*","x","2","^","+","7","="]	dd + x^2 = 7	<math><mrow><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>d</mi></mrow><mo>+</mo><msup><mi>x</mi><mn>2</mn></msup></mrow><mo>=</mo><mn>7</mn></mrow></math>
+der(3x,x)=der(3x)\neqder(3y^12,y)\neqder(3x^12)	der(3x,x)=der(3x)≠der(3y^{12},y)≠der(3x^{12})	["3","x","*","x","der","3","x","*","x","der","=","3","y","12","^","*","y","der","≠","3","x","12","^","*","x","der","≠"]	\frac{\mathrm{d}}{\mathrm{d}x}\left[3x\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x\right] \neq \frac{\mathrm{d}}{\mathrm{d}y}\left[3y^{12}\right] \neq \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right]	<math><mrow><mrow><mrow><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><mi>x</mi></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><mi>x</mi></mrow><mo>]</mo></mrow></mrow></mrow><mo>≠</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>y</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>y</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>≠</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow></math>
+2+2={{2+2}}	2+2=4	["2","2","+","4","="]	2 + 2 = 4	<math><mrow id="mz-4"><mrow id="mz-2"><mn id="mz-0">2</mn><mo>+</mo><mn id="mz-1">2</mn></mrow><mo>=</mo><mn id="mz-3">4</mn></mrow></math>
+{{10/2}} + {{3*3}} = {{10/2 + 3*3}}	5+9=14	["5","9","+","14","="]	5 + 9 = 14	<math><mrow id="mz-4"><mrow id="mz-2"><mn id="mz-0">5</mn><mo>+</mo><mn id="mz-1">9</mn></mrow><mo>=</mo><mn id="mz-3">14</mn></mrow></math>
+\frac{\mathrm{d}}{\mathrm{d}x}[x^2+1]	der([x^{2}+1],x)	["x","2","^","1","+","x","der"]	\frac{\mathrm{d}}{\mathrm{d}x}\left[x^2 + 1\right]	<math><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>+</mo><mn>1</mn></mrow><mo>]</mo></mrow></mrow></math>
+7 choose 3 = 7 comb 3 = comb(7,3) != 7 perm 3 = \perm(7,3)	7\comb3=7\comb3=comb(7,3)≠7\perm3=\perm(7,3)	["7","3","comb","7","3","comb","=","7","3","comb","=","7","3","perm","≠","7","3","perm","="]	\binom{7}{3} = \binom{7}{3} = \binom{7}{3} \neq {}^{7}\mathrm{P}_{3} = {}^{7}\mathrm{P}_{3}	<math><mrow id="mz-18"><mrow id="mz-14"><mrow id="mz-10"><mrow id="mz-6"><mrow id="mz-2"><mo>(</mo><mfrac linethickness="0"><mn id="mz-0">7</mn><mn id="mz-1">3</mn></mfrac><mo>)</mo></mrow><mo>=</mo><mrow id="mz-5"><mo>(</mo><mfrac linethickness="0"><mn id="mz-3">7</mn><mn id="mz-4">3</mn></mfrac><mo>)</mo></mrow></mrow><mo>=</mo><mrow id="mz-9"><mo>(</mo><mfrac linethickness="0"><mn id="mz-7">7</mn><mn id="mz-8">3</mn></mfrac><mo>)</mo></mrow></mrow><mo>≠</mo><mmultiscripts id="mz-13"><mi>P</mi><mn id="mz-12">3</mn><none/><mprescripts/><none/><mn id="mz-11">7</mn></mmultiscripts></mrow><mo>=</mo><mmultiscripts id="mz-17"><mi>P</mi><mn id="mz-16">3</mn><none/><mprescripts/><none/><mn id="mz-15">7</mn></mmultiscripts></mrow></math>
+round(7.23,2)	round(7.23,2)	["7.23","2","round"]	\text{round}\left(7.23, 2\right)	<math><mrow id="mz-2"><mi>round</mi><mo>(</mo><mn id="mz-0">7.23</mn><mo>,</mo><mn id="mz-1">2</mn><mo>)</mo></mrow></math>
+round(7.23)	round(7.23)	["7.23","0","round"]	\text{round}\left(7.23, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>7.23</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>
+log 7	log7	["7","ln"]	\ln\left(7\right)	<math><mrow id="mz-1"><mi>ln</mi><mo>(</mo><mn id="mz-0">7</mn><mo>)</mo></mrow></math>
+\log 7	log_{e}7	["7","ln"]	\ln\left(7\right)	<math><mrow id="mz-1"><mi>ln</mi><mo>(</mo><mn id="mz-0">7</mn><mo>)</mo></mrow></math>
+log 7+3	log7+3	["7","ln","3","+"]	\ln\left(7\right) + 3	<math><mrow><mrow><mi>ln</mi><mo>(</mo><mn>7</mn><mo>)</mo></mrow><mo>+</mo><mn>3</mn></mrow></math>
+log 7!	log7!	["7","!","ln"]	\ln\left(7!\right)	<math><mrow><mi>ln</mi><mo>(</mo><mrow><mn>7</mn><mo>!</mo></mrow><mo>)</mo></mrow></math>
+(6+5)!	(6+5)!	["6","5","+","!"]	\left(6 + 5\right)!	<math><mrow><mrow><mo>(</mo><mrow><mn>6</mn><mo>+</mo><mn>5</mn></mrow><mo>)</mo></mrow><mo>!</mo></mrow></math>
+5!!&&!!y	5!!&!!y	["5","!","!","y","\\not","\\not","&"]	\left(5!\right)! \land \neg \neg y	<math><mrow><mrow><mrow><mo>(</mo><mrow><mn>5</mn><mo>!</mo></mrow><mo>)</mo></mrow><mo>!</mo></mrow><mo>∧</mo><mrow><mo>¬</mo><mrow><mo>¬</mo><mi>y</mi></mrow></mrow></mrow></math>
+!!-5	!!-5	["-5","\\not","\\not"]	\neg \neg -5	<math><mrow><mo>¬</mo><mrow><mo>¬</mo><mn>-5</mn></mrow></mrow></math>
+!!+5	!!+5	["5","\\not","\\not"]	\neg \neg 5	<math><mrow id="mz-2"><mo>¬</mo><mrow id="mz-1"><mo>¬</mo><mn id="mz-0">5</mn></mrow></mrow></math>
+!+5	!+5	["5","\\not"]	\neg 5	<math><mrow id="mz-1"><mo>¬</mo><mn id="mz-0">5</mn></mrow></math>
+6!+5	6!+5	["6","!","5","+"]	6! + 5	<math><mrow id="mz-3"><mrow id="mz-1"><mn id="mz-0">6</mn><mo>!</mo></mrow><mo>+</mo><mn id="mz-2">5</mn></mrow></math>
+max(1,2,3)!	max(1,2,3)!	["1","2","3","3","max","!"]	\max\left(1, 2, 3\right)!	<math><mrow id="mz-5"><mrow id="mz-4"><mi>max</mi><mo>(</mo><mn id="mz-0">1</mn><mo>,</mo><mn id="mz-1">2</mn><mo>,</mo><mn id="mz-2">3</mn><mo>)</mo></mrow><mo>!</mo></mrow></math>
+max(3!,4,5)	max(3!,4,5)	["3","!","4","5","3","max"]	\max\left(3!, 4, 5\right)	<math><mrow id="mz-5"><mi>max</mi><mo>(</mo><mrow id="mz-1"><mn id="mz-0">3</mn><mo>!</mo></mrow><mo>,</mo><mn id="mz-2">4</mn><mo>,</mo><mn id="mz-3">5</mn><mo>)</mo></mrow></math>
+6!	6!	["6","!"]	6!	<math><mrow id="mz-1"><mn id="mz-0">6</mn><mo>!</mo></mrow></math>
+6! != 5!+6	6!_≠5!+6	["6","!","5","!","6","+","≠"]	6! \neq 5! + 6	<math><mrow id="mz-6"><mrow id="mz-1"><mn id="mz-0">6</mn><mo>!</mo></mrow><mo>≠</mo><mrow id="mz-5"><mrow id="mz-3"><mn id="mz-2">5</mn><mo>!</mo></mrow><mo>+</mo><mn id="mz-4">6</mn></mrow></mrow></math>
+6!-5! = 600	6!-5!_=600	["6","!","5","!","-","600","="]	6! - 5! = 600	<math><mrow id="mz-6"><mrow id="mz-4"><mrow id="mz-1"><mn id="mz-0">6</mn><mo>!</mo></mrow><mo>−</mo><mrow id="mz-3"><mn id="mz-2">5</mn><mo>!</mo></mrow></mrow><mo>=</mo><mn id="mz-5">600</mn></mrow></math>
+3!=6	3≠6	["3","6","≠"]	3 \neq 6	<math><mrow id="mz-2"><mn id="mz-0">3</mn><mo>≠</mo><mn id="mz-1">6</mn></mrow></math>
+3! = 6	3!_=6	["3","!","6","="]	3! = 6	<math><mrow id="mz-3"><mrow id="mz-1"><mn id="mz-0">3</mn><mo>!</mo></mrow><mo>=</mo><mn id="mz-2">6</mn></mrow></math>
+!8!	!8!	["8","!","\\not"]	\neg 8!	<math><mrow id="mz-2"><mo>¬</mo><mrow id="mz-1"><mn id="mz-0">8</mn><mo>!</mo></mrow></mrow></math>
+\binom 3 2	\binom{3}{2}	["3","2","comb"]	\binom{3}{2}	<math><mrow id="mz-2"><mo>(</mo><mfrac linethickness="0"><mn id="mz-0">3</mn><mn id="mz-1">2</mn></mfrac><mo>)</mo></mrow></math>
+\binom 33*4	\binom{3}{3}*4	["3","3","comb","4","*"]	\binom{3}{3} \cdot 4	<math><mrow id="mz-4"><mrow id="mz-2"><mo>(</mo><mfrac linethickness="0"><mn id="mz-0">3</mn><mn id="mz-1">3</mn></mfrac><mo>)</mo></mrow><mo>⋅</mo><mn id="mz-3">4</mn></mrow></math>
+\binom {6}{4}	\binom{6}{4}	["6","4","comb"]	\binom{6}{4}	<math><mrow id="mz-2"><mo>(</mo><mfrac linethickness="0"><mn id="mz-0">6</mn><mn id="mz-1">4</mn></mfrac><mo>)</mo></mrow></math>
+lim(t^3-3,t,0,r)<=0	lim(t^{3}-3,t,0,r)≤0	["t","3","^","3","-","t","0","r","4","lim","0","≤"]	\lim_{t\to 0^+}{t^3 - 3} \leq 0	<math><mrow><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>t</mi><mo>→</mo><msup><mn>0</mn><mo>+</mo></msup></mrow></munder><mrow><msup><mi>t</mi><mn>3</mn></msup><mo>−</mo><mn>3</mn></mrow></mrow><mo>≤</mo><mn>0</mn></mrow></math>
+lim(t,t,1)<=0	lim(t,t,1)≤0	["t","t","1","3","lim","0","≤"]	\lim_{t\to 1}{t} \leq 0
+lim(t,t \to 2)<=0	lim(t,t→2)≤0	["t","t","2","→","2","lim","0","≤"]	\lim_{t\to 2}{t} \leq 0	<math><mrow><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>t</mi><mo>→</mo><mn>2</mn></mrow></munder><mi>t</mi></mrow><mo>≤</mo><mn>0</mn></mrow></math>	limit(t, t, 2) <= 0
+lim(x^2)<=0	lim(x^{2})≤0	["x","2","^","1","lim","0","≤"]	\lim{x^2} \leq 0	<math><mrow id="mz-6"><mrow displaystyle="true" id="mz-4"><mi>lim</mi><msup id="mz-2"><mi id="mz-0">x</mi><mn id="mz-1">2</mn></msup></mrow><mo>≤</mo><mn id="mz-5">0</mn></mrow></math>
+int(t^5,t,0,7)<=0	int(t^{5},t,0,7)≤0	["t","5","^","t","0","7","4","int","0","≤"]	\int_{0}^{7}{t^5}\mathrm{d}t \leq 0	<math><mrow id="mz-9"><mrow displaystyle="true" id="mz-7"><msubsup><mo>∫</mo><mrow><mn id="mz-4">0</mn></mrow><mrow><mn id="mz-5">7</mn></mrow></msubsup><msup id="mz-2"><mi id="mz-0">t</mi><mn id="mz-1">5</mn></msup><mi>d</mi><mi id="mz-3">t</mi></mrow><mo>≤</mo><mn id="mz-8">0</mn></mrow></math>
+int(t^5,t,0)<=0	int(t^{5},t,0)≤0	["t","5","^","t","0","3","int","0","≤"]	\int_{0}{t^5}\mathrm{d}t \leq 0	<math><mrow><mrow displaystyle="true"><msub><mo>∫</mo><mrow><mn>0</mn></mrow></msub><msup><mi>t</mi><mn>5</mn></msup><mi>d</mi><mi>t</mi></mrow><mo>≤</mo><mn>0</mn></mrow></math>	integrate(Math.pow(t, 5), t, 0) <= 0
+int(t^2,t)<=0	int(t^{2},t)≤0	["t","2","^","t","2","int","0","≤"]	\int{t^2}\mathrm{d}t \leq 0	<math><mrow><mrow displaystyle="true"><mo>∫</mo><msup><mi>t</mi><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow><mo>≤</mo><mn>0</mn></mrow></math>	integrate(Math.pow(t, 2), t) <= 0
+int(x^2)<=0	int(x^{2})≤0	["x","2","^","1","int","0","≤"]	\int{x^2}\mathrm{d}x \leq 0	<math><mrow><mrow displaystyle="true"><mo>∫</mo><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow><mo>≤</mo><mn>0</mn></mrow></math>	integrate(Math.pow(x, 2), "x") <= 0
+int(x^2-1,0,infinity)	int(x^{2}-1,0,∞)	["x","2","^","1","-","0","∞","3","int"]	\int_{0}^{\infty}{x^2 - 1}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2) - 1, "x", 0, Infinity)
+2(3+4)	2(3+4)	["2","3","4","+","*"]	2\left(3 + 4\right)	<math><mrow><mn>2</mn><mo>⁢</mo><mrow><mo>(</mo><mrow><mn>3</mn><mo>+</mo><mn>4</mn></mrow><mo>)</mo></mrow></mrow></math>
+xy+1	xy+1	["x","y","*","1","+"]	xy + 1	<math><mrow><mrow><mi>x</mi><mo>⁢</mo><mi>y</mi></mrow><mo>+</mo><mn>1</mn></mrow></math>
+7!==9	7≠=9	["7","9","≠="]	7 \neq 9	<math><mrow><mn>7</mn><mo>≠</mo><mn>9</mn></mrow></math>	7 !== 9	true
+7! == 9	7!_=9	["7","!","9","="]	7! = 9	<math><mrow><mrow><mn>7</mn><mo>!</mo></mrow><mo>=</mo><mn>9</mn></mrow></math>	7 * 6 * 5 * 4 * 3 * 2 * 1 == 9	false
+3<>4	3≠4	["3","4","≠"]	3 \neq 4	<math><mrow><mn>3</mn><mo>≠</mo><mn>4</mn></mrow></math>	3 != 4	true
+mean(1,2,3)%2	mean(1,2,3)%2	["1","2","3","3","mean","2","mod"]	\frac{1 + 2 + 3}{3} \bmod 2	<math><mrow><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow><mo>mod</mo><mn>2</mn></mrow></math>	((1 + 2 + 3) / 3) % 2	0
+\int_0^7 x\mathrm{d}x	int(x,x,0,7)	["x","x","0","7","4","int"]	\int_{0}^{7}{x}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><mi>x</mi><mi>d</mi><mi>x</mi></mrow></math>	integrate(x, x, 0, 7)
+\int_0^7 xdx	int(x,x,0,7)	["x","x","0","7","4","int"]	\int_{0}^{7}{x}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><mi>x</mi><mi>d</mi><mi>x</mi></mrow></math>	integrate(x, x, 0, 7)
+\int_{0}^{7} x^2\mathrm{d}x	int(x^{2},x,0,7)	["x","2","^","x","0","7","4","int"]	\int_{0}^{7}{x^2}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2), x, 0, 7)
+\int x^2\mathrm{d}x	int( x^{2},x)	["x","2","^","x","2","int"]	\int{x^2}\mathrm{d}x	<math><mrow displaystyle="true"><mo>∫</mo><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2), x)
+\int x^2	int( x^{2})	["x","2","^","1","int"]	\int{x^2}\mathrm{d}x	<math><mrow displaystyle="true"><mo>∫</mo><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2), "x")
+\int t^2	int( t^{2})	["t","2","^","1","int"]	\int{t^2}\mathrm{d}t	<math><mrow displaystyle="true"><mo>∫</mo><msup><mi>t</mi><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow></math>	integrate(Math.pow(t, 2), "t")
+int(x^2,0,7)	int(x^{2},0,7)	["x","2","^","0","7","3","int"]	\int_{0}^{7}{x^2}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2), "x", 0, 7)
+int(t^2,0,8)	int(t^{2},0,8)	["t","2","^","0","8","3","int"]	\int_{0}^{8}{t^2}\mathrm{d}t	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>8</mn></mrow></msubsup><msup><mi>t</mi><mn>2</mn></msup><mi>d</mi><mi>t</mi></mrow></math>	integrate(Math.pow(t, 2), "t", 0, 8)
+\lim_{-3} x^2	lim_{-3}x^{2}	["x","2","^","-3","2","lim"]	\lim_{x\to -3}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>-3</mn></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	limit(Math.pow(x, 2), -3)
+\lim_0 x^2	lim_{0}x^{2}	["x","2","^","0","2","lim"]	\lim_{x\to 0}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>0</mn></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	limit(Math.pow(x, 2), 0)
+\lim_{\infty} x^2	lim_{∞}x^{2}	["x","2","^","∞","2","lim"]	\lim_{x\to \infty}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mi>∞</mi></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	limit(Math.pow(x, 2), Infinity)
+\lim_{-\infty} x^2	lim_{-∞}x^{2}	["x","2","^","-∞","2","lim"]	\lim_{x\to -\infty}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mi>-∞</mi></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	limit(Math.pow(x, 2), -Infinity)
+\lim_{x\to5^+} x^3	lim_{x→5^+}x^{3}	["x","3","^","x","5","r","4","lim"]	\lim_{x\to 5^+}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><msup><mn>5</mn><mo>+</mo></msup></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	limit(Math.pow(x, 3), x, 5, "r")
+\lim_{x->5} x^3	lim_{x→5}x^{3}	["x","3","^","x","5","→","2","lim"]	\lim_{x\to 5}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>5</mn></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	limit(Math.pow(x, 3), x, 5)
+\lim_{x\to5} x^3	lim_{x→5}x^{3}	["x","3","^","x","5","→","2","lim"]	\lim_{x\to 5}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>5</mn></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	limit(Math.pow(x, 3), x, 5)
+\lim_{x\to5^{+}} x^3	lim_{x→5^{+}}x^{3}	["x","3","^","x","5","r","4","lim"]	\lim_{x\to 5^+}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><msup><mn>5</mn><mo>+</mo></msup></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	limit(Math.pow(x, 3), x, 5, "r")
+\lim x^3	lim x^{3}	["x","3","^","1","lim"]	\lim{x^3}	<math><mrow displaystyle="true"><mi>lim</mi><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	limit(Math.pow(x, 3))
+\log\log x	loglog x	["x","loglog"]	\ln\left(\ln\left(x\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(x))
+loglog(x)	loglog(x)	["x","loglog"]	\ln\left(\ln\left(x\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(x))
+loglog x	loglog x	["x","loglog"]	\ln\left(\ln\left(x\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(x))
+logloglog x	logloglog x	["x","logloglog"]	\ln\left(\ln\left(\ln\left(x\right)\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(Math.log(x)))
+\loglog x	loglog x	["x","loglog"]	\ln\left(\ln\left(x\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(x))
+\loglog(x)	loglog(x)	["x","loglog"]	\ln\left(\ln\left(x\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(x))
+logloglog(x)	logloglog(x)	["x","logloglog"]	\ln\left(\ln\left(\ln\left(x\right)\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(Math.log(x)))
+\logloglog x	logloglog x	["x","logloglog"]	\ln\left(\ln\left(\ln\left(x\right)\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(Math.log(x)))
+\log\log\log x	logloglog x	["x","logloglog"]	\ln\left(\ln\left(\ln\left(x\right)\right)\right)	<math><mrow><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>ln</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>)</mo><mo>)</mo></mrow></math>	Math.log(Math.log(Math.log(x)))
+y = (sin x + cos x)^4 and y = (sin x - cos x)^4	y=(sin x+cos x)^{4}&y=(sin x-cos x)^{4}	["y","x","sin","x","cos","+","4","^","=","y","x","sin","x","cos","-","4","^","=","&"]	y = \left(\sin\left(x\right) + \cos\left(x\right)\right)^4 \land y = \left(\sin\left(x\right) - \cos\left(x\right)\right)^4	<math><mrow><mrow><mi>y</mi><mo>=</mo><msup><mrow><mo>(</mo><mrow><mrow><mi>sin</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mo>+</mo><mrow><mi>cos</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow><mo>)</mo></mrow><mn>4</mn></msup></mrow><mo>∧</mo><mrow><mi>y</mi><mo>=</mo><msup><mrow><mo>(</mo><mrow><mrow><mi>sin</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mo>−</mo><mrow><mi>cos</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></mrow><mo>)</mo></mrow><mn>4</mn></msup></mrow></mrow></math>	(y == Math.pow((Math.sin(x) + Math.cos(x)), 4) && y == Math.pow((Math.sin(x) - Math.cos(x)), 4))
+\sum_0^3 i^2	\sumidx_{0}^{3}i^{2}	["i","2","^","0","3","3","\\sumidx"]	\sum_{0}^{3}{i^2}	<math><mrow displaystyle="true"><munderover><mo>∑</mo><mn>0</mn><mn>3</mn></munderover><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	(()=>{let sum = 0; let loopCount = 0; for (let i=0;i<=3;i++) {if (loopCount++ > 1000000){break};sum += Math.pow(i, 2);}; return sum;})()	14
+5 * \sum_0^3 i^2 * 7	5*\sumidx_{0}^{3}i^{2}*7	["5","i","2","^","7","*","0","3","3","\\sumidx","*"]	5\sum_{0}^{3}{i^2 \cdot 7}	<math><mrow><mn>5</mn><mo>⁢</mo><mrow displaystyle="true"><munderover><mo>∑</mo><mn>0</mn><mn>3</mn></munderover><mrow><msup><mi>i</mi><mn>2</mn></msup><mo>⋅</mo><mn>7</mn></mrow></mrow></mrow></math>	5 * (()=>{let sum = 0; let loopCount = 0; for (let i=0;i<=3;i++) {if (loopCount++ > 1000000){break};sum += Math.pow(i, 2) * 7;}; return sum;})()	490
+\prod_0^3 i^2	\prodidx_{0}^{3}i^{2}	["i","2","^","0","3","3","\\prodidx"]	\prod_{0}^{3}{i^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mn>0</mn><mn>3</mn></munderover><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=3;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(i, 2);}; return prod;})()	0
+\sum_{0}^{10} i^2	\sumidx_{0}^{10}i^{2}	["i","2","^","0","10","3","\\sumidx"]	\sum_{0}^{10}{i^2}	<math><mrow displaystyle="true"><munderover><mo>∑</mo><mn>0</mn><mn>10</mn></munderover><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	(()=>{let sum = 0; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};sum += Math.pow(i, 2);}; return sum;})()	385
+\prod_{0}^{10} i^2	\prodidx_{0}^{10}i^{2}	["i","2","^","0","10","3","\\prodidx"]	\prod_{0}^{10}{i^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mn>0</mn><mn>10</mn></munderover><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(i, 2);}; return prod;})()	0
+\sum_{i=0}^{10} i^2	\sumidx_{i=0}^{10}i^{2}	["i","2","^","i","0","=","10","3","\\sumidx"]	\sum_{i = 0}^{10}{i^2}	<math><mrow displaystyle="true" id="mz-8"><munderover><mo>∑</mo><mrow id="mz-5"><mi id="mz-3">i</mi><mo>=</mo><mn id="mz-4">0</mn></mrow><mn id="mz-6">10</mn></munderover><msup id="mz-2"><mi id="mz-0">i</mi><mn id="mz-1">2</mn></msup></mrow></math>
+\prod_{i=0}^{10} i^2	\prodidx_{i=0}^{10}i^{2}	["i","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{i^2}	<math><mrow displaystyle="true" id="mz-8"><munderover><mo>∏</mo><mrow id="mz-5"><mi id="mz-3">i</mi><mo>=</mo><mn id="mz-4">0</mn></mrow><mn id="mz-6">10</mn></munderover><msup id="mz-2"><mi id="mz-0">i</mi><mn id="mz-1">2</mn></msup></mrow></math>
+\sum_{i in [3,10]} i^2	\sumidx_{i∈[3,10]}i^{2}	["i","2","^","i","3","10","2","[]","∈","2","\\sumidx"]	\sum_{i \in [3, 10]}{i^2}	<math><mrow displaystyle="true"><munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>10</mn><mo>]</mo></mrow></mrow></munder><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	summation(Math.pow(i, 2), (i >= 3 && i <= 10))
+\prod_{i in [3,10]} i^2	\prodidx_{i∈[3,10]}i^{2}	["i","2","^","i","3","10","2","[]","∈","2","\\prodidx"]	\prod_{i \in [3, 10]}{i^2}	<math><mrow displaystyle="true"><munder><mo>∏</mo><mrow><mi>i</mi><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>10</mn><mo>]</mo></mrow></mrow></munder><msup><mi>i</mi><mn>2</mn></msup></mrow></math>	product(Math.pow(i, 2), (i >= 3 && i <= 10))
+-x	-x	["x","neg"]	-x	<math><mrow id="mz-1"><mo>−</mo><mi id="mz-0">x</mi></mrow></math>
+√16	sqrt16	["16","sqrt"]	\sqrt{16}	<math><msqrt id="mz-1"><mn id="mz-0">16</mn></msqrt></math>
+5 P 3	5\perm3	["5","3","perm"]	{}^{5}\mathrm{P}_{3}	<math><mmultiscripts id="mz-2"><mi>P</mi><mn id="mz-1">3</mn><none/><mprescripts/><none/><mn id="mz-0">5</mn></mmultiscripts></math>
+5 C 3	5\comb3	["5","3","comb"]	\binom{5}{3}	<math><mrow id="mz-2"><mo>(</mo><mfrac linethickness="0"><mn id="mz-0">5</mn><mn id="mz-1">3</mn></mfrac><mo>)</mo></mrow></math>
+\lim_{x→0} sin(x)/x	lim_{x→0}sin(x)/x	["x","sin","x","/","x","0","→","2","lim"]	\lim_{x\to 0}{\frac{\sin\left(x\right)}{x}}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>0</mn></mrow></munder><mfrac><mrow><mi>sin</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mi>x</mi></mfrac></mrow></math>	limit(Math.sin(x) / x, x, 0)
+tan(45deg)	tan(45deg)	["45","°","*","tan"]	\tan\left(45°\right)	<math><mrow id="mz-3"><mi>tan</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">45</mn><mo>⁢</mo><mi id="mz-1">°</mi></mrow><mo>)</mo></mrow></math>
+cos(π/2)	cos(π/2)	["pi","2","/","cos"]	\cos\left(\frac{\pi}{2}\right)	<math><mrow id="mz-3"><mi>cos</mi><mo>(</mo><mfrac id="mz-2"><mi id="mz-0">π</mi><mn id="mz-1">2</mn></mfrac><mo>)</mo></mrow></math>
+6 ÷ 2	6/2	["6","2","/"]	\frac{6}{2}	<math><mfrac id="mz-2"><mn id="mz-0">6</mn><mn id="mz-1">2</mn></mfrac></math>
+2 · 3	2*3	["2","3","*"]	2 \cdot 3	<math><mrow id="mz-2"><mn id="mz-0">2</mn><mo>⋅</mo><mn id="mz-1">3</mn></mrow></math>
+\lim_{2→10} (1 + 1/2)^2	lim_{2→10}(1+1/2)^{2}	["1","1","2","/","+","2","^","2","10","→","2","lim"]	\lim_{2\to 10}{\left(1 + \frac{1}{2}\right)^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mn>2</mn><mo>→</mo><mn>10</mn></mrow></munder><msup><mrow><mo>(</mo><mrow><mn>1</mn><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac></mrow><mo>)</mo></mrow><mn>2</mn></msup></mrow></math>	limit(Math.pow((1 + 1 / 2), 2), 2, 10)
+4x	4x	[4,'x','*']	4x
+3/2-\frac{3}{2}=0	3/2-frac{3}{2}=0		\frac{3}{2} - \frac{3}{2} = 0
+math.sin(x)+Math.cos(pi)-\tan{pi/2}	sin(x)+cos(pi)-tan{pi/2}		\sin\left(x\right) + \cos\left(\pi\right) - \tan\left(\frac{\pi}{2}\right)
+Math.pow(x,2)=x**2=x^2=x^{2}	pow(x,2)=x^2=x^{2}=x^{2}		x^2 = x^2 = x^2 = x^2
+Math.tan(x)*Math.sec(x)*Math.csc(x)*Math.cot(\pi)	tan(x)*sec(x)*csc(x)*cot(π)
+Math.PI+Math.E	π+e
+\max(1,2)	max(1,2)
+\pi^2	π^{2}		\pi^2
+ε^21	ε^{21}		\epsilon^{21}
+\Pi*\gamma	Π*γ		\Pi\gamma
+x=(-b\pm \sqrt(b^2-4*a*c))/2a	x=(-b±\sqrt(b^{2}-4*a*c))/2a
+\sqrt[3]{x}	sqrt{3,x}		\sqrt[3]{x}
+cos(3pi)	cos(3pi)
+\cos pi	cos pi
+3+infinity!=7-\infty	3+∞≠7-∞		3 + \infty \neq 7 - \infty
+gcd(6,8)	gcd(6,8)		\gcd\left(6, 8\right)
+min(1+7,2*3,3+\csc x)+max(1,2)	min(1+7,2*3,3+csc x)+max(1,2)		\min\left(1 + 7, 2 \cdot 3, 3 + \csc\left(x\right)\right) + \max\left(1, 2\right)
+der(x^2+1,x)	der(x^{2}+1,x)		\frac{\mathrm{d}}{\mathrm{d}x}\left[x^2 + 1\right]
+der(x^12+sin(x))=12x^11+cos(x)	der(x^{12}+sin(x))=12x^{11}+cos(x)		\frac{\mathrm{d}}{\mathrm{d}x}\left[x^{12} + \sin\left(x\right)\right] = 12x^{11} + \cos\left(x\right)
+lim(t*sin(t),t,0,r)<=0	lim(t*sin(t),t,0,r)≤0		\lim_{t\to 0^+}{t\sin\left(t\right)} \leq 0
+lim(x+sqrt(x),x,infinity)>=0	lim(x+sqrt(x),x,∞)≥0	["x","x","sqrt","+","x","∞","3","lim","0","≥"]	\lim_{x\to \infty}{x + \sqrt{x}} \geq 0	<math><mrow><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mi>∞</mi></mrow></munder><mrow><mi>x</mi><mo>+</mo><msqrt><mi>x</mi></msqrt></mrow></mrow><mo>≥</mo><mn>0</mn></mrow></math>	limit(x + Math.sqrt(x), x, Infinity) >= 0
+12%+23%=35%	12%+23%=35%		12\% + 23\% = 35\%
+12%7=5	12%7=5		12 \bmod 7 = 5
+3+\function(72*3)=1	3+\function(72*3)=1		3 + \operatorname{function}\left(72 \cdot 3\right) = 1
+\frac{2.3333}{3}+\frac{1}{x}=7	frac{2.3333}{3}+frac{1}{x}=7		\frac{2.3333}{3} + \frac{1}{x} = 7
+\sqrt[3]{x^3-7}+sqrt[5]{x^3-8}-sqrt(3)+sqrt(x^3-7) in y	sqrt{3,x^{3}-7}+sqrt{5,x^{3}-8}-sqrt(3)+sqrt(x^{3}-7)∈y		\sqrt[3]{x^3 - 7} + \sqrt[5]{x^3 - 8} - \sqrt{3} + \sqrt{x^3 - 7} \in y
+log(3+7)+\log{3+7}+\log 3+\log_2 3+log_2(3+7)+log_[2]{3}+log_[2](3+7)+log[2]{3+7}+log2(3+7)+log_10{3+7}	log_{e}(3+7)+log_{e}{3+7}+log_{e}3+log_{2}3+log_{2}(3+7)+log_[2]{3}+log_[2](3+7)+log_[2]{3+7}+log_{2}(3+7)+log_{10}{3+7}
+der(3x^12,x)=der(3x^12)=36x^11	der(3x^{12},x)=der(3x^{12})=36x^{11}		\frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = 36x^{11}
+Math.round(x/7,2)+math.round(x/7)+round(13.244,i)	round(x/7,2)+round(x/7)+round(13.244,i)		\text{round}\left(\frac{x}{7}, 2\right) + \text{round}\left(\frac{x}{7}, 0\right) + \text{round}\left(13.244, i\right)
+Math.floor(x/7)+math.floor(x/7)+floor(-3.27)+⌊129/17⌋-\lfloor 129/7 \rfloor=y	floor(x/7)+floor(x/7)+floor(-3.27)+floor(129/17)-floor(129/7)=y		\lfloor \frac{x}{7} \rfloor + \lfloor \frac{x}{7} \rfloor + \lfloor -3.27 \rfloor + \lfloor \frac{129}{17} \rfloor - \lfloor \frac{129}{7} \rfloor = y
+Math.ceil(x/7)+math.ceil(x/7)+ceil(2.9)-ceiling(-3.24)+⌈\sqrt[3]{8}⌉+\lceil sqrt(738)\rceil=y	ceil(x/7)+ceil(x/7)+ceil(2.9)-ceil(-3.24)+ceil(sqrt{3,8})+ceil( sqrt(738))=y		\lceil \frac{x}{7} \rceil + \lceil \frac{x}{7} \rceil + \lceil 2.9 \rceil - \lceil -3.24 \rceil + \lceil \sqrt[3]{8} \rceil + \lceil \sqrt{738} \rceil = y
+loglog(x)+\log\log(x)+\log \log x = 7	loglog(x)+loglog(x)+loglog x=7		\ln\left(\ln\left(x\right)\right) + \ln\left(\ln\left(x\right)\right) + \ln\left(\ln\left(x\right)\right) = 7
+\lim\limits_{t\to 0^+}{t\sin{t}}	lim_{t→0^+}{tsin{t}}		\lim_{t\to 0^+}{t\sin\left(t\right)}
+\int_{0}^{\infty} {x^2-1} \mathrm{d}{x}+\int {x^2-1} \mathrm{d}{x}	int({x^{2}-1},x,0,∞)+int({x^{2}-1},x)		\int_{0}^{\infty}{x^2 - 1}\mathrm{d}x + \int{x^2 - 1}\mathrm{d}x
+xy		["x","y","*"]	xy
+2xy		["2","x","*","y","*"]	2xy
+abc		["abc"]	\mathrm{abc}
+speed = d/t		["speed","d","t","/","="]	\mathrm{speed} = \frac{d}{t}
+rate*time		["rate","time","*"]	\mathrm{rate} \cdot \mathrm{time}
+profit = revenue - cost		["profit","revenue","cost","-","="]	\mathrm{profit} = \mathrm{revenue} - \mathrm{cost}
+cost + 1		["cost","1","+"]	\mathrm{cost} + 1
+cosine		["cosine"]	\mathrm{cosine}
+point		["point"]	\mathrm{point}
+tank		["tank"]	\mathrm{tank}
+sinx		["x","sin"]	\sin\left(x\right)
+xsinx		["x","x","sin","*"]	x\sin\left(x\right)
+sint		["t","sin"]	\sin\left(t\right)
+cos t		["t","cos"]	\cos\left(t\right)
+\cos t		["t","cos"]	\cos\left(t\right)
+pir^2		["pi","r","2","^","*"]	\pi r^2
+x1 + x2		["x1","x2","+"]	x1 + x2
+\frac{rate}{time}		["r","a","*","t","*","e","*","t","i","*","m","*","e","*","/"]	\frac{rate}{time}
+\frac{\text{rate}}{\text{time}}		["rate","time","/"]	\frac{\mathrm{rate}}{\mathrm{time}}
+\mathrm{cost}(x)		["x","1","\\:cost"]	\operatorname{cost}\left(x\right)
+\operatorname{sgn}(x)		["x","1","\\:sgn"]	\operatorname{sgn}\left(x\right)
+\Delta x		["Δx"]	\Delta x
+2+3 mod 4		["2","3","+","4","mod"]	\left(2 + 3\right) \bmod 4
+a + b mod n		["a","b","+","n","mod"]	\left(a + b\right) \bmod n
+c = m^e mod n		["c","m","e","^","n","mod","="]	c = m^e \bmod n
+a mod 2n		["a","2","n","*","mod"]	a \bmod \left(2n\right)
+2 mod 3*4		["2","3","mod","4","*"]	\left(2 \bmod 3\right) \cdot 4
+a mod n + 1		["a","n","mod","1","+"]	a \bmod n + 1
+1 + (a mod n)		["1","a","n","mod","+"]	1 + \left(a \bmod n\right)
+a*b mod n		["a","b","*","n","mod"]	\left(ab\right) \bmod n
+2 + 3 % 4		["2","3","4","mod","+"]	2 + \left(3 \bmod 4\right)
+a % n * 2		["a","n","mod","2","*"]	\left(a \bmod n\right) \cdot 2
+x \bmod 2		["x","2","mod"]	x \bmod 2
+x \equiv 1 \pmod{3}		["x","1","≡","3","pmod"]	x \equiv 1 \pmod{3}
+17 ≡ 2 (mod 5)		["17","2","≡","5","pmod"]	17 \equiv 2 \pmod{5}
+a = b (mod n)		["a","b","=","n","pmod"]	a = b \pmod{n}
+x(t)		["t","1","\\:x"]	x\left(t\right)
+x(0)		["0","1","\\:x"]	x\left(0\right)
+x(t) = t^2		["t","1","\\:x","t","2","^","="]	x\left(t\right) = t^2
+x(x+1)		["x","x","1","+","*"]	x\left(x + 1\right)
+x(2t)		["x","2","t","*","*"]	x\left(2t\right)
+y(0) = 1		["0","1","\\:y","1","="]	y\left(0\right) = 1
+\int_{a}^{b} f(x)	int(f(x),x,a,b)	["x","1","\\:f","x","a","b","4","int"]	\int_{a}^{b}{f\left(x\right)}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mi>a</mi></mrow><mrow><mi>b</mi></mrow></msubsup><mrow><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mi>d</mi><mi>x</mi></mrow></math>	integrate(f(x), x, a, b)
+int(\alpha^2-1,0,infinity)	int(α^{2}-1,0,∞)	["α","2","^","1","-","0","∞","3","int"]	\int_{0}^{\infty}{\alpha^2 - 1}\mathrm{d}α	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>α</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>α</mi></mrow></math>	integrate(Math.pow(α, 2) - 1, "α", 0, Infinity)
+int(x^2-1,x,0,infinity)+int(x^2-1,x)+int(x^2-1,0,infinity)+int(x^2-1)	int(x^{2}-1,x,0,∞)+int(x^{2}-1,x)+int(x^{2}-1,0,∞)+int(x^{2}-1)	["x","2","^","1","-","x","0","∞","4","int","x","2","^","1","-","x","2","int","+","x","2","^","1","-","0","∞","3","int","+","x","2","^","1","-","1","int","+"]	\int_{0}^{\infty}{x^2 - 1}\mathrm{d}x + \int{x^2 - 1}\mathrm{d}x + \int_{0}^{\infty}{x^2 - 1}\mathrm{d}x + \int{x^2 - 1}\mathrm{d}x	<math><mrow><mrow><mrow><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow><mo>+</mo><mrow displaystyle="true"><mo>∫</mo><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow><mo>+</mo><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow><mo>+</mo><mrow displaystyle="true"><mo>∫</mo><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow></math>	integrate(Math.pow(x, 2) - 1, x, 0, Infinity) + integrate(Math.pow(x, 2) - 1, x) + integrate(Math.pow(x, 2) - 1, "x", 0, Infinity) + integrate(Math.pow(x, 2) - 1, "x")
+sum(i^2-17,i=0,infinity)!=product(i^2-17,i\in T)	sum(i^{2}-17,i=0,∞)≠prod(i^{2}-17,i∈T)	["i","2","^","17","-","i","0","=","∞","3","\\sumidx","i","2","^","17","-","i","T","∈","2","\\prodidx","≠"]	\sum_{i = 0}^{\infty}{i^2 - 17} \neq \prod_{i \in T}{i^2 - 17}	<math><mrow><mrow displaystyle="true"><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mi>∞</mi></munderover><mrow><msup><mi>i</mi><mn>2</mn></msup><mo>−</mo><mn>17</mn></mrow></mrow><mo>≠</mo><mrow displaystyle="true"><munder><mo>∏</mo><mrow><mi>i</mi><mo>∈</mo><mi>T</mi></mrow></munder><mrow><msup><mi>i</mi><mn>2</mn></msup><mo>−</mo><mn>17</mn></mrow></mrow></mrow></math>	(()=>{let sum = 0; let loopCount = 0; for (let i=0;i<=Infinity;i++) {if (loopCount++ > 1000000){break};sum += Math.pow(i, 2) - 17;}; return sum;})() != product(Math.pow(i, 2) - 17, T.includes(i))
+[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	["1","2","2","[]","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","17","23","2","[]","39","53","2","[]","2","[]","="]	[[1, 2], [3, 4]][[5, 6], [7, 8]] = [[17, 23], [39, 53]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>17</mn><mo>,</mo><mn>23</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>39</mn><mo>,</mo><mn>53</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	[[1, 2], [3, 4]] * [[5, 6], [7, 8]] == [[17, 23], [39, 53]]	false
+[{1,2},[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	[{1,2},[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	["1","2","2","{}","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","17","23","2","[]","39","53","2","[]","2","[]","="]	[\{1, 2\}, [3, 4]][[5, 6], [7, 8]] = [[17, 23], [39, 53]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>}</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>17</mn><mo>,</mo><mn>23</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>39</mn><mo>,</mo><mn>53</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	[[1, 2], [3, 4]] * [[5, 6], [7, 8]] == [[17, 23], [39, 53]]	false
+x between 3 and 5	x∈[3,5]	["x","3","5","2","[]","∈"]	x \in [3, 5]	<math><mrow><mi>x</mi><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></math>	(x >= 3 && x <= 5)
+x is 7	x=7	["x","7","="]	x = 7	<math><mrow><mi>x</mi><mo>=</mo><mn>7</mn></mrow></math>	x == 7
+x is in {1,2,3,4}	x∈{1,2,3,4}	["x","1","2","3","4","4","{}","∈"]	x \in \{1, 2, 3, 4\}	<math><mrow><mi>x</mi><mo>∈</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>}</mo></mrow></mrow></math>	[1, 2, 3, 4].includes(x)
+x^2y^2	x^{2}y^{2}	["x","2","^","y","2","^","*"]	x^2y^2	<math><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>⁢</mo><msup><mi>y</mi><mn>2</mn></msup></mrow></math>	Math.pow(x, 2) * Math.pow(y, 2)
+x^23^2	x^{23}^{2}	["x","23","2","^","^"]	x^{23^2}	<math><msup><mi>x</mi><msup><mn>23</mn><mn>2</mn></msup></msup></math>	Math.pow(x, Math.pow(23, 2))
+3 < x < 7	3<x<7	["3","x","<","7","<"]	3 < x < 7	<math><mrow><mrow><mn>3</mn><mo>&lt;</mo><mi>x</mi></mrow><mo>&lt;</mo><mn>7</mn></mrow></math>	(3 < x && x < 7)
+\sum_{i=0}^{10} x^{2}	\sumidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\sumidx"]	\sum_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let sum = 0; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};sum += Math.pow(x, 2);}; return sum;})()
+\prod_{i=0}^{10} x^{2}	\prodidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(x, 2);}; return prod;})()
+\prod_{i=0}^10 x^{2}	\prodidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(x, 2);}; return prod;})()
+51 mod 3*4	51 mod 3*4	["51","3","mod","4","*"]	\left(51 \bmod 3\right) \cdot 4	<math><mrow><mrow><mo>(</mo><mrow><mn>51</mn><mo>mod</mo><mn>3</mn></mrow><mo>)</mo></mrow><mo>⋅</mo><mn>4</mn></mrow></math>	(51 % 3) * 4	0
+-2 mod -x	-2 mod -x	["-2","x","neg","mod"]	-2 \bmod -x	<math><mrow><mn>-2</mn><mo>mod</mo><mrow><mo>−</mo><mi>x</mi></mrow></mrow></math>	-2 % -x
+
+# Code spellings (spreadsheet, SQL, numpy/math, SymPy, GLSL) that no other row used — added 2026-11-03
+=AND(a, b)	((a)&(b))	["a","b","&"]	a \land b
+=OR(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
+=NOT(a)	(!(a))	["a","\\not"]	\neg a
+=XOR(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
+=LOG(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
+=LOG(x, 2)	log_{2}(x)	["2","x","log"]	\log_{2}\left(x\right)
+=ATAN2(x, y)	atan2(y,x)	["y","x","atan2"]	\text{atan2}\left(y, x\right)
+=INT(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
+=FLOOR.MATH(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
+=CEILING.MATH(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
+=CEILING(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
+=FACT(5)	((5)!)	["5","!"]	5!
+=COMBIN(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+=PERMUT(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+=AVERAGE(a, b, c)	mean(a,b,c)	["a","b","c","3","mean"]	\frac{a + b + c}{3}
+=SUM(a, b, c)	sum(a,b,c)	["a","b","c","3","sum"]	a + b + c
+=PRODUCT(a, b, c)	prod(a,b,c)	["a","b","c","3","prod"]	a \cdot b \cdot c
+=MAX(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+=MIN(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
+=MEDIAN(a, b, c)	median(a,b,c)	["a","b","c","3","\\:median"]	\operatorname{median}\left(a, b, c\right)
+=STDEV.P(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
+=STDEVP(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
+=RAND()	random()	["random"]	\text{random}\left(\right)
+=ISNUMBER(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
+=LOG10(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
+=FIXED(x, 1)	fixed(x,1)	["x","1","fixed"]	\text{fixed}\left(x, 1\right)
+=PI()	π	["pi"]	\pi
+=EXP(x)	e^(x)	["e","x","^"]	e^x
+=SQRT(x)	sqrt(x)	["x","sqrt"]	\sqrt{x}
+=ABS(x)	abs(x)	["x","abs"]	\left|x\right|
+=LN(x)	log_{e}(x)	["x","ln"]	\ln\left(x\right)
+=SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
+=ASIN(x)	arcsin(x)	["x","arcsin"]	\arcsin\left(x\right)
+=IF(x>0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+POWER(x, 2)	pow(x,2)	["x","2","^"]	x^2
+ROUND(x, 2)	round(x,2)	["x","2","round"]	\text{round}\left(x, 2\right)
+SIN(x)	sin(x)	["x","sin"]	\sin\left(x\right)
+SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
+COMB(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+TRUNC(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+GREATEST(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+LEAST(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
+MOD(a, b)	((a) mod (b))	["a","b","mod"]	a \bmod b
+CASE WHEN x > 0 THEN 1 ELSE 0 END	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+np.maximum(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+np.nanmedian(x)	median(x)	["x","1","\\:median"]	\operatorname{median}\left(x\right)
+np.isfinite(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
+np.logical_xor(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
+np.logical_and(a, b)	((a)&(b))	["a","b","&"]	a \land b
+np.logical_or(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
+np.logical_not(a)	(!(a))	["a","\\not"]	\neg a
+np.where(x > 0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+np.isin(x, [1, 2])	((x)∈{1,2})	["x","1","2","2","{}","∈"]	x \in \{1, 2\}
+np.isclose(a, b)	((a)≈(b))	["a","b","≈"]	a \approx b
+np.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+math.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+Math.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+math.factorial(5)	((5)!)	["5","!"]	5!
+scipy.special.perm(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+scipy.special.comb(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+sympy.factorial(n)	((n)!)	["n","!"]	n!
+sympy.Rational(1, 3)	((1)/(3))	["1","3","/"]	\frac{1}{3}
+sympy.And(a, b)	((a)&(b))	["a","b","&"]	a \land b
+sympy.Nand(a, b)	((a) \nand (b))	["a","b","\\nand"]	a \barwedge b
+sympy.Nor(a, b)	((a) \nor (b))	["a","b","\\nor"]	a \downarrow b
+sympy.Piecewise((1, x > 0), (0, True))	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+sympy.Union(A, B)	((A)∪(B))	["A","B","∪"]	A \cup B
+sympy.summation(i**2, (i, 1, n))	(\sumidx_{i=1}^{n}(i^2))	["i","2","^","i","1","=","n","3","\\sumidx"]	\sum_{i = 1}^{n}{i^2}
+sympy.Interval.open(0, 1)	(0,1)	["0","1","2","()"]	(0, 1)
+sympy.Interval.Lopen(0, 1)	(0,1]	["0","1","2","(]"]	(0, 1]
+sympy.Interval.Ropen(0, 1)	[0,1)	["0","1","2","[)"]	[0, 1)
+sympy.Eq(a, b)	((a)=(b))	["a","b","="]	a = b
+sympy.Ne(a, b)	((a)≠(b))	["a","b","≠"]	a \neq b
+sympy.binomial(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+sympy.ff(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+sympy.limit(sympy.sin(x)/x, x, 0)	lim(sin(x)/x,x,0)	["x","sin","x","/","x","0","3","lim"]	\lim_{x\to 0}{\frac{\sin\left(x\right)}{x}}
+sympy.integrate(x**2, (x, 0, 1))	int(x^2,x,0,1)	["x","2","^","x","0","1","4","int"]	\int_{0}^{1}{x^2}\mathrm{d}x
+x in sympy.Rationals	x∈ℚ	["x","ℚ","∈"]	x \in \mathbb{Q}
+x in sympy.Complexes	x∈ℂ	["x","ℂ","∈"]	x \in \mathbb{C}
+vec2(a, b)	(a,b)	["a","b","2","()"]	(a, b)
+vec3(r, g, b)	(r,g,b)	["r","g","b","3","()"]	(r, g, b)
+inversesqrt(x)	(1/sqrt(x))	["1","x","sqrt","/"]	\frac{1}{\sqrt{x}}
+fract(x)	((x)-floor(x))	["x","x","floor","-"]	x - \lfloor x \rfloor
+mz_sq(x)	((x)^{2})	["x","2","^"]	x^2
+mz_cube(x)	((x)^{3})	["x","3","^"]	x^3
+
+# Plain English (src/parse/clean/english.js): comparisons, ranges, properties, and the words speech uses — added 2026-11-03
+x is between 3 and 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
+x is between 3 and 5 exclusive		["x","3","5","2","()","∈"]	x \in (3, 5)
+x is strictly between 0 and 1		["x","0","1","2","()","∈"]	x \in (0, 1)
+x is not between 3 and 5		["x","3","5","2","[]","∉"]	x \notin [3, 5]
+x is greater than 3		["x","3",">"]	x > 3
+x is more than 3		["x","3",">"]	x > 3
+x is at least 3		["x","3","≥"]	x \geq 3
+x is at most 3		["x","3","≤"]	x \leq 3
+x is no more than 3		["x","3","≤"]	x \leq 3
+x is greater than or equal to 3		["x","3","≥"]	x \geq 3
+x is less than or equal to 3		["x","3","≤"]	x \leq 3
+x is not equal to 3		["x","3","≠"]	x \neq 3
+x equals 3		["x","3","="]	x = 3
+x does not equal 3		["x","3","≠"]	x \neq 3
+x is not 3		["x","3","≠"]	x \neq 3
+x is approximately 3		["x","3","≈"]	x \approx 3
+x is greater than 3 and less than 7		["x","3",">","x","7","<","&"]	x > 3 \land x < 7
+x is at least 0 and at most 10		["x","0","≥","x","10","≤","&"]	x \geq 0 \land x \leq 10
+x is positive		["x","0",">"]	x > 0
+x is negative		["x","0","<"]	x < 0
+x is non-negative		["x","0","≥"]	x \geq 0
+x is zero		["x","0","="]	x = 0
+n is an integer		["n","ℤ","∈"]	n \in \mathbb{Z}
+n is a whole number		["n","ℤ","∈"]	n \in \mathbb{Z}
+x is a real number		["x","ℝ","∈"]	x \in \mathbb{R}
+n is even		["n","2","mod","0","="]	n \bmod 2 = 0
+n is odd		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
+n is not even		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
+n is a multiple of 3		["n","3","mod","0","="]	n \bmod 3 = 0
+n is divisible by 3		["n","3","mod","0","="]	n \bmod 3 = 0
+3 divides n		["n","3","mod","0","="]	n \bmod 3 = 0
+x is in the closed interval from 3 to 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
+x is in the open interval from 0 to 1		["x","0","1","2","()","∈"]	x \in (0, 1)
+x squared		["x","2","^"]	x^2
+x cubed		["x","3","^"]	x^3
+x to the fifth		["x","5","^"]	x^5
+x to the nth power		["x","n","^"]	x^n
+x to the n		["x","n","^"]	x^n
+e to the x		["e","x","^"]	e^x
+the square root of x		["x","sqrt"]	\sqrt{x}
+the square root of (x + 1)		["x","1","+","sqrt"]	\sqrt{x + 1}
+the cube root of x		["3","x","root"]	\sqrt[3]{x}
+the absolute value of x		["x","abs"]	\left|x\right|
+sine of x		["x","sin"]	\sin\left(x\right)
+the natural log of x		["x","ln"]	\ln\left(x\right)
+x plus y times 2		["x","y","2","*","+"]	x + y \cdot 2
+x divided by y		["x","y","/"]	\frac{x}{y}
+x over y		["x","y","/"]	\frac{x}{y}
+x minus y		["x","y","-"]	x - y
+half of x		["x","2","/"]	\frac{x}{2}
+twice x		["2","x","*"]	2x
+20 percent		["20%"]	20\%
+cost is more than budget		["cost","budget",">"]	\mathrm{cost} > \mathrm{budget}
+times + 1		["times","1","+"]	\mathrm{times} + 1
+x is within 0.001 of 7		["x","7","-","abs","0.001","≤"]	\left|x - 7\right| \leq 0.001
+x is within 1% of 7		["x","7","-","abs","1","100","/","7","*","≤"]	\left|x - 7\right| \leq \frac{1}{100} \cdot 7
+x is within 5 percent of y		["x","y","-","abs","5","100","/","y","abs","*","≤"]	\left|x - y\right| \leq \frac{5}{100}\left|y\right|
+x is not within 0.1 of 2		["x","2","-","abs","0.1",">"]	\left|x - 2\right| > 0.1

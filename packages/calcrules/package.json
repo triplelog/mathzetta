@@ -1,0 +1,48 @@
+{
+  "name": "calcrules",
+  "version": "0.1.0",
+  "description": "Rule-driven simplification of postfix math expressions, indexed by collapsed structure keys.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./cas": "./src/cas/index.js",
+    "./yaml": "./src/yaml.js",
+    "./rules/*": "./rules/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node test/run.mjs",
+    "build:rules": "node tools/bundle-rules.mjs",
+    "check:sympy": "node tools/check-sympy.mjs"
+  },
+  "files": [
+    "src",
+    "rules",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "mathzetta": "^1.0.0"
+  },
+  "homepage": "https://mathzetta.com/calcrules/web/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/triplelog/mathzetta.git",
+    "directory": "packages/calcrules"
+  },
+  "author": {
+    "name": "Robert Wilcox",
+    "email": "rwilcox@mathzetta.com",
+    "url": "https://mathzetta.com"
+  },
+  "bugs": {
+    "url": "https://github.com/triplelog/mathzetta/issues",
+    "email": "rwilcox@mathzetta.com"
+  }
+}

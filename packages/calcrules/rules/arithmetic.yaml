@@ -1,0 +1,227 @@
+name: Arithmetic and basic algebra
+
+# Pattern notes:
+#   - identifiers are slots; whatever binds to them can be any subexpression
+#   - numeric leaves are literals: "a 0 +" only matches when the operand is 0
+#   - a repeated slot name means "the same subexpression again": "a a -"
+#   - commutative: true also registers the mirrored operand orders
+#   - fold: true evaluates the produced expression numerically where exact
+
+rules:
+  # ---- evaluate what is already numeric --------------------------------
+  - id: fold-arithmetic
+    name: Work it out
+    pattern: a b +
+    when:
+      a: [isNumber]
+      b: [isNumber]
+    output: a b +
+    fold: true
+    explain: "{a} + {b} = {result}."
+    tags: [fold]
+
+  - id: fold-subtract
+    name: Work it out
+    pattern: a b -
+    when:
+      a: [isNumber]
+      b: [isNumber]
+    output: a b -
+    fold: true
+    explain: "{a} - {b} = {result}."
+    tags: [fold]
+
+  - id: fold-multiply
+    name: Work it out
+    pattern: a b *
+    when:
+      a: [isNumber]
+      b: [isNumber]
+    output: a b *
+    fold: true
+    explain: "{a} x {b} = {result}."
+    tags: [fold]
+
+  - id: fold-divide
+    name: Work it out
+    pattern: a b /
+    when:
+      a: [isNumber]
+      b: [isNonZero]
+    output: a b /
+    fold: true
+    explain: "{a} / {b} = {result}."
+    tags: [fold]
+
+  - id: fold-negate
+    name: Work it out
+    pattern: a neg
+    when:
+      a: [isNumber]
+    output: a neg
+    fold: true
+    explain: "The opposite of {a} is {result}."
+    tags: [fold]
+
+  # ---- identities ------------------------------------------------------
+  - id: add-zero
+    name: Adding zero
+    pattern: a 0 +
+    commutative: true
+    output: a
+    explain: "Adding 0 changes nothing, so this is just {a}."
+    tags: [identity]
+
+  - id: subtract-zero
+    name: Subtracting zero
+    pattern: a 0 -
+    output: a
+    explain: "Taking away 0 changes nothing, so this is just {a}."
+    tags: [identity]
+
+  - id: multiply-one
+    name: Multiplying by one
+    pattern: a 1 *
+    commutative: true
+    output: a
+    explain: "Multiplying by 1 changes nothing, so this is just {a}."
+    tags: [identity]
+
+  - id: divide-one
+    name: Dividing by one
+    pattern: a 1 /
+    output: a
+    explain: "Dividing by 1 changes nothing, so this is just {a}."
+    tags: [identity]
+
+  - id: multiply-zero
+    name: Multiplying by zero
+    pattern: a 0 *
+    commutative: true
+    output: "0"
+    explain: "Anything times 0 is 0."
+    tags: [identity]
+
+  - id: zero-divided
+    name: Zero divided by something
+    pattern: 0 a /
+    when:
+      a: [isNotZeroLiteral]
+    output: "0"
+    explain: "0 shared into any number of parts is still 0."
+    tags: [identity]
+
+  - id: power-of-one
+    name: Power of one
+    pattern: a 1 ^
+    output: a
+    explain: "{a} to the first power is just {a}."
+    tags: [identity]
+
+  - id: ln-of-e
+    name: Log of e
+    pattern: =e ln
+    output: "1"
+    explain: "The natural log of e is 1."
+    tags: [identity]
+
+  - id: power-of-zero
+    name: Power of zero
+    pattern: a 0 ^
+    when:
+      a: [isNotZeroLiteral]
+    output: "1"
+    explain: "Anything (except 0) raised to the power 0 is 1."
+    tags: [identity]
+
+  # (x^2)^2 shows up when the chain rule meets a power: (x²)² → x⁴
+  - id: power-of-power
+    name: Power of a power
+    pattern: a m ^ n ^
+    when:
+      m: [isNumber]
+      n: [isNumber]
+    output: a m n * ^
+    fold: true
+    explain: "A power of a power multiplies the exponents: {m} times {n} is {result}."
+    tags: [collect]
+
+  # ---- cancellation ----------------------------------------------------
+  - id: subtract-self
+    name: Subtracting itself
+    pattern: a a -
+    output: "0"
+    explain: "{a} minus itself leaves 0."
+    tags: [cancel]
+
+  - id: divide-self
+    name: Dividing by itself
+    pattern: a a /
+    when:
+      a: [isNotZeroLiteral]
+    output: "1"
+    explain: "{a} divided by itself is 1."
+    tags: [cancel]
+
+  - id: double-negate
+    name: Two negatives
+    pattern: a neg neg
+    output: a
+    explain: "The opposite of the opposite of {a} is {a} again."
+    tags: [cancel]
+
+  - id: multiply-negative-one
+    name: Times negative one
+    pattern: a -1 *
+    commutative: true
+    output: a neg
+    explain: "Multiplying by -1 just flips the sign of {a}."
+    tags: [sign]
+
+  # ---- collecting terms ------------------------------------------------
+  - id: add-self
+    name: Something plus itself
+    pattern: a a +
+    output: a 2 *
+    explain: "{a} plus another {a} is two of them."
+    tags: [collect]
+
+  # Numbers separated by a nested multiplication cannot reach each other
+  # otherwise, so 3*(2*x) would sit there unfinished. Differentiation produces
+  # exactly this shape all the time.
+  - id: regroup-number-product
+    name: Multiply the numbers first
+    pattern: a b c * *
+    commutative: true
+    when:
+      a: [isNumber]
+      b: [isNumber]
+    output: a b * c *
+    fold: true
+    explain: "{a} and {b} are both numbers, so multiply them together first."
+    tags: [collect]
+
+  - id: collect-like-terms
+    name: Collect like terms
+    pattern: x m * y n * +
+    commutative: true
+    when:
+      m: [isNumber]
+      n: [isNumber]
+    require:
+      - [sameAs, x, y]
+    output: x m n + *
+    fold: true
+    explain: "{m} lots of {x} plus {n} lots of {x} makes {result}."
+    tags: [collect]
+
+  - id: distribute
+    name: Distribute over a sum
+    pattern: a b c + *
+    commutative: true
+    when:
+      a: [isNumber]
+    output: a b * a c * +
+    explain: "Share the {a} across both parts: {b} and {c} each get multiplied."
+    priority: -1
+    tags: [expand]

@@ -1,0 +1,215 @@
+# every-output.tsv — Arithmetic, comparisons, strings, logic, functions, conditionals and edge cases, each through JavaScript (and its value), LaTeX, MathML and SQL.
+# Columns: Input, Clean, Postfix, Latex, MathML, JavaScript, SQL, Evaluated, Python, Excel, Text, HTML. A blank cell is not checked; ERROR (or ERROR: text) expects a refusal; a # line is a note.
+Input	Clean	Postfix	Latex	MathML	JavaScript	SQL	Evaluated	Python	Excel	Text
+
+# Arithmetic Operations - Integers
+1+1	1+1	["1","1","+"]	1 + 1	<math><mrow><mn>1</mn><mo>+</mo><mn>1</mn></mrow></math>	1 + 1	1 + 1	2	1 + 1	=1+1	1 + 1
+5-3	5-3	["5","3","-"]	5 - 3	<math><mrow><mn>5</mn><mo>−</mo><mn>3</mn></mrow></math>	5 - 3	5 - 3	2	5 - 3	=5-3	5 - 3
+2*4	2*4	["2","4","*"]	2 \cdot 4	<math><mrow><mn>2</mn><mo>⋅</mo><mn>4</mn></mrow></math>	2 * 4	2 * 4	8	2 * 4	=2*4	2 * 4
+8/2	8/2	["8","2","/"]	\frac{8}{2}	<math><mfrac><mn>8</mn><mn>2</mn></mfrac></math>	8 / 2	8 / 2	4	8 / 2	=8/2	8 / 2
+10%3	10%3	["10","3","mod"]	10 \bmod 3	<math><mrow><mn>10</mn><mo>mod</mo><mn>3</mn></mrow></math>	10 % 3	MOD(10, 3)	1	10 % 3	=MOD(10, 3)	10 mod 3
+2^3	2^{3}	["2","3","^"]	2^3	<math><msup><mn>2</mn><mn>3</mn></msup></math>	Math.pow(2, 3)	POWER(2, 3)	8	2 ** 3	=2^3	2^3
+(-5)	(-5)	["-5"]	-5	<math><mn>-5</mn></math>	-5	-5	-5	-5	=-5	-5
+
+# Arithmetic Operations - Floats
+1.5+2.5	1.5+2.5	["1.5","2.5","+"]	1.5 + 2.5	<math><mrow><mn>1.5</mn><mo>+</mo><mn>2.5</mn></mrow></math>	1.5 + 2.5	1.5 + 2.5	4	1.5 + 2.5	=1.5+2.5	1.5 + 2.5
+3.7-1.2	3.7-1.2	["3.7","1.2","-"]	3.7 - 1.2	<math><mrow><mn>3.7</mn><mo>−</mo><mn>1.2</mn></mrow></math>	3.7 - 1.2	3.7 - 1.2	2.5	3.7 - 1.2	=3.7-1.2	3.7 - 1.2
+2.5*3.0	2.5*3.0	["2.5","3.0","*"]	2.5 \cdot 3.0	<math><mrow><mn>2.5</mn><mo>⋅</mo><mn>3.0</mn></mrow></math>	2.5 * 3.0	2.5 * 3.0	7.5	2.5 * 3.0	=2.5*3.0	2.5 * 3.0
+7.5/2.5	7.5/2.5	["7.5","2.5","/"]	\frac{7.5}{2.5}	<math><mfrac><mn>7.5</mn><mn>2.5</mn></mfrac></math>	7.5 / 2.5	7.5 / 2.5	3	7.5 / 2.5	=7.5/2.5	7.5 / 2.5
+(-2.5)	(-2.5)	["-2.5"]	-2.5	<math><mn>-2.5</mn></math>	-2.5	-2.5	-2.5	-2.5	=-2.5	-2.5
+0.1+0.2	0.1+0.2	["0.1","0.2","+"]	0.1 + 0.2	<math><mrow><mn>0.1</mn><mo>+</mo><mn>0.2</mn></mrow></math>	0.1 + 0.2	0.1 + 0.2	0.30000000000000004	0.1 + 0.2	=0.1+0.2	0.1 + 0.2
+
+# Comparison Operations - Numbers (True Cases)
+5>3	5>3	["5","3",">"]	5 > 3	<math><mrow><mn>5</mn><mo>&gt;</mo><mn>3</mn></mrow></math>	5 > 3	5 > 3	true	5 > 3	=5>3	5 > 3
+2<7	2<7	["2","7","<"]	2 < 7	<math><mrow><mn>2</mn><mo>&lt;</mo><mn>7</mn></mrow></math>	2 < 7	2 < 7	true	2 < 7	=2<7	2 < 7
+4>=4	4≥4	["4","4","≥"]	4 \geq 4	<math><mrow><mn>4</mn><mo>≥</mo><mn>4</mn></mrow></math>	4 >= 4	4 >= 4	true	4 >= 4	=4>=4	4 ≥ 4
+3<=5	3≤5	["3","5","≤"]	3 \leq 5	<math><mrow><mn>3</mn><mo>≤</mo><mn>5</mn></mrow></math>	3 <= 5	3 <= 5	true	3 <= 5	=3<=5	3 ≤ 5
+2==2	2=2	["2","2","="]	2 = 2	<math><mrow><mn>2</mn><mo>=</mo><mn>2</mn></mrow></math>	2 == 2	2 = 2	true	2 == 2	=2=2	2 = 2
+3!=4	3≠4	["3","4","≠"]	3 \neq 4	<math><mrow><mn>3</mn><mo>≠</mo><mn>4</mn></mrow></math>	3 != 4	3 <> 4	true	3 != 4	=3<>4	3 ≠ 4
+
+# Comparison Operations - Numbers (False Cases)
+3>5	3>5	["3","5",">"]	3 > 5	<math><mrow><mn>3</mn><mo>&gt;</mo><mn>5</mn></mrow></math>	3 > 5	3 > 5	false	3 > 5	=3>5	3 > 5
+7<2	7<2	["7","2","<"]	7 < 2	<math><mrow><mn>7</mn><mo>&lt;</mo><mn>2</mn></mrow></math>	7 < 2	7 < 2	false	7 < 2	=7<2	7 < 2
+3>=4	3≥4	["3","4","≥"]	3 \geq 4	<math><mrow><mn>3</mn><mo>≥</mo><mn>4</mn></mrow></math>	3 >= 4	3 >= 4	false	3 >= 4	=3>=4	3 ≥ 4
+5<=3	5≤3	["5","3","≤"]	5 \leq 3	<math><mrow><mn>5</mn><mo>≤</mo><mn>3</mn></mrow></math>	5 <= 3	5 <= 3	false	5 <= 3	=5<=3	5 ≤ 3
+2==3	2=3	["2","3","="]	2 = 3	<math><mrow><mn>2</mn><mo>=</mo><mn>3</mn></mrow></math>	2 == 3	2 = 3	false	2 == 3	=2=3	2 = 3
+4!=4	4≠4	["4","4","≠"]	4 \neq 4	<math><mrow><mn>4</mn><mo>≠</mo><mn>4</mn></mrow></math>	4 != 4	4 <> 4	false	4 != 4	=4<>4	4 ≠ 4
+
+# Comparison Operations - Floats (True Cases)
+1.5>1.2	1.5>1.2	["1.5","1.2",">"]	1.5 > 1.2	<math><mrow><mn>1.5</mn><mo>&gt;</mo><mn>1.2</mn></mrow></math>	1.5 > 1.2	1.5 > 1.2	true	1.5 > 1.2	=1.5>1.2	1.5 > 1.2
+0.5<0.8	0.5<0.8	["0.5","0.8","<"]	0.5 < 0.8	<math><mrow><mn>0.5</mn><mo>&lt;</mo><mn>0.8</mn></mrow></math>	0.5 < 0.8	0.5 < 0.8	true	0.5 < 0.8	=0.5<0.8	0.5 < 0.8
+2.0>=2.0	2.0≥2.0	["2.0","2.0","≥"]	2.0 \geq 2.0	<math><mrow><mn>2.0</mn><mo>≥</mo><mn>2.0</mn></mrow></math>	2.0 >= 2.0	2.0 >= 2.0	true	2.0 >= 2.0	=2.0>=2.0	2.0 ≥ 2.0
+1.5<=1.8	1.5≤1.8	["1.5","1.8","≤"]	1.5 \leq 1.8	<math><mrow><mn>1.5</mn><mo>≤</mo><mn>1.8</mn></mrow></math>	1.5 <= 1.8	1.5 <= 1.8	true	1.5 <= 1.8	=1.5<=1.8	1.5 ≤ 1.8
+3.14==3.14	3.14=3.14	["3.14","3.14","="]	3.14 = 3.14	<math><mrow><mn>3.14</mn><mo>=</mo><mn>3.14</mn></mrow></math>	3.14 == 3.14	3.14 = 3.14	true	3.14 == 3.14	=3.14=3.14	3.14 = 3.14
+1.1!=1.2	1.1≠1.2	["1.1","1.2","≠"]	1.1 \neq 1.2	<math><mrow><mn>1.1</mn><mo>≠</mo><mn>1.2</mn></mrow></math>	1.1 != 1.2	1.1 <> 1.2	true	1.1 != 1.2	=1.1<>1.2	1.1 ≠ 1.2
+
+# Comparison Operations - Floats (False Cases)
+1.2>1.5	1.2>1.5	["1.2","1.5",">"]	1.2 > 1.5	<math><mrow><mn>1.2</mn><mo>&gt;</mo><mn>1.5</mn></mrow></math>	1.2 > 1.5	1.2 > 1.5	false	1.2 > 1.5	=1.2>1.5	1.2 > 1.5
+0.8<0.5	0.8<0.5	["0.8","0.5","<"]	0.8 < 0.5	<math><mrow><mn>0.8</mn><mo>&lt;</mo><mn>0.5</mn></mrow></math>	0.8 < 0.5	0.8 < 0.5	false	0.8 < 0.5	=0.8<0.5	0.8 < 0.5
+1.9>=2.0	1.9≥2.0	["1.9","2.0","≥"]	1.9 \geq 2.0	<math><mrow><mn>1.9</mn><mo>≥</mo><mn>2.0</mn></mrow></math>	1.9 >= 2.0	1.9 >= 2.0	false	1.9 >= 2.0	=1.9>=2.0	1.9 ≥ 2.0
+1.8<=1.5	1.8≤1.5	["1.8","1.5","≤"]	1.8 \leq 1.5	<math><mrow><mn>1.8</mn><mo>≤</mo><mn>1.5</mn></mrow></math>	1.8 <= 1.5	1.8 <= 1.5	false	1.8 <= 1.5	=1.8<=1.5	1.8 ≤ 1.5
+3.14==3.15	3.14=3.15	["3.14","3.15","="]	3.14 = 3.15	<math><mrow><mn>3.14</mn><mo>=</mo><mn>3.15</mn></mrow></math>	3.14 == 3.15	3.14 = 3.15	false	3.14 == 3.15	=3.14=3.15	3.14 = 3.15
+2.5!=2.5	2.5≠2.5	["2.5","2.5","≠"]	2.5 \neq 2.5	<math><mrow><mn>2.5</mn><mo>≠</mo><mn>2.5</mn></mrow></math>	2.5 != 2.5	2.5 <> 2.5	false	2.5 != 2.5	=2.5<>2.5	2.5 ≠ 2.5
+'world'=="world"	'world'="world"	["'world'","\"world\"","="]	\text{'world'} = \text{"world"}	<math><mrow><mtext>'world'</mtext><mo>=</mo><mtext>"world"</mtext></mrow></math>	"world" == "world"	'world' = "world"	true	"world" == "world"	="world"="world"	'world' = "world"
+"test123"	"test123"	["\"test123\""]	\text{"test123"}	<math><mtext>"test123"</mtext></math>	"test123"	"test123"	test123	"test123"	="test123"	"test123"
+
+# String Comparisons (True Cases)
+"apple"=="apple"	"apple"="apple"	["\"apple\"","\"apple\"","="]	\text{"apple"} = \text{"apple"}	<math><mrow><mtext>"apple"</mtext><mo>=</mo><mtext>"apple"</mtext></mrow></math>	"apple" == "apple"	"apple" = "apple"	true	"apple" == "apple"	="apple"="apple"	"apple" = "apple"
+"cat"!="dog"	"cat"≠"dog"	["\"cat\"","\"dog\"","≠"]	\text{"cat"} \neq \text{"dog"}	<math><mrow><mtext>"cat"</mtext><mo>≠</mo><mtext>"dog"</mtext></mrow></math>	"cat" != "dog"	"cat" <> "dog"	true	"cat" != "dog"	="cat"<>"dog"	"cat" ≠ "dog"
+"abc"<"def"	"abc"<"def"	["\"abc\"","\"def\"","<"]	\text{"abc"} < \text{"def"}	<math><mrow><mtext>"abc"</mtext><mo>&lt;</mo><mtext>"def"</mtext></mrow></math>	"abc" < "def"	"abc" < "def"	true	"abc" < "def"	="abc"<"def"	"abc" < "def"
+"xyz">"abc"	"xyz">"abc"	["\"xyz\"","\"abc\"",">"]	\text{"xyz"} > \text{"abc"}	<math><mrow><mtext>"xyz"</mtext><mo>&gt;</mo><mtext>"abc"</mtext></mrow></math>	"xyz" > "abc"	"xyz" > "abc"	true	"xyz" > "abc"	="xyz">"abc"	"xyz" > "abc"
+"same">="same"	"same"≥"same"	["\"same\"","\"same\"","≥"]	\text{"same"} \geq \text{"same"}	<math><mrow><mtext>"same"</mtext><mo>≥</mo><mtext>"same"</mtext></mrow></math>	"same" >= "same"	"same" >= "same"	true	"same" >= "same"	="same">="same"	"same" ≥ "same"
+"hello"<="world"	"hello"≤"world"	["\"hello\"","\"world\"","≤"]	\text{"hello"} \leq \text{"world"}	<math><mrow><mtext>"hello"</mtext><mo>≤</mo><mtext>"world"</mtext></mrow></math>	"hello" <= "world"	"hello" <= "world"	true	"hello" <= "world"	="hello"<="world"	"hello" ≤ "world"
+
+# String Comparisons (False Cases)
+"apple"=="orange"	"apple"="orange"	["\"apple\"","\"orange\"","="]	\text{"apple"} = \text{"orange"}	<math><mrow><mtext>"apple"</mtext><mo>=</mo><mtext>"orange"</mtext></mrow></math>	"apple" == "orange"	"apple" = "orange"	false	"apple" == "orange"	="apple"="orange"	"apple" = "orange"
+"cat"!="cat"	"cat"≠"cat"	["\"cat\"","\"cat\"","≠"]	\text{"cat"} \neq \text{"cat"}	<math><mrow><mtext>"cat"</mtext><mo>≠</mo><mtext>"cat"</mtext></mrow></math>	"cat" != "cat"	"cat" <> "cat"	false	"cat" != "cat"	="cat"<>"cat"	"cat" ≠ "cat"
+"def"<"abc"	"def"<"abc"	["\"def\"","\"abc\"","<"]	\text{"def"} < \text{"abc"}	<math><mrow><mtext>"def"</mtext><mo>&lt;</mo><mtext>"abc"</mtext></mrow></math>	"def" < "abc"	"def" < "abc"	false	"def" < "abc"	="def"<"abc"	"def" < "abc"
+"abc">"xyz"	"abc">"xyz"	["\"abc\"","\"xyz\"",">"]	\text{"abc"} > \text{"xyz"}	<math><mrow><mtext>"abc"</mtext><mo>&gt;</mo><mtext>"xyz"</mtext></mrow></math>	"abc" > "xyz"	"abc" > "xyz"	false	"abc" > "xyz"	="abc">"xyz"	"abc" > "xyz"
+"later">="sooner"	"later"≥"sooner"	["\"later\"","\"sooner\"","≥"]	\text{"later"} \geq \text{"sooner"}	<math><mrow><mtext>"later"</mtext><mo>≥</mo><mtext>"sooner"</mtext></mrow></math>	"later" >= "sooner"	"later" >= "sooner"	false	"later" >= "sooner"	="later">="sooner"	"later" ≥ "sooner"
+"world"<="hello"	"world"≤"hello"	["\"world\"","\"hello\"","≤"]	\text{"world"} \leq \text{"hello"}	<math><mrow><mtext>"world"</mtext><mo>≤</mo><mtext>"hello"</mtext></mrow></math>	"world" <= "hello"	"world" <= "hello"	false	"world" <= "hello"	="world"<="hello"	"world" ≤ "hello"
+
+# Logical Operations (True Cases)
+true&&true	true&true	["true","true","&"]	\mathrm{true} \land \mathrm{true}	<math><mrow><mi>true</mi><mo>∧</mo><mi>true</mi></mrow></math>	(true && true)	(TRUE AND TRUE)	true	(True and True)	=AND(TRUE, TRUE)	true ∧ true
+false||true	false||true	["false","true","|"]	\mathrm{false} \lor \mathrm{true}	<math><mrow><mi>false</mi><mo>∨</mo><mi>true</mi></mrow></math>	(false || true)	(FALSE OR TRUE)	true	(False or True)	=OR(FALSE, TRUE)	false ∨ true
+true||false	true||false	["true","false","|"]	\mathrm{true} \lor \mathrm{false}	<math><mrow><mi>true</mi><mo>∨</mo><mi>false</mi></mrow></math>	(true || false)	(TRUE OR FALSE)	true	(True or False)	=OR(TRUE, FALSE)	true ∨ false
+!false	!false	["false","\\not"]	\neg \mathrm{false}	<math><mrow><mo>¬</mo><mi>false</mi></mrow></math>	!false	NOT FALSE	true	not False	=NOT(FALSE)	¬false
+(5>3)&&(2<4)	(5>3)&(2<4)	["5","3",">","2","4","<","&"]	5 > 3 \land 2 < 4	<math><mrow><mrow><mn>5</mn><mo>&gt;</mo><mn>3</mn></mrow><mo>∧</mo><mrow><mn>2</mn><mo>&lt;</mo><mn>4</mn></mrow></mrow></math>	(5 > 3 && 2 < 4)	(5 > 3 AND 2 < 4)	true	(5 > 3 and 2 < 4)	=AND(5>3, 2<4)	5 > 3 ∧ 2 < 4
+(1==1)||(2==3)	(1=1)||(2=3)	["1","1","=","2","3","=","|"]	1 = 1 \lor 2 = 3	<math><mrow><mrow><mn>1</mn><mo>=</mo><mn>1</mn></mrow><mo>∨</mo><mrow><mn>2</mn><mo>=</mo><mn>3</mn></mrow></mrow></math>	(1 == 1 || 2 == 3)	(1 = 1 OR 2 = 3)	true	(1 == 1 or 2 == 3)	=OR(1=1, 2=3)	1 = 1 ∨ 2 = 3
+
+# Logical Operations (False Cases)
+true&&false	true&false	["true","false","&"]	\mathrm{true} \land \mathrm{false}	<math><mrow><mi>true</mi><mo>∧</mo><mi>false</mi></mrow></math>	(true && false)	(TRUE AND FALSE)	false	(True and False)	=AND(TRUE, FALSE)	true ∧ false
+false&&true	false&true	["false","true","&"]	\mathrm{false} \land \mathrm{true}	<math><mrow><mi>false</mi><mo>∧</mo><mi>true</mi></mrow></math>	(false && true)	(FALSE AND TRUE)	false	(False and True)	=AND(FALSE, TRUE)	false ∧ true
+false||false	false||false	["false","false","|"]	\mathrm{false} \lor \mathrm{false}	<math><mrow><mi>false</mi><mo>∨</mo><mi>false</mi></mrow></math>	(false || false)	(FALSE OR FALSE)	false	(False or False)	=OR(FALSE, FALSE)	false ∨ false
+!true	!true	["true","\\not"]	\neg \mathrm{true}	<math><mrow><mo>¬</mo><mi>true</mi></mrow></math>	!true	NOT TRUE	false	not True	=NOT(TRUE)	¬true
+(5<3)&&(2>4)	(5<3)&(2>4)	["5","3","<","2","4",">","&"]	5 < 3 \land 2 > 4	<math><mrow><mrow><mn>5</mn><mo>&lt;</mo><mn>3</mn></mrow><mo>∧</mo><mrow><mn>2</mn><mo>&gt;</mo><mn>4</mn></mrow></mrow></math>	(5 < 3 && 2 > 4)	(5 < 3 AND 2 > 4)	false	(5 < 3 and 2 > 4)	=AND(5<3, 2>4)	5 < 3 ∧ 2 > 4
+(1==2)&&(3==3)	(1=2)&(3=3)	["1","2","=","3","3","=","&"]	1 = 2 \land 3 = 3	<math><mrow><mrow><mn>1</mn><mo>=</mo><mn>2</mn></mrow><mo>∧</mo><mrow><mn>3</mn><mo>=</mo><mn>3</mn></mrow></mrow></math>	(1 == 2 && 3 == 3)	(1 = 2 AND 3 = 3)	false	(1 == 2 and 3 == 3)	=AND(1=2, 3=3)	1 = 2 ∧ 3 = 3
+
+# Mathematical Functions
+abs(-5)	abs(-5)	["-5","abs"]	\left|-5\right|	<math><mrow><mo>|</mo><mn>-5</mn><mo>|</mo></mrow></math>	Math.abs(-5)	ABS(-5)	5	abs(-5)	=ABS(-5)	|-5|
+abs(3)	abs(3)	["3","abs"]	\left|3\right|	<math><mrow><mo>|</mo><mn>3</mn><mo>|</mo></mrow></math>	Math.abs(3)	ABS(3)	3	abs(3)	=ABS(3)	|3|
+sqrt(9)	sqrt(9)	["9","sqrt"]	\sqrt{9}	<math><msqrt><mn>9</mn></msqrt></math>	Math.sqrt(9)	SQRT(9)	3	math.sqrt(9)	=SQRT(9)	√(9)
+sqrt(16)	sqrt(16)	["16","sqrt"]	\sqrt{16}	<math><msqrt><mn>16</mn></msqrt></math>	Math.sqrt(16)	SQRT(16)	4	math.sqrt(16)	=SQRT(16)	√(16)
+round(3.7)	round(3.7)	["3.7","0","round"]	\text{round}\left(3.7, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>3.7</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Math.round(3.7)	ROUND(3.7, 0)	4	round(3.7, 0)	=ROUND(3.7, 0)	round(3.7, 0)
+round(3.2)	round(3.2)	["3.2","0","round"]	\text{round}\left(3.2, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>3.2</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Math.round(3.2)	ROUND(3.2, 0)	3	round(3.2, 0)	=ROUND(3.2, 0)	round(3.2, 0)
+floor(3.9)	floor(3.9)	["3.9","floor"]	\lfloor 3.9 \rfloor	<math><mrow><mo>⌊</mo><mn>3.9</mn><mo>⌋</mo></mrow></math>	Math.floor(3.9)	FLOOR(3.9)	3	math.floor(3.9)	=INT(3.9)	⌊3.9⌋
+ceil(3.1)	ceil(3.1)	["3.1","ceil"]	\lceil 3.1 \rceil	<math><mrow><mo>⌈</mo><mn>3.1</mn><mo>⌉</mo></mrow></math>	Math.ceil(3.1)	CEIL(3.1)	4	math.ceil(3.1)	=-INT(-3.1)	⌈3.1⌉
+
+# Mathematical Functions with Multiple Arguments
+max(5,3,8)	max(5,3,8)	["5","3","8","3","max"]	\max\left(5, 3, 8\right)	<math><mrow><mi>max</mi><mo>(</mo><mn>5</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>8</mn><mo>)</mo></mrow></math>	Math.max(5, 3, 8)	GREATEST(5, 3, 8)	8	max(5, 3, 8)	=MAX(5, 3, 8)	max(5, 3, 8)
+min(5,3,8)	min(5,3,8)	["5","3","8","3","min"]	\min\left(5, 3, 8\right)	<math><mrow><mi>min</mi><mo>(</mo><mn>5</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>8</mn><mo>)</mo></mrow></math>	Math.min(5, 3, 8)	LEAST(5, 3, 8)	3	min(5, 3, 8)	=MIN(5, 3, 8)	min(5, 3, 8)
+max(1.5,2.3,1.1)	max(1.5,2.3,1.1)	["1.5","2.3","1.1","3","max"]	\max\left(1.5, 2.3, 1.1\right)	<math><mrow><mi>max</mi><mo>(</mo><mn>1.5</mn><mo>,</mo><mn>2.3</mn><mo>,</mo><mn>1.1</mn><mo>)</mo></mrow></math>	Math.max(1.5, 2.3, 1.1)	GREATEST(1.5, 2.3, 1.1)	2.3	max(1.5, 2.3, 1.1)	=MAX(1.5, 2.3, 1.1)	max(1.5, 2.3, 1.1)
+min(1.5,2.3,1.1)	min(1.5,2.3,1.1)	["1.5","2.3","1.1","3","min"]	\min\left(1.5, 2.3, 1.1\right)	<math><mrow><mi>min</mi><mo>(</mo><mn>1.5</mn><mo>,</mo><mn>2.3</mn><mo>,</mo><mn>1.1</mn><mo>)</mo></mrow></math>	Math.min(1.5, 2.3, 1.1)	LEAST(1.5, 2.3, 1.1)	1.1	min(1.5, 2.3, 1.1)	=MIN(1.5, 2.3, 1.1)	min(1.5, 2.3, 1.1)
+
+# Complex Expressions
+(2+3)*4	(2+3)*4	["2","3","+","4","*"]	\left(2 + 3\right) \cdot 4	<math><mrow><mrow><mo>(</mo><mrow><mn>2</mn><mo>+</mo><mn>3</mn></mrow><mo>)</mo></mrow><mo>⋅</mo><mn>4</mn></mrow></math>	(2 + 3) * 4	(2 + 3) * 4	20	(2 + 3) * 4	=(2+3)*4	(2 + 3) * 4
+2+(3*4)	2+(3*4)	["2","3","4","*","+"]	2 + 3 \cdot 4	<math><mrow><mn>2</mn><mo>+</mo><mrow><mn>3</mn><mo>⋅</mo><mn>4</mn></mrow></mrow></math>	2 + 3 * 4	2 + 3 * 4	14	2 + 3 * 4	=2+3*4	2 + 3 * 4
+(10/2)^2	(10/2)^{2}	["10","2","/","2","^"]	\left(\frac{10}{2}\right)^2	<math><msup><mrow><mo>(</mo><mfrac><mn>10</mn><mn>2</mn></mfrac><mo>)</mo></mrow><mn>2</mn></msup></math>	Math.pow((10 / 2), 2)	POWER(10 / 2, 2)	25	(10 / 2) ** 2	=(10/2)^2	(10 / 2)^2
+sqrt(3^2+4^2)	sqrt(3^{2}+4^{2})	["3","2","^","4","2","^","+","sqrt"]	\sqrt{3^2 + 4^2}	<math><msqrt><mrow><msup><mn>3</mn><mn>2</mn></msup><mo>+</mo><msup><mn>4</mn><mn>2</mn></msup></mrow></msqrt></math>	Math.sqrt(Math.pow(3, 2) + Math.pow(4, 2))	SQRT(POWER(3, 2) + POWER(4, 2))	5	math.sqrt(3 ** 2 + 4 ** 2)	=SQRT(3^2+4^2)	√(3^2 + 4^2)
+
+# Edge Cases
+0	0	["0"]	0	<math><mn>0</mn></math>	0	0	0	0	=0	0
+1	1	["1"]	1	<math><mn>1</mn></math>	1	1	1	1	=1	1
+0.0	0.0	["0.0"]	0.0	<math><mn>0.0</mn></math>	0.0	0.0	0	0.0	=0.0	0.0
+-0	-0	["-0"]	-0	<math><mn>-0</mn></math>	-0	-0	-0	-0	=-0	-0
+true	true	["true"]	\mathrm{true}	<math><mi>true</mi></math>	true	TRUE	true	True	=TRUE	true
+false	false	["false"]	\mathrm{false}	<math><mi>false</mi></math>	false	FALSE	false	False	=FALSE	false
+
+# Division and Modulo Edge Cases
+5/0	5/0	["5","0","/"]	\frac{5}{0}	<math><mfrac><mn>5</mn><mn>0</mn></mfrac></math>	5 / 0	5 / 0	Infinity	5 / 0	=5/0	5 / 0
+-5/0	-5/0	["-5","0","/"]	\frac{-5}{0}	<math><mfrac><mn>-5</mn><mn>0</mn></mfrac></math>	-5 / 0	-5 / 0	-Infinity	-5 / 0	=-5/0	-5 / 0
+0/0	0/0	["0","0","/"]	\frac{0}{0}	<math><mfrac><mn>0</mn><mn>0</mn></mfrac></math>	0 / 0	0 / 0	NaN	0 / 0	=0/0	0 / 0
+0/5	0/5	["0","5","/"]	\frac{0}{5}	<math><mfrac><mn>0</mn><mn>5</mn></mfrac></math>	0 / 5	0 / 5	0	0 / 5	=0/5	0 / 5
+6%2	6%2	["6","2","mod"]	6 \bmod 2	<math><mrow><mn>6</mn><mo>mod</mo><mn>2</mn></mrow></math>	6 % 2	MOD(6, 2)	0	6 % 2	=MOD(6, 2)	6 mod 2
+7%3	7%3	["7","3","mod"]	7 \bmod 3	<math><mrow><mn>7</mn><mo>mod</mo><mn>3</mn></mrow></math>	7 % 3	MOD(7, 3)	1	7 % 3	=MOD(7, 3)	7 mod 3
+
+# Power Operations
+0^0	0^{0}	["0","0","^"]	0^0	<math><msup><mn>0</mn><mn>0</mn></msup></math>	Math.pow(0, 0)	POWER(0, 0)	1	0 ** 0	=0^0	0^0
+1^100	1^{100}	["1","100","^"]	1^{100}	<math><msup><mn>1</mn><mn>100</mn></msup></math>	Math.pow(1, 100)	POWER(1, 100)	1	1 ** 100	=1^100	1^100
+-2^2	-2^{2}	["2","2","^","neg"]	-2^2	<math><mrow><mo>−</mo><msup><mn>2</mn><mn>2</mn></msup></mrow></math>	-(Math.pow(2, 2))	-POWER(2, 2)	-4	-(2 ** 2)	=-(2^2)	-2^2
+(-2)^3	(-2)^{3}	["-2","3","^"]	\left(-2\right)^3	<math><msup><mrow><mo>(</mo><mn>-2</mn><mo>)</mo></mrow><mn>3</mn></msup></math>	Math.pow((-2), 3)	POWER(-2, 3)	-8	(-2) ** 3	=(-2)^3	(-2)^3
+2^(-1)	2^(-1)	["2","-1","^"]	2^{-1}	<math><msup><mn>2</mn><mn>-1</mn></msup></math>	Math.pow(2, -1)	POWER(2, -1)	0.5	2 ** -1	=2^(-1)	2^-1
+pi	pi	["pi"]	\pi	<math><mi>π</mi></math>	Math.PI	PI()	3.141592653589793	math.pi	=PI()	π
+e	e	["e"]	e	<math><mi>e</mi></math>	Math.E	EXP(1)	2.718281828459045	math.e	=EXP(1)	e
+
+# Mixed Type Comparisons
+1==true	1=true	["1","true","="]	1 = \mathrm{true}	<math><mrow><mn>1</mn><mo>=</mo><mi>true</mi></mrow></math>	1 == true	1 = TRUE	true	1 == True	=1=TRUE	1 = true
+0==false	0=false	["0","false","="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 == false	0 = FALSE	true	0 == False	=0=FALSE	0 = false
+"1"==1	"1"=1	["\"1\"","1","="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" == 1	"1" = 1	true	"1" == 1	="1"=1	"1" = 1
+""==0	""=0	["\"\"","0","="]	\text{""} = 0	<math><mrow><mtext>""</mtext><mo>=</mo><mn>0</mn></mrow></math>	"" == 0	"" = 0	true	"" == 0	=""=0	"" = 0
+
+# Parentheses Grouping
+(1+2)	(1+2)	["1","2","+"]	1 + 2	<math><mrow><mn>1</mn><mo>+</mo><mn>2</mn></mrow></math>	1 + 2	1 + 2	3	1 + 2	=1+2	1 + 2
+((3))	((3))	["3"]	3	<math><mn>3</mn></math>	3	3	3	3	=3	3
+(2*3)+1	(2*3)+1	["2","3","*","1","+"]	2 \cdot 3 + 1	<math><mrow><mrow><mn>2</mn><mo>⋅</mo><mn>3</mn></mrow><mo>+</mo><mn>1</mn></mrow></math>	2 * 3 + 1	2 * 3 + 1	7	2 * 3 + 1	=2*3+1	2 * 3 + 1
+1+(2*3)	1+(2*3)	["1","2","3","*","+"]	1 + 2 \cdot 3	<math><mrow><mn>1</mn><mo>+</mo><mrow><mn>2</mn><mo>⋅</mo><mn>3</mn></mrow></mrow></math>	1 + 2 * 3	1 + 2 * 3	7	1 + 2 * 3	=1+2*3	1 + 2 * 3
+
+# Floating Point Precision Tests
+0.1+0.1+0.1	0.1+0.1+0.1	["0.1","0.1","+","0.1","+"]	0.1 + 0.1 + 0.1	<math><mrow><mrow><mn>0.1</mn><mo>+</mo><mn>0.1</mn></mrow><mo>+</mo><mn>0.1</mn></mrow></math>	0.1 + 0.1 + 0.1	0.1 + 0.1 + 0.1	0.30000000000000004	0.1 + 0.1 + 0.1	=0.1+0.1+0.1	0.1 + 0.1 + 0.1
+1.0-0.9	1.0-0.9	["1.0","0.9","-"]	1.0 - 0.9	<math><mrow><mn>1.0</mn><mo>−</mo><mn>0.9</mn></mrow></math>	1.0 - 0.9	1.0 - 0.9	0.09999999999999998	1.0 - 0.9	=1.0-0.9	1.0 - 0.9
+0.3*3	0.3*3	["0.3","3","*"]	0.3 \cdot 3	<math><mrow><mn>0.3</mn><mo>⋅</mo><mn>3</mn></mrow></math>	0.3 * 3	0.3 * 3	0.8999999999999999	0.3 * 3	=0.3*3	0.3 * 3
+2<1?1:0	2<1?(1)?:0	["2","1","<","1","0","?:"]	\begin{cases}1 & \text{if } 2 < 1 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>2</mn><mo>&lt;</mo><mn>1</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(2 < 1 ? 1 : 0)	CASE WHEN 2 < 1 THEN 1 ELSE 0 END	0	(1 if 2 < 1 else 0)	=IF(2<1, 1, 0)	2 < 1 ? 1 : 0
+true?"yes":"no"	true?("yes")?:"no"	["true","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{true} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>true</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(true ? "yes" : "no")	CASE WHEN TRUE THEN "yes" ELSE "no" END	yes	("yes" if True else "no")	=IF(TRUE, "yes", "no")	true ? "yes" : "no"
+false?"yes":"no"	false?("yes")?:"no"	["false","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{false} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>false</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(false ? "yes" : "no")	CASE WHEN FALSE THEN "yes" ELSE "no" END	no	("yes" if False else "no")	=IF(FALSE, "yes", "no")	false ? "yes" : "no"
+"1"===1	"1"===1	["\"1\"","1","==="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" === 1	"1" = 1	false	"1" == 1	="1"=1	"1" === 1
+0===false	0===false	["0","false","==="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 === false	0 = FALSE	false	0 == False	=0=FALSE	0 === false
++7+(+8)*+9	+7+(+8)*+9	["7","8","9","*","+"]	7 + 8 \cdot 9	<math><mrow><mn>7</mn><mo>+</mo><mrow><mn>8</mn><mo>⋅</mo><mn>9</mn></mrow></mrow></math>	7 + 8 * 9	7 + 8 * 9	79	7 + 8 * 9	=7+8*9	7 + 8 * 9
+7!	7!	["7","!"]	7!	<math><mrow><mn>7</mn><mo>!</mo></mrow></math>	7 * 6 * 5 * 4 * 3 * 2 * 1	FACTORIAL(7)	5040	7 * 6 * 5 * 4 * 3 * 2 * 1	=FACT(7)	7!
+!7!	!7!	["7","!","\\not"]	\neg 7!	<math><mrow><mo>¬</mo><mrow><mn>7</mn><mo>!</mo></mrow></mrow></math>	!(7 * 6 * 5 * 4 * 3 * 2 * 1)	NOT FACTORIAL(7)	false	not (7 * 6 * 5 * 4 * 3 * 2 * 1)	=NOT(FACT(7))	¬7!
+
+# Conditional Expressions (Ternary)
+5>3?1:0	5>3?(1)?:0	["5","3",">","1","0","?:"]	\begin{cases}1 & \text{if } 5 > 3 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>5</mn><mo>&gt;</mo><mn>3</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(5 > 3 ? 1 : 0)	CASE WHEN 5 > 3 THEN 1 ELSE 0 END	1	(1 if 5 > 3 else 0)	=IF(5>3, 1, 0)	5 > 3 ? 1 : 0
+"true"===true	"true"===true	["\"true\"","true","==="]	\text{"true"} = \mathrm{true}	<math><mrow><mtext>"true"</mtext><mo>=</mo><mi>true</mi></mrow></math>	"true" === true	"true" = TRUE	false	"true" == True	="true"=TRUE	"true" === true
+true===true	true===true	["true","true","==="]	\mathrm{true} = \mathrm{true}	<math><mrow><mi>true</mi><mo>=</mo><mi>true</mi></mrow></math>	true === true	TRUE = TRUE	true	True == True	=TRUE=TRUE	true === true
+Abs(2)	abs(2)	["2","abs"]	\left|2\right|	<math><mrow><mo>|</mo><mn>2</mn><mo>|</mo></mrow></math>	Math.abs(2)	ABS(2)	2	abs(2)	=ABS(2)	|2|
+|-2|	|-2|	["-2","abs"]	\left|-2\right|	<math><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></math>	Math.abs(-2)	ABS(-2)	2	abs(-2)	=ABS(-2)	|-2|
+2 in {1,2,3}	2∈{1,2,3}	["2","1","2","3","3","{}","∈"]	2 \in \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	[1, 2, 3].includes(2)	2 IN (1, 2, 3)	true	2 in {1, 2, 3}	=OR(2=1, 2=2, 2=3)	2 ∈ {1, 2, 3}
+2 in (1,3)	2∈(1,3)	["2","1","3","2","()","∈"]	2 \in (1, 3)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></mrow></math>	(2 > 1 && 2 < 3)	(2 > 1 AND 2 < 3)	true	(2 > 1 and 2 < 3)	=AND(2>1, 2<3)	2 ∈ (1, 3)
+2 in (1,2]	2∈(1,2]	["2","1","2","2","(]","∈"]	2 \in (1, 2]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow></mrow></math>	(2 > 1 && 2 <= 2)	(2 > 1 AND 2 <= 2)	true	(2 > 1 and 2 <= 2)	=AND(2>1, 2<=2)	2 ∈ (1, 2]
+2 in [3,5]	2∈[3,5]	["2","3","5","2","[]","∈"]	2 \in [3, 5]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></math>	(2 >= 3 && 2 <= 5)	(2 >= 3 AND 2 <= 5)	false	(2 >= 3 and 2 <= 5)	=AND(2>=3, 2<=5)	2 ∈ [3, 5]
+2 in [1,2)	2∈[1,2)	["2","1","2","2","[)","∈"]	2 \in [1, 2)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></mrow></math>	(2 >= 1 && 2 < 2)	(2 >= 1 AND 2 < 2)	false	(2 >= 1 and 2 < 2)	=AND(2>=1, 2<2)	2 ∈ [1, 2)
+2 not in {1,2,3}	2∉{1,2,3}	["2","1","2","3","3","{}","∉"]	2 \notin \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∉</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	![1, 2, 3].includes(2)	2 NOT IN (1, 2, 3)	false	2 not in {1, 2, 3}	=NOT(OR(2=1, 2=2, 2=3))	2 ∉ {1, 2, 3}
+Sum(1,2,3)	sum(1,2,3)	["1","2","3","3","sum"]	1 + 2 + 3	<math><mrow><mn>1</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn></mrow></math>	1 + 2 + 3	1 + 2 + 3	6	1 + 2 + 3	=1+2+3	1 + 2 + 3
+Prod(1,2,3)	prod(1,2,3)	["1","2","3","3","prod"]	1 \cdot 2 \cdot 3	<math><mrow><mn>1</mn><mo>⋅</mo><mn>2</mn><mo>⋅</mo><mn>3</mn></mrow></math>	1 * 2 * 3	1 * 2 * 3	6	1 * 2 * 3	=1*2*3	1 * 2 * 3
+Gcd(1,2,3)	gcd(1,2,3)	["1","2","3","3","gcd"]	\gcd\left(1, 2, 3\right)	<math><mrow><mi>gcd</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((args)=>{let gcd = function(a,b) { return (!b)?a:gcd(b,a%b); }; return Math.abs(args.reduce(gcd));})([1, 2, 3])	GCD(1, 2, 3)		math.gcd(1, 2, 3)	=GCD(1, 2, 3)	gcd(1, 2, 3)
+Avg(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
+Mean(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
+!(3>2||4<5)	!(3>2||4<5)	["3","2",">","4","5","<","|","\\not"]	\neg \left(3 > 2 \lor 4 < 5\right)	<math><mrow><mo>¬</mo><mrow><mo>(</mo><mrow><mrow><mn>3</mn><mo>&gt;</mo><mn>2</mn></mrow><mo>∨</mo><mrow><mn>4</mn><mo>&lt;</mo><mn>5</mn></mrow></mrow><mo>)</mo></mrow></mrow></math>	!(3 > 2 || 4 < 5)	NOT ((3 > 2 OR 4 < 5))	false	not (3 > 2 or 4 < 5)	=NOT(OR(3>2, 4<5))	¬(3 > 2 ∨ 4 < 5)
+(-2)^2	(-2)^{2}	["-2","2","^"]			Math.pow((-2), 2)	POWER(-2, 2)	4	(-2) ** 2	=(-2)^2	(-2)^2
++7	+7	["7"]			7	7	7	7	=7	7
+
+# String Operations
+"hello"	"hello"	["\"hello\""]			"hello"	"hello"	"hello"	"hello"	="hello"	"hello"
+'world'	'world'	["'world'"]			"world"	'world'	"world"	"world"	="world"	'world'
+"a"+"b"	"a"+"b"	["\"a\"","\"b\"","+"]			"a" + "b"	"a" || "b"	"ab"	"a" + "b"	="a"&"b"	"a" + "b"
+""	""	["\"\""]			""	""	""	""	=""	""
+
+# Variable-like identifiers
+x	x	["x"]			x	x		x	=x	x
+y	y	["y"]			y	y		y	=y	y
+
+# Strict Equality Comparisons
+1===true	1===true	["1","true","==="]			1 === true	1 = TRUE	false	1 == True	=1=TRUE	1 === true
+""===0	""===0	["\"\"","0","==="]			"" === 0	"" = 0	false	"" == 0	=""=0	"" === 0
+1===1	1===1	["1","1","==="]			1 === 1	1 = 1	true	1 == 1	=1=1	1 === 1
+"abc"==="abc"	"abc"==="abc"	["\"abc\"","\"abc\"","==="]			"abc" === "abc"	"abc" = "abc"	true	"abc" == "abc"	="abc"="abc"	"abc" === "abc"
+
+# String Concatenation
+"Hello "+"World"	"Hello "+"World"	["\"Hello \"","\"World\"","+"]			"Hello " + "World"	"Hello " || "World"	"Hello World"	"Hello " + "World"	="Hello "&"World"	"Hello " + "World"
+"123"+"456"	"123"+"456"	["\"123\"","\"456\"","+"]			"123" + "456"	"123" || "456"	"123456"	"123" + "456"	="123"&"456"	"123" + "456"
+"a"+"b"+"c"	"a"+"b"+"c"	["\"a\"","\"b\"","+","\"c\"","+"]			"a" + "b" + "c"	"a" || "b" || "c"	"abc"	"a" + "b" + "c"	="a"&"b"&"c"	"a" + "b" + "c"
+
+# Ternary Operator Tests
+true?1:0	true?(1)?:0	["true","1","0","?:"]			(true ? 1 : 0)	CASE WHEN TRUE THEN 1 ELSE 0 END	1	(1 if True else 0)	=IF(TRUE, 1, 0)	true ? 1 : 0
+false?1:0	false?(1)?:0	["false","1","0","?:"]			(false ? 1 : 0)	CASE WHEN FALSE THEN 1 ELSE 0 END	0	(1 if False else 0)	=IF(FALSE, 1, 0)	false ? 1 : 0
+5>3?10:20	5>3?(10)?:20	["5","3",">","10","20","?:"]			(5 > 3 ? 10 : 20)	CASE WHEN 5 > 3 THEN 10 ELSE 20 END	10	(10 if 5 > 3 else 20)	=IF(5>3, 10, 20)	5 > 3 ? 10 : 20
+2<1?10:20	2<1?(10)?:20	["2","1","<","10","20","?:"]			(2 < 1 ? 10 : 20)	CASE WHEN 2 < 1 THEN 10 ELSE 20 END	20	(10 if 2 < 1 else 20)	=IF(2<1, 10, 20)	2 < 1 ? 10 : 20
+1===1?"yes":"no"	1===1?("yes")?:"no"	["1","1","===","\"yes\"","\"no\"","?:"]			(1 === 1 ? "yes" : "no")	CASE WHEN 1 = 1 THEN "yes" ELSE "no" END	"yes"	("yes" if 1 == 1 else "no")	=IF(1=1, "yes", "no")	1 === 1 ? "yes" : "no"
+1===2?"yes":"no"	1===2?("yes")?:"no"	["1","2","===","\"yes\"","\"no\"","?:"]			(1 === 2 ? "yes" : "no")	CASE WHEN 1 = 2 THEN "yes" ELSE "no" END	"no"	("yes" if 1 == 2 else "no")	=IF(1=2, "yes", "no")	1 === 2 ? "yes" : "no"
+
+# Fixed decimals: round, then exactly that many (a text)
+fixed(2.5, 3)	fixed(2.5,3)	["2.5","3","fixed"]	\text{fixed}\left(2.5, 3\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>2.5</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	Number(2.5).toFixed(3)	ROUND(CAST(2.5 AS NUMERIC), 3)	2.500	format(2.5, '.3f')	=FIXED(2.5, 3)	fixed(2.5, 3)
+fixed(3.14159, 2)	fixed(3.14159,2)	["3.14159","2","fixed"]	\text{fixed}\left(3.14159, 2\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>3.14159</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></math>	Number(3.14159).toFixed(2)	ROUND(CAST(3.14159 AS NUMERIC), 2)	3.14	format(3.14159, '.2f')	=FIXED(3.14159, 2)	fixed(3.14159, 2)
+fixed(1/3, 4)	fixed(1/3,4)	["1","3","/","4","fixed"]	\text{fixed}\left(\frac{1}{3}, 4\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>,</mo><mn>4</mn><mo>)</mo></mrow></math>	Number(1 / 3).toFixed(4)	ROUND(CAST(1 / 3 AS NUMERIC), 4)	0.3333	format(1 / 3, '.4f')	=FIXED(1/3, 4)	fixed(1 / 3, 4)
+fixed(-2.5, 0)	fixed(-2.5,0)	["-2.5","0","fixed"]	\text{fixed}\left(-2.5, 0\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>-2.5</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Number(-2.5).toFixed(0)	ROUND(CAST(-2.5 AS NUMERIC), 0)	-3	format(-2.5, '.0f')	=FIXED(-2.5, 0)	fixed(-2.5, 0)
+fixed(2.5)	fixed(2.5)	["2.5","2","fixed"]	\text{fixed}\left(2.5, 2\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>2.5</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></math>	Number(2.5).toFixed(2)	ROUND(CAST(2.5 AS NUMERIC), 2)	2.50	format(2.5, '.2f')	=FIXED(2.5, 2)	fixed(2.5, 2)

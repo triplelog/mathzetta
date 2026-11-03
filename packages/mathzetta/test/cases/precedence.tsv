@@ -1,0 +1,71 @@
+# precedence.tsv — Precedence and associativity: which operator binds tighter, brackets, powers, unary minus.
+# Columns: Input, Clean, Postfix, Latex. A blank cell is not checked; a # line is a note.
+Input	Clean	Postfix	Latex
+2+3*4	2+3*4	["2","3","4","*","+"]	2 + 3 \cdot 4
+2*3+4	2*3+4	["2","3","*","4","+"]	2 \cdot 3 + 4
+2^3^4	2^{3}^{4}	["2","3","4","^","^"]	2^{3^4}
+2^3*4	2^{3}*4	["2","3","^","4","*"]	2^3 \cdot 4
+2*3^4	2*3^{4}	["2","3","4","^","*"]	2 \cdot 3^4
+2+3*4^5	2+3*4^{5}	["2","3","4","5","^","*","+"]	2 + 3 \cdot 4^5
+2^3+4*5	2^{3}+4*5	["2","3","^","4","5","*","+"]	2^3 + 4 \cdot 5
+2^3*4+5	2^{3}*4+5	["2","3","^","4","*","5","+"]	2^3 \cdot 4 + 5
+(2+3)*4	(2+3)*4	["2","3","+","4","*"]	\left(2 + 3\right) \cdot 4
+2*(3+4)	2*(3+4)	["2","3","4","+","*"]	2\left(3 + 4\right)
+(2+3)^4	(2+3)^{4}	["2","3","+","4","^"]	\left(2 + 3\right)^4
+2^(3+4)	2^(3+4)	["2","3","4","+","^"]	2^{3 + 4}
+2^3^4^5	2^{3}^{4}^{5}	["2","3","4","5","^","^","^"]	2^{3^{4^5}}
+a^b^c^d	a^b^c^d	["a","b","c","d","^","^","^"]	a^{b^{c^d}}
+-2+3	-2+3	["-2","3","+"]	-2 + 3
+-2*3	-2*3	["-2","3","*"]	-2 \cdot 3
+-2^3	-2^{3}	["2","3","^","neg"]	-2^3
+(-2)^3	(-2)^{3}	["-2","3","^"]	\left(-2\right)^3
+2*-3	2*-3	["2","-3","*"]	2 \cdot -3
+!a&b	!a&b	["a","\\not","b","&"]	\neg a \land b
+a&!b	a&!b	["a","b","\\not","&"]	a \land \neg b
+a&b|c	a&b|c	["a","b","&","c","|"]	a \land b \lor c
+a|b&c	a|b&c	["a","b","c","&","|"]	a \lor b \land c
+a\xor b&c	a \xor b&c	["a","b","c","&","\\xor"]	a \oplus b \land c
+a&b\xor c	a&b \xor c	["a","b","&","c","\\xor"]	a \land b \oplus c
+a\xor b|c	a \xor b|c	["a","b","\\xor","c","|"]	a \oplus b \lor c
+a|b\xor c	a|b \xor c	["a","b","c","\\xor","|"]	a \lor b \oplus c
+a\nand b&c	a \nand b&c	["a","b","c","&","\\nand"]	a \barwedge b \land c
+a&b\nand c	a&b \nand c	["a","b","&","c","\\nand"]	a \land b \barwedge c
+a\nor b|c	a \nor b|c	["a","b","c","|","\\nor"]	a \downarrow b \lor c
+a|b\nor c	a|b \nor c	["a","b","|","c","\\nor"]	a \lor b \downarrow c
+!a&b|c\xor d	!a&b|c \xor d	["a","\\not","b","&","c","d","\\xor","|"]	\neg a \land b \lor c \oplus d
+a\nand b\nor c	a \nand b \nor c	["a","b","\\nand","c","\\nor"]	a \barwedge b \downarrow c
+2<3=4	2<3=4	["2","3","<","4","="]	2 < 3 = 4
+2<3<4	2<3<4	["2","3","<","4","<"]	2 < 3 < 4
+a=b≠c	a=b≠c	["a","b","=","c","≠"]	a = b \neq c
+2+3<4*5	2+3<4*5	["2","3","+","4","5","*","<"]	2 + 3 < 4 \cdot 5
+2*3>4+5	2*3>4+5	["2","3","*","4","5","+",">"]	2 \cdot 3 > 4 + 5
+2^3≤4^2	2^{3}≤4^{2}	["2","3","^","4","2","^","≤"]	2^3 \leq 4^2
+|2+3|*4	|2+3|*4	["2","3","+","abs","4","*"]	\left|2 + 3\right| \cdot 4
+2*|3+4|	2*|3+4|	["2","3","4","+","abs","*"]	2\left|3 + 4\right|
+|2*3|+4	|2*3|+4	["2","3","*","abs","4","+"]	\left|2 \cdot 3\right| + 4
+2+3!	2+3!	["2","3","!","+"]	2 + 3!
+(2+3)!	(2+3)!	["2","3","+","!"]	\left(2 + 3\right)!
+2!*3	2!*3	["2","!","3","*"]	2! \cdot 3
+2*3!	2*3!	["2","3","!","*"]	2 \cdot 3!
+sin(2+3)*4	sin(2+3)*4	["2","3","+","sin","4","*"]	\sin\left(2 + 3\right) \cdot 4
+2*sin(3+4)	2*sin(3+4)	["2","3","4","+","sin","*"]	2\sin\left(3 + 4\right)
+sin(2)*cos(3)	sin(2)*cos(3)	["2","sin","3","cos","*"]	\sin\left(2\right)\cos\left(3\right)
+2+3 mod 4	2+3 mod 4	["2","3","+","4","mod"]	\left(2 + 3\right) \bmod 4
+2*3 mod 4	2*3 mod 4	["2","3","*","4","mod"]	\left(2 \cdot 3\right) \bmod 4
+2 mod 3*4	2 mod 3*4	["2","3","mod","4","*"]	\left(2 \bmod 3\right) \cdot 4
+2>3?4:5	2>3?(4)?:5	["2","3",">","4","5","?:"]	\begin{cases}4 & \text{if } 2 > 3 \\ 5 & \text{otherwise} \end{cases}
+a+b>c?d*e:f/g	a+b>c?(d*e)?:f/g	["a","b","+","c",">","d","e","*","f","g","/","?:"]	\begin{cases}de & \text{if } a + b > c \\ \frac{f}{g} & \text{otherwise} \end{cases}
+((2+3)*4)^5	((2+3)*4)^{5}	["2","3","+","4","*","5","^"]	\left(\left(2 + 3\right) \cdot 4\right)^5
+2^(3*(4+5))	2^(3*(4+5))	["2","3","4","5","+","*","^"]	2^{3\left(4 + 5\right)}
+2+-3	2+-3	["2","-3","+"]	2 + -3
+2*-3^4	2*-3^{4}	["2","3","4","^","neg","*"]	2 \cdot -3^4
+!-a	!-a	["a","neg","\\not"]	\neg \left(-a\right)
+-!a	-!a	["a","\\not","neg"]	-\left(\neg a\right)
+2 + 3 * 4	2+3*4	["2","3","4","*","+"]	2 + 3 \cdot 4
+sin ( 2 + 3 ) * 4	sin(2+3)*4	["2","3","+","sin","4","*"]	\sin\left(2 + 3\right) \cdot 4
+2x+3	2x+3	["2","x","*","3","+"]	2x + 3
+2x^3	2x^{3}	["2","x","3","^","*"]	2x^3
+2(3+4)	2(3+4)	["2","3","4","+","*"]	2\left(3 + 4\right)
+1-2-3	1-2-3	["1","2","-","3","-"]	1 - 2 - 3
+8/4/2	8/4/2	["8","4","/","2","/"]	\frac{\frac{8}{4}}{2}
+2^3^2^1	2^{3}^{2}^{1}	["2","3","2","1","^","^","^"]	2^{3^{2^1}}

@@ -1,0 +1,192 @@
+name: Solving by undoing
+
+# mode: isolate. Each rule undoes the outermost function on the side with the
+# unknown: ln u = r → u = e^r. The predicates hasVariable and freeOfVariable mean
+# "mentions / doesn't mention the unknown being solved for".
+#
+# The CAS does the rest itself: it moves terms without the unknown to the other
+# side, divides by a coefficient, and when the unknown appears in several places
+# it uses the polynomial methods (factoring, the quadratic formula) or splits a
+# product equal to 0. Every answer is checked in the original equation, so a
+# rule may give extra candidates (squaring both sides does): the wrong ones are
+# dropped, with a step saying so.
+#
+# An output can give several answers: `pm` (±) splits into two, and so does
+# `|` (or): "u r arcsin = u =pi r arcsin - = |".
+
+rules:
+  - id: iso-swap
+    name: Unknown on the left
+    mode: isolate
+    pattern: l r =
+    when:
+      l: [freeOfVariable]
+      r: [hasVariable]
+    output: r l =
+    priority: 20
+    explain: "Swap the sides so the unknown is on the left."
+    tags: [tidy]
+
+  - id: iso-ln
+    name: Undo the log
+    mode: isolate
+    pattern: u ln r =
+    when:
+      u: [hasVariable]
+    output: u =e r ^ =
+    explain: "Raise e to each side: e^(ln {u}) = {u}."
+    tags: [inverse]
+
+  - id: iso-log
+    name: Undo the log
+    mode: isolate
+    pattern: b u log r =
+    when:
+      u: [hasVariable]
+      b: [freeOfVariable]
+    output: u b r ^ =
+    explain: "Raise {b} to each side: {b}^(log base {b} of {u}) = {u}."
+    tags: [inverse]
+
+  - id: iso-exp
+    name: Undo e to a power
+    mode: isolate
+    pattern: =e u ^ r =
+    when:
+      u: [hasVariable]
+    output: u r ln =
+    explain: "Take ln of each side: ln(e^{u}) = {u}."
+    tags: [inverse]
+
+  - id: iso-exponential
+    name: Undo a power of a number
+    mode: isolate
+    pattern: b u ^ r =
+    when:
+      u: [hasVariable]
+      b: [freeOfVariable]
+    output: u b r log =
+    explain: "Take the log to base {b} of each side."
+    tags: [inverse]
+
+  - id: iso-square
+    name: Undo the square
+    mode: isolate
+    pattern: u 2 ^ r =
+    when:
+      u: [hasVariable]
+    output: u r sqrt pm =
+    priority: 1
+    explain: "Take the square root of each side; {u} can be positive or negative."
+    tags: [inverse]
+
+  - id: iso-even-power
+    name: Undo an even power
+    mode: isolate
+    pattern: u n ^ r =
+    when:
+      u: [hasVariable]
+      n: [isEvenWhole]
+    output: u r 1 n / ^ pm =
+    explain: "Take the root of each side (the {n}th root); {u} can be positive or negative."
+    tags: [inverse]
+
+  - id: iso-odd-power
+    name: Undo an odd power
+    mode: isolate
+    pattern: u n ^ r =
+    when:
+      u: [hasVariable]
+      n: [isOddWhole]
+    output: u r 1 n / ^ =
+    explain: "Take the root of each side (the {n}th root)."
+    tags: [inverse]
+
+  - id: iso-fractional-power
+    name: Undo a power
+    mode: isolate
+    pattern: u n ^ r =
+    when:
+      u: [hasVariable]
+      n: [isRational]
+    output: u r 1 n / ^ =
+    priority: -1
+    explain: "Raise each side to the power 1/{n}."
+    tags: [inverse]
+
+  - id: iso-sqrt
+    name: Undo the square root
+    mode: isolate
+    pattern: u sqrt r =
+    when:
+      u: [hasVariable]
+    output: u r 2 ^ =
+    explain: "Square each side (this can add answers, so each one is checked at the end)."
+    tags: [inverse]
+
+  - id: iso-root
+    name: Undo the root
+    mode: isolate
+    pattern: n u root r =
+    when:
+      u: [hasVariable]
+    output: u r n ^ =
+    explain: "Raise each side to the power {n}."
+    tags: [inverse]
+
+  - id: iso-reciprocal
+    name: Undo the fraction
+    mode: isolate
+    pattern: c u / r =
+    when:
+      u: [hasVariable]
+      c: [freeOfVariable]
+    output: u c r / =
+    explain: "{c}/{u} = {r}, so {u} = {c}/{r}."
+    tags: [inverse]
+
+  - id: iso-abs
+    name: Undo the absolute value
+    mode: isolate
+    pattern: u abs r =
+    when:
+      u: [hasVariable]
+    output: u r pm =
+    explain: "|{u}| = {r} means {u} is {r} or -{r}."
+    tags: [inverse]
+
+  - id: iso-sin
+    name: Undo the sine
+    mode: isolate
+    pattern: u sin r =
+    when:
+      u: [hasVariable]
+    output: u r arcsin = u =pi r arcsin - = |
+    explain: "Two angles in a turn have sine {r}: arcsin {r} and π - arcsin {r} (add any whole number of turns, 2πk, for the rest)."
+    tags: [inverse, trig]
+
+  - id: iso-cos
+    name: Undo the cosine
+    mode: isolate
+    pattern: u cos r =
+    when:
+      u: [hasVariable]
+    output: u r arccos pm =
+    explain: "Two angles in a turn have cosine {r}: ±arccos {r} (add 2πk for the rest)."
+    tags: [inverse, trig]
+
+  - id: iso-tan
+    name: Undo the tangent
+    mode: isolate
+    pattern: u tan r =
+    when:
+      u: [hasVariable]
+    output: u r arctan =
+    explain: "Take arctan of each side (add πk for the rest)."
+    tags: [inverse, trig]
+
+  - { id: iso-arcsin, name: Undo arcsin, mode: isolate, pattern: u arcsin r =, when: { u: [hasVariable] }, output: u r sin =, tags: [inverse], explain: "Take sin of each side." }
+  - { id: iso-arccos, name: Undo arccos, mode: isolate, pattern: u arccos r =, when: { u: [hasVariable] }, output: u r cos =, tags: [inverse], explain: "Take cos of each side." }
+  - { id: iso-arctan, name: Undo arctan, mode: isolate, pattern: u arctan r =, when: { u: [hasVariable] }, output: u r tan =, tags: [inverse], explain: "Take tan of each side." }
+  - { id: iso-sinh, name: Undo sinh, mode: isolate, pattern: u sinh r =, when: { u: [hasVariable] }, output: u r arcsinh =, tags: [inverse], explain: "Take arcsinh of each side." }
+  - { id: iso-tanh, name: Undo tanh, mode: isolate, pattern: u tanh r =, when: { u: [hasVariable] }, output: u r arctanh =, tags: [inverse], explain: "Take arctanh of each side." }

@@ -1,0 +1,15 @@
+name: More derivatives
+
+# Derivative rules the CAS adds to rules/calculus.yaml (which calcvidnew also uses).
+
+rules:
+  - id: d-general-power
+    name: A power with the variable in both places
+    mode: differentiate
+    pattern: u w ^ v der
+    require:
+      - [dependsOn, u, v]
+      - [dependsOn, w, v]
+    output: u w ^ w v der u ln * w u v der * u / + *
+    explain: "Write {u}^{w} as e^({w} ln {u}) and use the chain rule: the derivative is {u}^{w} times the derivative of {w} ln {u}."
+    tags: [chain]

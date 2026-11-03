@@ -1,0 +1,446 @@
+name: Values and identities
+
+# The CAS's simplify rules (mode: simplify). They see expressions in normal form
+# (calcrules/src/cas/form.js), as drawn: x/2, 2x - 3, -x, √x is "x sqrt",
+# ∛x is "3 x root", π/6 is "=pi 6 /", 2π/3 is "2 =pi * 3 /", e^x is "=e x ^".
+#
+#   - a word is a slot (u, v, n …); a fixed symbol is written =pi, =e
+#   - a number is itself; "1 2 /" is ½
+#   - arithmetic (2 + 3, x + x, √8 = 2√2) is done for you before and after every rule
+#   - a rule for a sum or product of two parts also fires on any two parts of a longer one
+#   - tags pick what a step list shows (steps: 'brief' hides value, identity, tidy …)
+#
+# To change one: copy it into a file of your own with the same id and edit it;
+# to turn one off: give its id with enabled: false. createCAS({ rules: [yours] }).
+
+rules:
+  # ---- logs and exponentials -------------------------------------------
+  - id: ln-one
+    name: Log of 1
+    pattern: 1 ln
+    output: "0"
+    explain: "e^0 = 1, so ln 1 = 0."
+    tags: [value]
+
+  - id: ln-e
+    name: Log of e
+    pattern: =e ln
+    output: "1"
+    explain: "e^1 = e, so ln e = 1."
+    tags: [value]
+
+  - id: ln-exp
+    name: Log undoes e to a power
+    pattern: =e u ^ ln
+    output: u
+    explain: "ln and e^ undo each other: ln(e^{u}) = {u}."
+    tags: [inverse]
+
+  - id: exp-ln
+    name: e to a power undoes the log
+    pattern: =e u ln ^
+    output: u
+    explain: "e^ and ln undo each other: e^(ln {u}) = {u} (for {u} > 0)."
+    tags: [inverse]
+
+  - id: exp-multiple-ln
+    name: A multiple of a log in a power
+    pattern: =e n u ln * ^
+    when:
+      n: [isRational]
+    output: u n ^
+    explain: "e^({n} ln {u}) = (e^(ln {u}))^{n} = {result}."
+    tags: [inverse]
+
+  - id: log-same-base
+    name: Log of its own base
+    pattern: b b log
+    output: "1"
+    explain: "{b}^1 = {b}, so the log of {b} to base {b} is 1."
+    tags: [value]
+
+  - id: log-of-power
+    name: Log undoes a power of its base
+    pattern: b b u ^ log
+    output: u
+    explain: "log base {b} and {b}^ undo each other."
+    tags: [inverse]
+
+  - id: power-of-log
+    name: A power undoes the log to its base
+    pattern: b b u log ^
+    output: u
+    explain: "{b}^(log base {b} of {u}) = {u}."
+    tags: [inverse]
+
+  # ---- roots and absolute value --------------------------------------------
+  - id: sqrt-of-square
+    name: Square root of a square
+    pattern: u 2 ^ sqrt
+    output: u abs
+    explain: "√({u}²) is the size of {u}, whatever its sign: |{u}|."
+    tags: [identity]
+
+  - id: abs-squared
+    name: Absolute value squared
+    pattern: u abs 2 ^
+    output: u 2 ^
+    explain: "Squaring removes the sign anyway: |{u}|² = {u}²."
+    tags: [identity]
+
+  - id: abs-of-abs
+    name: Absolute value twice
+    pattern: u abs abs
+    output: u abs
+    explain: "|{u}| is never negative, so its absolute value is itself."
+    tags: [identity]
+
+  - id: abs-positive
+    name: Absolute value of a positive number
+    pattern: u abs
+    when:
+      u: [isPositiveConstant]
+    output: u
+    explain: "{u} is positive, so |{u}| = {u}."
+    tags: [value]
+
+  - id: abs-negative
+    name: Absolute value of a negative number
+    pattern: u abs
+    when:
+      u: [isNegativeConstant]
+    output: u neg
+    explain: "{u} is negative, so |{u}| = -({u})."
+    tags: [value]
+
+  - id: abs-of-exp
+    name: e to a power is positive
+    pattern: =e u ^ abs
+    output: =e u ^
+    explain: "e to any power is positive, so the absolute value changes nothing."
+    tags: [identity]
+
+  # ---- trigonometry: signs and turns ---------------------------------------
+  - id: sin-odd
+    name: Sine of a negative angle
+    pattern: u sin
+    when:
+      u: [hasMinusSign]
+    output: u neg sin neg
+    explain: "sin(-θ) = -sin θ."
+    tags: [symmetry]
+
+  - id: cos-even
+    name: Cosine of a negative angle
+    pattern: u cos
+    when:
+      u: [hasMinusSign]
+    output: u neg cos
+    explain: "cos(-θ) = cos θ."
+    tags: [symmetry]
+
+  - id: tan-odd
+    name: Tangent of a negative angle
+    pattern: u tan
+    when:
+      u: [hasMinusSign]
+    output: u neg tan neg
+    explain: "tan(-θ) = -tan θ."
+    tags: [symmetry]
+
+  - id: sin-full-turn
+    name: A full turn
+    pattern: u sin
+    when:
+      u: [[piMultipleAtLeast, 2]]
+    output: u 2 =pi * - sin
+    explain: "Turning a full 2π brings you back: sin({u}) = sin({u} - 2π)."
+    tags: [symmetry]
+
+  - id: cos-full-turn
+    name: A full turn
+    pattern: u cos
+    when:
+      u: [[piMultipleAtLeast, 2]]
+    output: u 2 =pi * - cos
+    explain: "Turning a full 2π brings you back: cos({u}) = cos({u} - 2π)."
+    tags: [symmetry]
+
+  - id: tan-half-turn
+    name: Tangent repeats every π
+    pattern: u tan
+    when:
+      u: [[piMultipleAtLeast, 1]]
+    output: u =pi - tan
+    explain: "tan repeats every π: tan({u}) = tan({u} - π)."
+    tags: [symmetry]
+
+  - id: sin-half-turn
+    name: A half turn
+    pattern: u sin
+    when:
+      u: [[piMultipleAbove, 1], [piMultipleBelow, 2]]
+    output: u =pi - sin neg
+    explain: "Half a turn flips the sign: sin({u}) = -sin({u} - π)."
+    tags: [symmetry]
+
+  - id: cos-half-turn
+    name: A half turn
+    pattern: u cos
+    when:
+      u: [[piMultipleAbove, 1], [piMultipleBelow, 2]]
+    output: u =pi - cos neg
+    explain: "Half a turn flips the sign: cos({u}) = -cos({u} - π)."
+    tags: [symmetry]
+
+  - id: sin-second-quarter
+    name: The second quarter turn
+    pattern: u sin
+    when:
+      u: [[piMultipleAbove, 1/2], [piMultipleAtMost, 1]]
+    output: =pi u - sin
+    explain: "sin({u}) = sin(π - {u})."
+    tags: [symmetry]
+
+  - id: cos-second-quarter
+    name: The second quarter turn
+    pattern: u cos
+    when:
+      u: [[piMultipleAbove, 1/2], [piMultipleAtMost, 1]]
+    output: =pi u - cos neg
+    explain: "cos({u}) = -cos(π - {u})."
+    tags: [symmetry]
+
+  - id: tan-second-quarter
+    name: The second quarter turn
+    pattern: u tan
+    when:
+      u: [[piMultipleAbove, 1/2], [piMultipleBelow, 1]]
+    output: =pi u - tan neg
+    explain: "tan({u}) = -tan(π - {u})."
+    tags: [symmetry]
+
+  # ---- trigonometry: the standard angles -------------------------------------
+  - { id: sin-0, name: Sine of 0, pattern: 0 sin, output: "0", tags: [value], explain: "sin 0 = 0." }
+  - { id: sin-pi-6, name: Sine of π/6, pattern: =pi 6 / sin, output: 1 2 /, tags: [value], explain: "sin(π/6) = 1/2." }
+  - { id: sin-pi-4, name: Sine of π/4, pattern: =pi 4 / sin, output: 2 sqrt 2 /, tags: [value], explain: "sin(π/4) = √2/2." }
+  - { id: sin-pi-3, name: Sine of π/3, pattern: =pi 3 / sin, output: 3 sqrt 2 /, tags: [value], explain: "sin(π/3) = √3/2." }
+  - { id: sin-pi-2, name: Sine of π/2, pattern: =pi 2 / sin, output: "1", tags: [value], explain: "sin(π/2) = 1." }
+  - { id: sin-pi, name: Sine of π, pattern: =pi sin, output: "0", tags: [value], explain: "sin π = 0." }
+  - { id: cos-0, name: Cosine of 0, pattern: 0 cos, output: "1", tags: [value], explain: "cos 0 = 1." }
+  - { id: cos-pi-6, name: Cosine of π/6, pattern: =pi 6 / cos, output: 3 sqrt 2 /, tags: [value], explain: "cos(π/6) = √3/2." }
+  - { id: cos-pi-4, name: Cosine of π/4, pattern: =pi 4 / cos, output: 2 sqrt 2 /, tags: [value], explain: "cos(π/4) = √2/2." }
+  - { id: cos-pi-3, name: Cosine of π/3, pattern: =pi 3 / cos, output: 1 2 /, tags: [value], explain: "cos(π/3) = 1/2." }
+  - { id: cos-pi-2, name: Cosine of π/2, pattern: =pi 2 / cos, output: "0", tags: [value], explain: "cos(π/2) = 0." }
+  - { id: cos-pi, name: Cosine of π, pattern: =pi cos, output: "-1", tags: [value], explain: "cos π = -1." }
+  - { id: tan-0, name: Tangent of 0, pattern: 0 tan, output: "0", tags: [value], explain: "tan 0 = 0." }
+  - { id: tan-pi-6, name: Tangent of π/6, pattern: =pi 6 / tan, output: 3 sqrt 3 /, tags: [value], explain: "tan(π/6) = √3/3." }
+  - { id: tan-pi-4, name: Tangent of π/4, pattern: =pi 4 / tan, output: "1", tags: [value], explain: "tan(π/4) = 1." }
+  - { id: tan-pi-3, name: Tangent of π/3, pattern: =pi 3 / tan, output: 3 sqrt, tags: [value], explain: "tan(π/3) = √3." }
+  - { id: arcsin-0, name: Arcsine of 0, pattern: 0 arcsin, output: "0", tags: [value], explain: "sin 0 = 0, so arcsin 0 = 0." }
+  - { id: arcsin-half, name: Arcsine of 1/2, pattern: 1 2 / arcsin, output: =pi 6 /, tags: [value], explain: "sin(π/6) = 1/2, so arcsin(1/2) = π/6." }
+  - { id: arcsin-1, name: Arcsine of 1, pattern: 1 arcsin, output: =pi 2 /, tags: [value], explain: "sin(π/2) = 1, so arcsin 1 = π/2." }
+  - { id: arccos-0, name: Arccosine of 0, pattern: 0 arccos, output: =pi 2 /, tags: [value], explain: "cos(π/2) = 0, so arccos 0 = π/2." }
+  - { id: arccos-half, name: Arccosine of 1/2, pattern: 1 2 / arccos, output: =pi 3 /, tags: [value], explain: "cos(π/3) = 1/2, so arccos(1/2) = π/3." }
+  - { id: arccos-1, name: Arccosine of 1, pattern: 1 arccos, output: "0", tags: [value], explain: "cos 0 = 1, so arccos 1 = 0." }
+  - { id: arccos-minus-1, name: Arccosine of -1, pattern: -1 arccos, output: =pi, tags: [value], explain: "cos π = -1, so arccos(-1) = π." }
+  - { id: arctan-0, name: Arctangent of 0, pattern: 0 arctan, output: "0", tags: [value], explain: "tan 0 = 0, so arctan 0 = 0." }
+  - { id: arctan-1, name: Arctangent of 1, pattern: 1 arctan, output: =pi 4 /, tags: [value], explain: "tan(π/4) = 1, so arctan 1 = π/4." }
+  - { id: sinh-0, name: sinh of 0, pattern: 0 sinh, output: "0", tags: [value], explain: "sinh 0 = 0." }
+  - { id: cosh-0, name: cosh of 0, pattern: 0 cosh, output: "1", tags: [value], explain: "cosh 0 = 1." }
+  - { id: tanh-0, name: tanh of 0, pattern: 0 tanh, output: "0", tags: [value], explain: "tanh 0 = 0." }
+
+  - { id: arctan-sqrt3, name: Arctangent of √3, pattern: 3 sqrt arctan, output: =pi 3 /, tags: [value], explain: "tan(π/3) = √3, so arctan √3 = π/3." }
+  - { id: arctan-sqrt3-over-3, name: Arctangent of √3/3, pattern: 3 sqrt 3 / arctan, output: =pi 6 /, tags: [value], explain: "tan(π/6) = √3/3, so arctan(√3/3) = π/6." }
+
+  # atan2(y, x): the angle of the point (x, y), in (-π, π]
+  - id: atan2-right
+    name: The angle of a point to the right
+    pattern: y x atan2
+    when:
+      x: [isPositiveConstant]
+    output: y x / arctan
+    explain: "For x > 0, atan2(y, x) = arctan(y/x)."
+    tags: [value]
+  - id: atan2-left-up
+    name: The angle of a point to the left
+    pattern: y x atan2
+    when:
+      x: [isNegativeConstant]
+      y: [isPositiveConstant]
+    output: y x / arctan =pi +
+    explain: "For x < 0 and y > 0, atan2(y, x) = arctan(y/x) + π."
+    tags: [value]
+  - id: atan2-left-down
+    name: The angle of a point to the left
+    pattern: y x atan2
+    when:
+      x: [isNegativeConstant]
+      y: [isNegativeConstant]
+    output: y x / arctan =pi -
+    explain: "For x < 0 and y < 0, atan2(y, x) = arctan(y/x) - π."
+    tags: [value]
+  - { id: atan2-negative-axis, name: The angle of a point on the negative axis, pattern: 0 x atan2, when: { x: [isNegativeConstant] }, output: =pi, tags: [value], explain: "A point on the negative x-axis is at angle π." }
+  - { id: atan2-up, name: Straight up, pattern: y 0 atan2, when: { y: [isPositiveConstant] }, output: =pi 2 /, tags: [value], explain: "A point straight up is at angle π/2." }
+  - { id: atan2-down, name: Straight down, pattern: y 0 atan2, when: { y: [isNegativeConstant] }, output: =pi 2 / neg, tags: [value], explain: "A point straight down is at angle -π/2." }
+
+  # the odd inverses take the sign out; arccos(-u) = π - arccos u
+  - id: arcsin-odd
+    name: Arcsine of a negative
+    pattern: u arcsin
+    when:
+      u: [hasMinusSign]
+    output: u neg arcsin neg
+    explain: "arcsin(-x) = -arcsin x."
+    tags: [symmetry]
+
+  - id: arctan-odd
+    name: Arctangent of a negative
+    pattern: u arctan
+    when:
+      u: [hasMinusSign]
+    output: u neg arctan neg
+    explain: "arctan(-x) = -arctan x."
+    tags: [symmetry]
+
+  - id: arccos-negative
+    name: Arccosine of a negative
+    pattern: u arccos
+    when:
+      u: [hasMinusSign]
+    output: =pi u neg arccos -
+    explain: "arccos(-x) = π - arccos x."
+    tags: [symmetry]
+
+  # ---- trigonometry: identities --------------------------------------------
+  - id: pythagorean
+    name: sin² + cos² = 1
+    pattern: u sin 2 ^ u cos 2 ^ +
+    commutative: true
+    output: "1"
+    explain: "sin²{u} + cos²{u} = 1 for every angle."
+    tags: [identity]
+
+  - id: pythagorean-multiple
+    name: sin² + cos² = 1
+    pattern: a u sin 2 ^ * a u cos 2 ^ * +
+    commutative: true
+    output: a
+    explain: "{a}·sin²{u} + {a}·cos²{u} = {a}(sin²{u} + cos²{u}) = {a}."
+    tags: [identity]
+
+  - id: one-minus-sin-squared
+    name: 1 - sin² = cos²
+    pattern: u sin 2 ^ neg 1 +
+    output: u cos 2 ^
+    explain: "1 - sin²{u} = cos²{u}."
+    tags: [identity]
+
+  - id: one-minus-cos-squared
+    name: 1 - cos² = sin²
+    pattern: u cos 2 ^ neg 1 +
+    output: u sin 2 ^
+    explain: "1 - cos²{u} = sin²{u}."
+    tags: [identity]
+
+  - id: sin-over-cos
+    name: sin/cos is tan
+    pattern: u sin u cos /
+    output: u tan
+    explain: "sin {u} / cos {u} = tan {u}."
+    tags: [identity]
+
+  - id: cos-over-sin
+    name: cos/sin is cot
+    pattern: u cos u sin /
+    output: u cot
+    explain: "cos {u} / sin {u} = cot {u}."
+    tags: [identity]
+
+  - id: sin-arcsin
+    name: sin undoes arcsin
+    pattern: u arcsin sin
+    output: u
+    explain: "sin(arcsin {u}) = {u}."
+    tags: [inverse]
+
+  - id: cos-arccos
+    name: cos undoes arccos
+    pattern: u arccos cos
+    output: u
+    explain: "cos(arccos {u}) = {u}."
+    tags: [inverse]
+
+  - id: tan-arctan
+    name: tan undoes arctan
+    pattern: u arctan tan
+    output: u
+    explain: "tan(arctan {u}) = {u}."
+    tags: [inverse]
+
+  - id: cosh-squared-minus-sinh-squared
+    name: cosh² - sinh² = 1
+    pattern: u cosh 2 ^ u sinh 2 ^ -
+    output: "1"
+    explain: "cosh²{u} - sinh²{u} = 1."
+    tags: [identity]
+
+  # ---- logs: opt-in rewrites (run with cas.rewrite(x, 'expand-log') or 'combine-log') ----
+  - id: ln-product
+    name: Log of a product
+    mode: expand-log
+    pattern: a b * ln
+    output: a ln b ln +
+    explain: "ln({a}·{b}) = ln {a} + ln {b} (for positive {a}, {b})."
+    tags: [log]
+
+  - id: ln-quotient
+    name: Log of a quotient
+    mode: expand-log
+    pattern: a b / ln
+    output: a ln b ln -
+    explain: "ln({a}/{b}) = ln {a} - ln {b} (for positive {a}, {b})."
+    tags: [log]
+
+  - id: ln-power
+    name: Log of a power
+    mode: expand-log
+    pattern: a n ^ ln
+    output: n a ln *
+    explain: "ln({a}^{n}) = {n}·ln {a} (for positive {a})."
+    tags: [log]
+
+  - id: ln-root
+    name: Log of a square root
+    mode: expand-log
+    pattern: a sqrt ln
+    output: a ln 2 /
+    explain: "ln √{a} = ½ ln {a}."
+    tags: [log]
+
+  - id: ln-sum-combine
+    name: Sum of logs
+    mode: combine-log
+    pattern: a ln b ln +
+    commutative: true
+    output: a b * ln
+    explain: "ln {a} + ln {b} = ln({a}·{b})."
+    tags: [log]
+
+  - id: ln-difference-combine
+    name: Difference of logs
+    mode: combine-log
+    pattern: a ln b ln -
+    output: a b / ln
+    explain: "ln {a} - ln {b} = ln({a}/{b})."
+    tags: [log]
+
+  - id: ln-multiple-combine
+    name: A multiple of a log
+    mode: combine-log
+    pattern: n a ln *
+    when:
+      n: [isRational]
+    output: a n ^ ln
+    explain: "{n}·ln {a} = ln({a}^{n})."
+    tags: [log]

@@ -1,0 +1,47 @@
+name: Complex numbers
+
+# Loaded only by createCAS({ complex: true }), where i is the imaginary unit.
+# The arithmetic (i² = -1, √-4 = 2i, (2 + 3i)(1 - i) = 5 + i, 1/(1 + i) = (1 - i)/2)
+# and Re, Im, conj, arg, |z| are the normal form's (src/cas/form.js); unknowns
+# count as real, so Re(x + 3i) = x. Write a complex unknown as a + bi.
+
+operators:
+  - { symbol: re, arity: 1, label: real part }
+  - { symbol: im, arity: 1, label: imaginary part }
+  - { symbol: conj, arity: 1, label: complex conjugate }
+  - { symbol: arg, arity: 1, label: argument }
+
+rules:
+  - id: euler
+    name: Euler's formula
+    pattern: =e u ^
+    when:
+      u: [hasImaginaryPart, isConstant]
+    output: =e u re ^ u im cos =i u im sin * + *
+    explain: "e^(a + bi) = e^a (cos b + i sin b)."
+    tags: [complex]
+
+  - id: ln-negative
+    name: Log of a negative number
+    pattern: u ln
+    when:
+      u: [isNegativeConstant]
+    output: u neg ln =i =pi * +
+    explain: "{u} = |{u}|·e^(iπ), so ln {u} = ln |{u}| + iπ (the principal value)."
+    tags: [complex]
+
+  - id: ln-complex
+    name: Log of a complex number
+    pattern: u ln
+    when:
+      u: [hasImaginaryPart, isConstant]
+    output: u abs ln u arg =i * +
+    explain: "ln z = ln |z| + i arg z (the principal value)."
+    tags: [complex]
+
+  - id: i-to-the-i
+    name: i to the power i
+    pattern: =i =i ^
+    output: =e =pi 2 / neg ^
+    explain: "i = e^(iπ/2), so i^i = e^(i·iπ/2) = e^(-π/2) (the principal value)."
+    tags: [complex]
