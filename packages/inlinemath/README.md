@@ -34,9 +34,17 @@ view.set('2x + x^2', { animate: true });    // the next step: matching parts gli
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
 ```
 
+Inline Math needs its stylesheet on the page (the fonts are optional):
+
+```js
+import '@mathzetta/inlinemath/inlinemath.css';     // with a bundler
+import '@mathzetta/inlinemath/fonts/fonts.css';    // optional: Latin Modern, the TeX look
+```
+
 ```html
-<link rel="stylesheet" href="@mathzetta/inlinemath/fonts/fonts.css">  <!-- optional -->
-<link rel="stylesheet" href="@mathzetta/inlinemath/inlinemath.css">
+<!-- or from the CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/fonts/fonts.css">  <!-- optional -->
 ```
 
 ### Lite: drawing only
@@ -124,13 +132,14 @@ npm run build        # dist/ (a few seconds)
   - `inlinemath.css` and `fonts/` — put both on the page.
 
 ```html
-<link rel="stylesheet" href="@mathzetta/inlinemath/fonts/fonts.css">
-<link rel="stylesheet" href="@mathzetta/inlinemath/inlinemath.css">
-<script src="@mathzetta/inlinemath/inlinemath.global.min.js"></script>
+<!-- dist/ copied beside the page as inlinemath/ -->
+<link rel="stylesheet" href="inlinemath/fonts/fonts.css">
+<link rel="stylesheet" href="inlinemath/inlinemath.css">
+<script src="inlinemath/inlinemath.global.min.js"></script>
 <script>
   el.innerHTML = InlineMath.markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.');
 </script>
-<!-- or as a module: import { toHTML } from './inlinemath/inlinemath.js'; -->
+<!-- or as a module from the same copy: import { toHTML } from './inlinemath/inlinemath.js'; -->
 ```
 
 Both folders are build output (git-ignored); run the build again after changing `src/`.

@@ -10,5 +10,5 @@ me privately first:
 Include the input, the function you called and what happened. I'll reply within a few days, fix
 it in a release, and credit you if you'd like.
 
-Supported: the latest release of each package (`mathzetta` 1.x; `@mathzetta/inlinemath` and `@mathzetta/cas/engine` once
+Supported: the latest release of each package (`mathzetta` 1.x; `@mathzetta/inlinemath` and `@mathzetta/cas` once
 published).
