@@ -64,8 +64,8 @@ export function nodeAt(tree: Node, path: number[]): Node | null;
 export function pathOf(tree: Node, id: number): number[] | null;
 /** Gives a tree built by hand the ids MathZetta would. */
 export function numberTree<T extends Node>(tree: T): T;
-/** SVG paths of the glyphs Inline Math draws: ( ) { } √ ∫ ∑ ∏. */
-export const PATHS: Record<string, string>;
+/** SVG paths of the glyphs Inline Math draws, ( ) { } √ ∫ ∑ ∏: each filled or stroked, in a unit box. */
+export const PATHS: Record<string, { fill?: string; stroke?: string }>;
 
 export interface ClickInfo { node: Node; id: number; path: number[] | null; element: Element; event: Event }
 

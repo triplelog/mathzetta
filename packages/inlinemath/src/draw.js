@@ -42,6 +42,7 @@ export function layoutOptions(tree, options) {
     const { colors, highlight, scope, blocks, ...rest } = options;
     const styles = new Map();
     for (const [target, colour] of pairs(colors)) {
+        if (!isColour(colour)) continue;   // one CSS colour value, nothing more: no `;`, no url(…)
         for (const n of select(tree, target)) styles.set(n, `color:${colour}`);
     }
     const marked = new Set(highlight === undefined ? [] : select(tree, highlight));
@@ -59,6 +60,11 @@ export function layoutOptions(tree, options) {
 }
 
 /** { 'x^2': 'red', 3: 'blue' } or [[target, colour]] → [[target, colour]]; numeric keys become ids. */
+/** A colour a style attribute can hold on its own: red, #06c, rgb(0 102 204 / 50%), var(--accent). */
+function isColour(value) {
+    return typeof value === 'string' && /^[#\w\s.,%()/+-]+$/.test(value) && !/url\s*\(|expression/i.test(value);
+}
+
 function pairs(colors) {
     if (!colors) return [];
     if (Array.isArray(colors)) return colors;

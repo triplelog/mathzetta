@@ -22,7 +22,7 @@ works where Node can require ES modules (Node 20.19+ and 22.12+); in the browser
 in `dist/` (below).
 
 ```js
-import { toHTML, render } from './inlinemath/src/index.js';
+import { toHTML, render } from 'inlinemath';
 
 toHTML('\\int_0^1 x^2\\,dx');              // HTML string; works in Node too
 
@@ -55,7 +55,7 @@ el.innerHTML = toHTML('\\frac{d}{dx} x^2 = 2x', { colors: { '2x': 'crimson' } })
 ## Try it
 
 ```bash
-npm test          # 232 checks; every input in mathzetta/test/cases/calculus.tsv
+npm test          # 253 checks; every input in mathzetta/test/cases/calculus.tsv
 ```
 
 [inlinemath.com](https://inlinemath.com) has the live editor, steps and the gallery; its
@@ -119,8 +119,8 @@ npm run build        # dist/ (a few seconds)
 
 - **`dist/`** — Inline Math with everything inside, no import map or `node_modules` needed:
   - `inlinemath.js`, `markdown.js`, `cas.js` — ES modules (shared code in `dist/chunks/`);
-  - `inlinemath.global.min.js` (~120 KB) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
-  - `inlinemath-cas.global.min.js` (~260 KB) — the same plus the CAS (`Inline Math.mathCAS`, `casBlocks`, `stepsHTML`);
+  - `inlinemath.global.min.js` (136 KB, 46 KB gzipped) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
+  - `inlinemath-cas.global.min.js` (270 KB, 87 KB gzipped) — the same plus the CAS (`InlineMath.mathCAS`, `casBlocks`, `stepsHTML`);
   - `inlinemath.css` and `fonts/` — put both on the page.
 
 ```html
@@ -128,7 +128,7 @@ npm run build        # dist/ (a few seconds)
 <link rel="stylesheet" href="inlinemath/inlinemath.css">
 <script src="inlinemath/inlinemath.global.min.js"></script>
 <script>
-  el.innerHTML = Inline Math.markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.');
+  el.innerHTML = InlineMath.markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.');
 </script>
 <!-- or as a module: import { toHTML } from './inlinemath/inlinemath.js'; -->
 ```
@@ -265,8 +265,7 @@ playground: any input, any operation, detail level, and a live rule editor).
 5. **Copy as LaTeX or text** from a selection.
 6. **Line breaking and alignment.** Multi-line derivations with the `=` signs lined up (an `align` helper), and breaking long sums.
 7. **A DOM refine pass, optional.** Measure once after fonts load, to nudge fraction bars and script heights where the em estimates are off with unusual fonts.
-8. **Script-tag bundle.** A `window.InlineMath` build, like MathZetta's `build/mathzetta.min.js`, for pages without modules.
-9. **Spacing table.** Move the per-operator spacing (bin, rel, thin) into one table so a house style is one edit.
+8. **Spacing table.** Move the per-operator spacing (bin, rel, thin) into one table so a house style is one edit.
 
 ## Known rough edges
 

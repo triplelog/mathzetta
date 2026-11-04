@@ -86,7 +86,8 @@ export function casBlocks(options = {}) {
     const head = tokens[tokens.length - 1];
     const name = head?.startsWith('\\:') ? head.slice(2) : null;
     const symbolic = name && CALLS.has(name);
-    const calculus = (head === 'der' || (head === 'int' && tokens[tokens.length - 2] === '2'));
+    // d/dx …, ∫ … dx and ∫ from a to b … dx (MathZetta writes the limits as int's 3rd and 4th operands)
+    const calculus = head === 'der' || head === 'int';
     if (!symbolic && !calculus) return calculateBlock(text, scope);
     const node = cas.node(tokens);
     const args = symbolic ? node.args : [node];
@@ -117,7 +118,7 @@ export function casBlocks(options = {}) {
   return handler;
 }
 
-const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /**
  * Steps (from any CAS call) as an ordered list: each step's expression before,

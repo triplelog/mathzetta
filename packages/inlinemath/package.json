@@ -28,6 +28,7 @@
     },
     "./inlinemath.css": "./inlinemath.css",
     "./fonts/fonts.css": "./fonts/fonts.css",
+    "./fonts/*": "./fonts/*",
     "./dist/*": "./dist/*",
     "./package.json": "./package.json"
   },

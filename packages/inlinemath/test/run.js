@@ -289,6 +289,36 @@ test('markdown: another renderer, with the maths put back into its output', () =
     assert.ok(html.startsWith('<article><i>so</i> <span class="mv-md-math">'));
 });
 
+// ---- untrusted text, links, the CAS blocks (from a review before publishing) ---------------
+
+{
+    const { casBlocks, stepsHTML } = await import('../src/cas.js');
+    const { PATHS } = await import('../src/glyphs.js');
+    test('a definite integral in a block goes to the CAS: ∫ from 0 to a of x dx = a²/2', () => {
+        const html = toHTML('{{\\int_0^a x dx}}', { blocks: casBlocks() });
+        assert.ok(has(html, 'frac') || html.includes('mv-frac'), 'drawn as a fraction');
+        assert.equal(text(html).replace(/\s/g, ''), 'a22');
+    });
+    test('a step whose rule id holds a quote keeps its attribute whole', () => {
+        assert.ok(stepsHTML([{ id: 'a"b', name: 'n', from: 'x', to: 'x', path: [] }]).includes('data-rule="a&quot;b"'));
+    });
+    test('a colour is one CSS value: anything else is left out', () => {
+        assert.ok(toHTML('x', { colors: { x: 'crimson' } }).includes('color:crimson'));
+        assert.ok(toHTML('x', { colors: { x: 'rgb(0 102 204 / 50%)' } }).includes('color:rgb(0 102 204 / 50%)'));
+        for (const bad of ['red;background:url(https://example.com/x)', 'red" onmouseover="x', 'expression(alert(1))']) {
+            assert.ok(!toHTML('x', { colors: { x: bad } }).includes('style='), bad);
+        }
+    });
+    test('Markdown links and images may hold brackets in their address; script links still go nowhere', () => {
+        assert.equal(markdownToHTML('[f](https://en.wikipedia.org/wiki/Function_(mathematics)) is'), '<p><a href="https://en.wikipedia.org/wiki/Function_(mathematics)">f</a> is</p>');
+        assert.equal(markdownToHTML('![p](img_(1).png)'), '<p><img src="img_(1).png" alt="p"></p>');
+        assert.equal(markdownToHTML('[a](javascript:alert(1))'), '<p><a href="#">a</a></p>');
+    });
+    test('PATHS are shapes, each filled or stroked', () => {
+        for (const [name, shape] of Object.entries(PATHS)) assert.ok(typeof (shape.fill ?? shape.stroke) === 'string', name);
+    });
+}
+
 // ---- the lite build: the same drawing, nothing live, the calculator only if asked for ----
 
 {

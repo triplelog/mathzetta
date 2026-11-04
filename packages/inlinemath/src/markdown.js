@@ -180,9 +180,10 @@ function inline(text, options, sourceOf) {
   // raw HTML (only with { html: true })
   if (options.html) t = t.replace(/<\/?[A-Za-z][^>]*>/g, (tag) => hold(tag));
   // images and links
-  t = t.replace(/!\[([^\]]*)\]\(\s*([^\s)]+)(?:\s+"([^"]*)")?\s*\)/g, (_, alt, url, title) =>
+  // an address may hold balanced brackets: wiki/Function_(mathematics)
+  t = t.replace(/!\[([^\]]*)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, alt, url, title) =>
     hold(`<img src="${safeUrl(url)}" alt="${escape(alt)}"${title ? ` title="${escape(title)}"` : ''}>`));
-  t = t.replace(/\[([^\]]+)\]\(\s*([^\s)]+)(?:\s+"([^"]*)")?\s*\)/g, (_, label, url, title) =>
+  t = t.replace(/\[([^\]]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, label, url, title) =>
     hold(`<a href="${safeUrl(url)}"${title ? ` title="${escape(title)}"` : ''}>${inline(label, options, sourceOf)}</a>`));
   t = escape(t);
   t = t.replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '<strong>$2</strong>');
