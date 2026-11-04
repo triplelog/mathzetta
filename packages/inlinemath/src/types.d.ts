@@ -6,7 +6,7 @@ export type { Input, Node, BlockHandler };
 
 /**
  * A part of an expression: a node id (MathZetta's postfix index), an expression written like any
- * input ('x^2': every part that is x²), a path ({ path: [0, 1] }, as calcrules reports it), a test,
+ * input ('x^2': every part that is x²), a path ({ path: [0, 1] }, as @mathzetta/cas reports it), a test,
  * or a list of any of these.
  */
 export type Target = number | string | { path: number[] } | ((node: Node) => boolean) | Target[];
@@ -43,7 +43,7 @@ export interface DrawOptions extends LayoutOptions {
     highlight?: Target;
     /** Variable values for `{{…}}` blocks. */
     scope?: Record<string, unknown>;
-    /** Another `{{…}}` handler (casBlocks() from 'inlinemath/cas'). */
+    /** Another `{{…}}` handler (casBlocks() from '@mathzetta/inlinemath/cas'). */
     blocks?: BlockHandler;
 }
 
@@ -114,10 +114,11 @@ export function renderMarkdownInto<E extends Element>(element: E, markdown: stri
 export function extractMath(markdown: string, options?: { delimiters?: string[] }): { text: string; math: Array<{ source: string; display: boolean; raw: string }> };
 export function renderMarkdown(markdown: string, options?: MarkdownOptions): string;
 
-// ---- inlinemath/cas (needs calcrules) --------------------------------------------------------
+// ---- inlinemath/cas (needs @mathzetta/cas) --------------------------------------------------------
 
-export interface CASStep { id: string; name: string; from: string; to: string; path?: number[]; explanation?: string }
-/** calcrules' CAS reading and writing MathZetta text (its full API: calcrules/docs/cas.md). */
+/** A step from the CAS (@mathzetta/cas's CASStep fits): path null for a step standing for hidden ones. */
+export interface CASStep { id: string; name: string; from: string; to: string; path?: number[] | null; explanation?: string }
+/** @mathzetta/cas reading and writing MathZetta text (its full API: @mathzetta/cas/docs/cas.md). */
 export type CAS = Record<string, any>;
 export function mathCAS(options?: { rules?: unknown[]; names?: string[]; complex?: boolean; [option: string]: unknown }): CAS;
 /** A `{{…}}` handler: toHTML(input, { blocks: casBlocks() }). `last` holds the latest CAS result. */

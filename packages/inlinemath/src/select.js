@@ -6,7 +6,7 @@
  *
  *   4                 the node with id 4 (MathZetta's postfix index)
  *   'x^2'             every part that is x² — written like any other input
- *   { path: [0, 1] }  child 1 of child 0 of the root — the same paths calcrules reports
+ *   { path: [0, 1] }  child 1 of child 0 of the root — the same paths @mathzetta/cas reports
  *   (node) => bool    any test
  *   [ …targets ]      all of them
  *

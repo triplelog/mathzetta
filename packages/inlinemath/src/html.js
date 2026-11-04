@@ -13,7 +13,7 @@ export { layoutOptions } from './draw.js';
  * are calculated first: '3+4={{3+4}}' draws 3 + 4 = 7.
  * @param {string|string[]|object} input expression text, standard postfix, or a tree
  * @param {object} [options] { scope } variable values for `{{...}}` blocks;
- *   { blocks } another handler for them (casBlocks() from 'inlinemath/cas' simplifies, solves …)
+ *   { blocks } another handler for them (casBlocks() from '@mathzetta/inlinemath/cas' simplifies, solves …)
  */
 export function treeOf(input, options = {}) {
     return draw.treeOf(input, { ...options, blocks: options.blocks ?? calculateBlock });

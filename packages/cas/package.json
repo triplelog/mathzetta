@@ -1,18 +1,18 @@
 {
-  "name": "calcrules",
+  "name": "@mathzetta/cas",
   "version": "0.1.0",
-  "description": "Rewrite maths with rules you can read: differentiation and simplification as YAML rules over MathZetta postfix, with explained steps — and an exact CAS on top (simplify, expand, factor, solve, differentiate, integrate, any-precision decimals, complex numbers).",
+  "description": "MathZetta CAS: exact computer algebra with explained steps — simplify, expand, factor, solve, differentiate, integrate, any-precision decimals, complex numbers — on a rule engine whose rules are readable YAML over MathZetta postfix.",
   "type": "module",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
+  "main": "src/cas/index.js",
+  "types": "src/cas/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
-      "default": "./src/index.js"
-    },
-    "./cas": {
       "types": "./src/cas/index.d.ts",
       "default": "./src/cas/index.js"
+    },
+    "./engine": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
     },
     "./yaml": {
       "types": "./src/yaml.d.ts",
@@ -38,14 +38,14 @@
   "devDependencies": {
     "mathzetta": "^1.0.0"
   },
-  "homepage": "https://mathzetta.com/calcrules/web/",
+  "homepage": "https://mathzetta.com/cas/",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/triplelog/mathzetta.git",
-    "directory": "packages/calcrules"
+    "directory": "packages/cas"
   },
   "author": {
     "name": "Robert Wilcox",
@@ -57,17 +57,17 @@
     "email": "rwilcox@mathzetta.com"
   },
   "keywords": [
-    "math",
     "cas",
     "computer-algebra",
     "symbolic",
+    "math",
     "simplify",
+    "factor",
+    "solve",
     "derivative",
     "integral",
-    "solve",
-    "rewrite-rules",
     "steps",
-    "postfix",
+    "rewrite-rules",
     "mathzetta"
   ],
   "engines": {

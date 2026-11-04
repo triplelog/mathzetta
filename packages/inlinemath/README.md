@@ -1,6 +1,6 @@
 # Inline Math
 
-Draws calculus-level maths as plain HTML and CSS (the `inlinemath` package, at inlinemath.com). The input is anything
+Draws calculus-level maths as plain HTML and CSS (the `@mathzetta/inlinemath` package, at inlinemath.com). The input is anything
 [MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta) reads (`sin^2 x`, `\frac{d}{dx}(x^2)`, `x**2/2`, `√x`).
 Every part of the drawing can be found, coloured, clicked and animated.
 
@@ -14,15 +14,15 @@ It needs nothing besides MathZetta: no KaTeX, no fonts (Latin Modern is
 optional), and no build step.
 
 ```bash
-npm install inlinemath mathzetta     # mathzetta 1.x is a peer dependency; add calcrules for inlinemath/cas
+npm install @mathzetta/inlinemath mathzetta     # mathzetta 1.x is a peer; add @mathzetta/cas for @mathzetta/inlinemath/cas
 ```
 
-Inline Math is ES modules (`import`). TypeScript declarations come with it. `require('inlinemath')`
+Inline Math is ES modules (`import`). TypeScript declarations come with it. `require('@mathzetta/inlinemath')`
 works where Node can require ES modules (Node 20.19+ and 22.12+); in the browser, use the bundles
 in `dist/` (below).
 
 ```js
-import { toHTML, render } from 'inlinemath';
+import { toHTML, render } from '@mathzetta/inlinemath';
 
 toHTML('\\int_0^1 x^2\\,dx');              // HTML string; works in Node too
 
@@ -35,20 +35,20 @@ view.segments();                            // [{ text: 'x', id: 3 }, { text: 's
 ```
 
 ```html
-<link rel="stylesheet" href="inlinemath/fonts/fonts.css">  <!-- optional -->
-<link rel="stylesheet" href="inlinemath/inlinemath.css">
+<link rel="stylesheet" href="@mathzetta/inlinemath/fonts/fonts.css">  <!-- optional -->
+<link rel="stylesheet" href="@mathzetta/inlinemath/inlinemath.css">
 ```
 
 ### Lite: drawing only
 
-`inlinemath/lite` is `toHTML()` and nothing live: the same layout, glyphs, colours, highlights and
+`@mathzetta/inlinemath/lite` is `toHTML()` and nothing live: the same layout, glyphs, colours, highlights and
 spoken labels for screen readers, without the live view (`render`, step animation, events), Markdown
 or the CAS — about a third smaller. `{{…}}` blocks are worked out only if MathZetta's calculator is
-loaded too (`import 'mathzetta/calculate'`, or `inlinemath/lite-calc`, which brings it); otherwise
+loaded too (`import 'mathzetta/calculate'`, or `@mathzetta/inlinemath/lite-calc`, which brings it); otherwise
 they are drawn as written.
 
 ```js
-import { toHTML } from 'inlinemath/lite';
+import { toHTML } from '@mathzetta/inlinemath/lite';
 el.innerHTML = toHTML('\\frac{d}{dx} x^2 = 2x', { colors: { '2x': 'crimson' } });
 ```
 
@@ -113,7 +113,7 @@ A *target* can be any of these:
 ## A static build: `npm run build`
 
 ```bash
-npm install          # at the repository root: links mathzetta and calcrules, installs rollup
+npm install          # at the repository root: links mathzetta and MathZetta CAS, installs rollup
 npm run build        # dist/ (a few seconds)
 ```
 
@@ -124,9 +124,9 @@ npm run build        # dist/ (a few seconds)
   - `inlinemath.css` and `fonts/` — put both on the page.
 
 ```html
-<link rel="stylesheet" href="inlinemath/fonts/fonts.css">
-<link rel="stylesheet" href="inlinemath/inlinemath.css">
-<script src="inlinemath/inlinemath.global.min.js"></script>
+<link rel="stylesheet" href="@mathzetta/inlinemath/fonts/fonts.css">
+<link rel="stylesheet" href="@mathzetta/inlinemath/inlinemath.css">
+<script src="@mathzetta/inlinemath/inlinemath.global.min.js"></script>
 <script>
   el.innerHTML = InlineMath.markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.');
 </script>
@@ -141,17 +141,17 @@ Every npm release's `dist/` is on jsDelivr (and unpkg); the bundles carry MathZe
 page needs nothing else:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/fonts/fonts.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/fonts/fonts.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.css">
 
 <!-- a script tag: window.InlineMath -->
-<script src="https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/inlinemath.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.global.min.js"></script>
 <script>document.getElementById('out').innerHTML = InlineMath.toHTML('\\frac{d}{dx} x^2');</script>
 
-<!-- or modules: inlinemath.js, markdown.js, cas.js (the CAS one holds calcrules too) -->
+<!-- or modules: inlinemath.js, markdown.js, cas.js (the CAS one holds MathZetta CAS too) -->
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/inlinemath.js';
-  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/markdown.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.js';
+  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/markdown.js';
 </script>
 ```
 
@@ -166,7 +166,7 @@ declares Latin Modern Roman (the TeX look) in two files, regular 45 KB and itali
 downloaded only when text uses it; without the link the maths is drawn in the system serif.
 
 Every build comes **with MathZetta inside, or without it** (`*.external.*`), with or without the
-CAS (calcrules). Sizes, gzipped:
+CAS (MathZetta CAS). Sizes, gzipped:
 
 | | ES module | classic `<script>` (`window.InlineMath`) |
 |---|---|---|
@@ -191,16 +191,16 @@ map (every name can point at the one MathZetta bundle). The fonts are 94 KB more
                "mathzetta/calculate": "https://cdn.jsdelivr.net/npm/mathzetta@1/build/mathzetta.esm.min.js" } }
 </script>
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/inlinemath@0.1/dist/inlinemath.external.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.external.js';
 </script>
 ```
 
 Publishing is `npm publish` (`prepublishOnly` runs the tests and the build).
 
-## Markdown with maths: `inlinemath/markdown`
+## Markdown with maths: `@mathzetta/inlinemath/markdown`
 
 ```js
-import { markdownToHTML } from 'inlinemath/markdown';
+import { markdownToHTML } from '@mathzetta/inlinemath/markdown';
 el.innerHTML = markdownToHTML(text);                          // needs inlinemath.css
 el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}}, {{diff(…)}} too
 ```
@@ -223,14 +223,14 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
   `delimiters` picks which marks count.
 - **Playground:** [inlinemath.com/markdown.html](https://inlinemath.com/markdown.html), an editor with a live preview.
 
-## The CAS: `inlinemath/cas`
+## The CAS: `@mathzetta/inlinemath/cas`
 
-calcrules' CAS (exact simplify, factor, solve, d/dx, ∫ …; calcrules/docs/cas.md)
+MathZetta CAS (exact simplify, factor, solve, d/dx, ∫ …; @mathzetta/cas's docs/cas.md)
 in drawn maths:
 
 ```js
-import { toHTML } from 'inlinemath';
-import { casBlocks, stepsHTML, mathCAS } from 'inlinemath/cas';
+import { toHTML } from '@mathzetta/inlinemath';
+import { casBlocks, stepsHTML, mathCAS } from '@mathzetta/inlinemath/cas';
 
 toHTML("f'(x) = {{diff(x^3 sin(x), x)}}", { blocks: casBlocks() })
 toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })    // x = 2 ∨ x = 3
@@ -244,7 +244,7 @@ Block functions: `simplify`, `expand`, `factor`, `cancel`, `diff(f, x[, n])`,
 explanation. `mathCAS({ rules, names })` uses rule files of your own;
 `mathCAS({ complex: true })` makes i the imaginary unit (and reads Re, Im, conj,
 arg; the conjugate is drawn with an overline). Pages map
-`calcrules` and `calcrules/cas` in their import map ([inlinemath.com/cas.html](https://inlinemath.com/cas.html) is a
+`@mathzetta/cas/engine` and `@mathzetta/cas` in their import map ([inlinemath.com/cas.html](https://inlinemath.com/cas.html) is a
 playground: any input, any operation, detail level, and a live rule editor).
 
 ## What still needs doing

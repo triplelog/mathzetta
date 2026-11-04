@@ -1,8 +1,8 @@
-# CLAUDE.md — calcrules
+# CLAUDE.md — MathZetta CAS
 
 Rule-driven rewriting of MathZetta postfix: differentiation and
 simplification as YAML rules, matched by structure keys, and a CAS on top
-(`calcrules/cas`, docs/cas.md). Zero dependencies; `mathzetta` is only a dev
+(`@mathzetta/cas`, docs/cas.md). Zero dependencies; `mathzetta` is only a dev
 dependency (the playground, the CAS tests, check:sympy).
 
 ```bash
@@ -17,13 +17,13 @@ npm run check:sympy   # CAS answers vs real SymPy (python3 + sympy)
 - `src/expr.js` — nodes (`{ type: 'num'|'sym'|'op', token, args, s }`, `s` = canonical postfix string), `parse(text)`, `fromPostfix(tokens)`.
 - `src/keys.js`, `src/match.js`, `src/apply.js`, `src/simplify.js` — the engine; `src/rule.js` compiles a rule; `src/predicates.js` the `when`/`require` vocabulary; `src/yaml.js` its own YAML parser.
 - `rules/calculus.yaml`, `rules/arithmetic.yaml` — the shipped rules. Pattern notes at the top of arithmetic.yaml; `=e` in a pattern is the literal symbol e.
-- The playground and rule editor (mathzetta.com/calcrules/web/) are in the private mathzetta-website repository.
+- The playground and rule editor (mathzetta.com/cas/) are in the private mathzetta-website repository.
 - `src/cas/` — the CAS: `form.js` the normal form (exact BigInt fractions, like terms, roots of numbers — code, not rules), `rules.js` loading rule files (`operators:`, `messages:`, override by id) + CAS predicates + the rewrite driver, `steps.js` step selection, `poly.js` expand/factor/cancel, `solve.js`, `integrate.js`, `approx.js` (any-precision decimals), `index.js` createCAS + MESSAGES. `rules/cas/*.yaml` hold function knowledge (values, identities, integrals, isolate rules for solving, extra derivatives); `rules/cas/complex/` is added only by `createCAS({ complex: true })`.
 - Complex mode is a flag (`settings.complex` in form.js, set around every CAS call by `withComplex`): `i` is the unit, the canon memo is keyed by mode. Anything that treats `i` specially must check the flag — off, `i` is an ordinary unknown.
 
 ## Rules
 
-- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (`src/index.d.ts`, `src/cas/index.d.ts`, `src/yaml.d.ts`); README examples are written against the published package (`from 'calcrules'`), so keep them runnable.
+- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (`src/index.d.ts`, `src/cas/index.d.ts`, `src/yaml.d.ts`); README examples are written against the published package (`from '@mathzetta/cas/engine'`), so keep them runnable.
 - **Nothing runs away on a short input** (test/limits.test.js): polynomials past degree 256 (`MAX_DEGREE`, poly.js) aren't made dense; complex powers are multiplied out to the 60th; an exact power n^(a/s) too large for `MAX_BITS` stays as written; `approximate` refuses results past 4·MAX_BITS bits (exp, whole powers, factorials) with a CasError, takes roots past index 64 by logarithms, and calls residue that shrinks as precision grows 0.
 - Structure keys are written like postfix: a variadic operator's count comes before it (`_ _ _ 3 max`). The engine folds +, -, *, neg and whole powers on the exact decimal tokens (apply.js), never on doubles.
 - Postfix in, postfix out; nothing here evaluates transcendental functions (folds are exact-only).

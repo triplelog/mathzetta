@@ -9,7 +9,7 @@ and the tree tools; each output format is its own entry point
 dependencies; plain ES modules.
 
 This package is `packages/mathzetta` of the public repository triplelog/mathzetta (an npm workspace,
-see ../../CLAUDE.md); `../inlinemath` (display) and `../calcrules` (rule rewriting, the CAS) are its
+see ../../CLAUDE.md); `../inlinemath` (display) and `../cas` (rule rewriting, the CAS) are its
 neighbours there. Other projects build on it too (qblur, tabview, the tabdn servers, pyslots, the
 calculus videos) from outside this repository. Keep MathZetta standalone — no imports from any of
 them, and nothing here about the closed projects beyond a public link.

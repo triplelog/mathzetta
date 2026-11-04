@@ -1,5 +1,5 @@
 {
-  "name": "inlinemath",
+  "name": "@mathzetta/inlinemath",
   "version": "0.1.0",
   "description": "Draw calculus-level maths as HTML and CSS from anything MathZetta reads, with every part addressable.",
   "type": "module",
@@ -46,12 +46,12 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "peerDependencies": {
-    "calcrules": "^0.1.0",
+    "@mathzetta/cas": "^0.1.0",
     "mathzetta": "^1.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
-    "calcrules": "^0.1.0",
+    "@mathzetta/cas": "^0.1.0",
     "mathzetta": "^1.0.0",
     "rollup": "^4.65.0"
   },
@@ -60,7 +60,7 @@
     "node": ">=18"
   },
   "peerDependenciesMeta": {
-    "calcrules": {
+    "@mathzetta/cas": {
       "optional": true
     }
   },
@@ -76,7 +76,9 @@
     "html",
     "calculus",
     "render",
-    "mathzetta"
+    "mathzetta",
+    "inline",
+    "markdown"
   ],
   "repository": {
     "type": "git",

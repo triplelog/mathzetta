@@ -1,13 +1,13 @@
 /**
- * 'inlinemath/markdown' — Markdown with maths in it.
+ * '@mathzetta/inlinemath/markdown' — Markdown with maths in it.
  *
- *   import { markdownToHTML } from 'inlinemath/markdown';
+ *   import { markdownToHTML } from '@mathzetta/inlinemath/markdown';
  *   el.innerHTML = markdownToHTML('The area is $\\pi r^2$, so for $r = 3$ it is ${{pi r^2}}$.');
  *
  * Maths: $…$ inline, $$…$$ (or a ```math fence) on its own, \(…\) and \[…\] too.
  * Each is read by MathZetta (LaTeX, plain text or code all work) and drawn by
  * Inline Math; {{…}} inside is worked out first (MathZetta's calculator, or the CAS:
- * { blocks: casBlocks() } from 'inlinemath/cas'). A definition such as $r = 3$ or
+ * { blocks: casBlocks() } from '@mathzetta/inlinemath/cas'). A definition such as $r = 3$ or
  * $g := 9.81$ is remembered for the {{…}} after it ({ define: false } turns that off).
  *
  * A $ is maths only when it looks like it (Pandoc's rule): the opening $ is not

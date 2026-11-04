@@ -1,4 +1,4 @@
-// calcrules — rule-driven simplification of postfix math expressions.
+// @mathzetta/cas — rule-driven simplification of postfix math expressions.
 
 export * from './ops.js';
 export * from './expr.js';

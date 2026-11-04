@@ -1,4 +1,4 @@
-# calcrules/cas — a small computer algebra system
+# MathZetta CAS (@mathzetta/cas) — a small computer algebra system
 
 Simplify, expand, factor, cancel, differentiate, integrate, solve (one unknown,
 or linear systems), substitute, check equivalence, and approximate to any number
@@ -6,7 +6,7 @@ of digits — exactly, with steps, and with what it knows about functions kept i
 YAML rules anyone can change.
 
 ```js
-import { createCAS } from 'calcrules/cas';
+import { createCAS } from '@mathzetta/cas';
 import { parse } from 'mathzetta';                  // optional: read ordinary maths
 
 const cas = createCAS({ read: (text) => parse(text) });
@@ -21,13 +21,13 @@ cas.approximate('e^(pi sqrt(163))', { digits: 30 }).text // '262537412640768743.
 ```
 
 Without `read`, strings are MathZetta postfix (`'x 2 ^ 3 *'`); token arrays and
-calcrules nodes work too. In Inline Math, `inlinemath/cas` wires this up for you:
+MathZetta CAS nodes work too. In Inline Math, `@mathzetta/inlinemath/cas` wires this up for you:
 `{{solve(x^2 = 4, x)}}` in drawn maths, and step lists drawn as maths
 ([inlinemath.com/cas.html](https://inlinemath.com/cas.html) is a playground).
 
 ## Calls
 
-Every call returns `{ result, text, steps }` (`result` a calcrules node, `text`
+Every call returns `{ result, text, steps }` (`result` a MathZetta CAS node, `text`
 written by `format`), and takes `{ steps, approximate }` (below).
 
 | call | gives |
@@ -142,7 +142,7 @@ const cas = createCAS({ rules: [myYaml] });          // after the shipped rules
 const bare = createCAS({ rules: [myYaml], defaults: false });   // instead of them
 ```
 
-A rule file is calcrules YAML (see the README), with two more sections:
+A rule file is MathZetta CAS YAML (see the README), with two more sections:
 
 ```yaml
 operators:                    # new functions: patterns can use them
@@ -180,7 +180,7 @@ Arithmetic happens before and after every rule, and a rule for a sum or product
 of two parts also fires on any two parts of a longer one (sin²x + cos²x inside
 sin²x + cos²x + 1).
 
-Predicates for `when`, besides calcrules' own (isNumber, isSymbol, contains …):
+Predicates for `when`, besides MathZetta CAS's own (isNumber, isSymbol, contains …):
 `isRational`, `isWhole`, `isEvenWhole`, `isOddWhole`, `isPositiveRational`,
 `isNegativeRational`, `isConstant` (no unknowns), `isPositiveConstant`,
 `isNegativeConstant` (e, π, √2 …), `notOne`, `notMinusOne`, `hasMinusSign`,

@@ -1,6 +1,6 @@
 /**
- * 'inlinemath/lite-calc' — the lite build with MathZetta's calculator: `{{…}}` blocks are worked out
- * ('3+4={{3+4}}' draws 3 + 4 = 7). The same as `inlinemath/lite` plus `import 'mathzetta/calculate'`;
+ * '@mathzetta/inlinemath/lite-calc' — the lite build with MathZetta's calculator: `{{…}}` blocks are worked out
+ * ('3+4={{3+4}}' draws 3 + 4 = 7). The same as `@mathzetta/inlinemath/lite` plus `import 'mathzetta/calculate'`;
  * this entry exists for the bundles in dist/, which carry their own copy of MathZetta.
  */
 import { calculateBlock } from './calculator.js';

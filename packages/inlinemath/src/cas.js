@@ -1,9 +1,9 @@
 /**
- * 'inlinemath/cas' — calcrules' CAS in Inline Math: `{{…}}` blocks that simplify,
+ * '@mathzetta/inlinemath/cas' — @mathzetta/cas in Inline Math: `{{…}}` blocks that simplify,
  * solve, differentiate …, and step lists drawn as maths.
  *
- *   import { toHTML } from 'inlinemath';
- *   import { casBlocks, stepsHTML, mathCAS } from 'inlinemath/cas';
+ *   import { toHTML } from '@mathzetta/inlinemath';
+ *   import { casBlocks, stepsHTML, mathCAS } from '@mathzetta/inlinemath/cas';
  *
  *   toHTML('f′(x) = {{diff(x^3 sin x, x)}}', { blocks: casBlocks() })
  *   toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })   // x = 2 or x = 3
@@ -13,11 +13,11 @@
  * solve(equation, x), approx(expr[, digits]); d/dx … and ∫ … without limits go to the CAS
  * too. Everything else is MathZetta's calculator (calculateBlock), as without this.
  *
- * Needs calcrules (a peer dependency, like mathzetta).
+ * Needs @mathzetta/cas (a peer dependency, like mathzetta).
  */
 
-import { createCAS, toText as plainText } from 'calcrules/cas';
-import { parse as parsePostfix } from 'calcrules';
+import { createCAS, toText as plainText } from '@mathzetta/cas';
+import { parse as parsePostfix } from '@mathzetta/cas/engine';
 import { parse, operator } from './mathzetta.js';
 import { calculateBlock } from './calculator.js';
 // Only this entry needs MathZetta's text writer (so only pages using inlinemath/cas map 'mathzetta/text').
@@ -49,7 +49,7 @@ export function tokensOf(node) {
 }
 
 /**
- * A CAS that reads and writes MathZetta text. Options go to calcrules' createCAS
+ * A CAS that reads and writes MathZetta text. Options go to @mathzetta/cas's createCAS
  * (rules: your rule files; complex: true for i = √-1); `names` are functions of your
  * own, so `sinc(x)` is read as sinc and not as s·i·n·c(x). With complex, Re, Im,
  * conj and arg are read as functions too.

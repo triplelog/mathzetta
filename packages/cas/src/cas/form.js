@@ -11,7 +11,7 @@
 //   - terms are ordered by degree (x² + 3x + 1), factors numbers-first (2√3 π x)
 //
 // Everything else (what sin, ln, d/dx … do) is rules. The internal form is only
-// used in here: callers get calcrules nodes (`display`), drawn the way MathZetta
+// used in here: callers get @mathzetta/cas nodes (`display`), drawn the way MathZetta
 // writes them (x/2, 2x - 3, -x, √x, ∛x), so rules match what people see.
 
 import { op, sym, exactNum, isOp } from '../expr.js';
@@ -483,7 +483,7 @@ export function fn(name, args) {
 
 const memo = new Map();
 
-/** A calcrules node (any postfix) → the internal normal form. */
+/** A @mathzetta/cas node (any postfix) → the internal normal form. */
 export function canon(node) {
   const key = settings.complex ? `ℂ ${node.s}` : node.s;
   const hit = memo.get(key);
@@ -535,7 +535,7 @@ export function qNode(q) {
 }
 
 const displays = new WeakMap();
-/** The internal form → a calcrules node. */
+/** The internal form → a @mathzetta/cas node. */
 export function display(x) {
   let n = displays.get(x);
   if (!n) displays.set(x, (n = draw(x)));

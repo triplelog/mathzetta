@@ -112,7 +112,7 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-clickable .mv-n { cursor: pointer; }
 .mv-clickable .mv-n:hover { outline: 1px dashed rgba(0, 0, 0, 0.25); }
 
-/* ---- steps (stepsHTML from 'inlinemath/cas') ---------------------------------------- */
+/* ---- steps (stepsHTML from '@mathzetta/inlinemath/cas') ---------------------------------------- */
 .mv-steps { margin: 0; padding-left: 1.6em; }
 .mv-step { margin: 0.5em 0 0.9em; }
 .mv-step-name { display: block; font-size: 0.85em; font-weight: 600; color: #555; }
@@ -120,7 +120,7 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-step-arrow { color: #888; }
 .mv-step-why { margin: 0.1em 0 0; font-size: 0.9em; color: #444; }
 
-/* ---- Markdown with maths (markdownToHTML from 'inlinemath/markdown') ------------------- */
+/* ---- Markdown with maths (markdownToHTML from '@mathzetta/inlinemath/markdown') ------------------- */
 .mv-md-math { display: inline-block; vertical-align: middle; }
 .mv-md-display { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
 .mv-md-block { margin: 0.8em 0; }

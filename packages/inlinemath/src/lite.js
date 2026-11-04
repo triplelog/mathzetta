@@ -1,9 +1,9 @@
 /**
- * 'inlinemath/lite' — Inline Math's drawing only: `toHTML()` and nothing live. The same layout,
+ * '@mathzetta/inlinemath/lite' — Inline Math's drawing only: `toHTML()` and nothing live. The same layout,
  * glyphs, colours, highlights and accessible (spoken) labels as the full build, without the live
  * view (render, step animation, events), Markdown, the CAS or the calculator.
  *
- *   import { toHTML } from 'inlinemath/lite';
+ *   import { toHTML } from '@mathzetta/inlinemath/lite';
  *   el.innerHTML = toHTML('\\int_0^1 x^2 dx');
  *
  * `{{…}}` blocks: load the calculator too (`import 'mathzetta/calculate'`) and they are worked out

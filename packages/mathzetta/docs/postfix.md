@@ -2,7 +2,7 @@
 
 `parse()` turns any input into **standard postfix**: an array of string
 tokens in reverse Polish order. It is the one representation everything
-else reads — the renderers, `evaluate()`, and (eventually) calcrules.
+else reads — the renderers, `evaluate()`, and (eventually) MathZetta CAS.
 
 ```
 3x^2 + 2x - 1     →  3 x 2 ^ * 2 x * + 1 -
@@ -103,12 +103,12 @@ where side `r`/`l` means from the right/left (`x→0^+` becomes `x, 0, r`).
 The full table, with precedences, is `src/operators.js`; `operator(token)`
 looks one up at run time.
 
-## Compared with calcrules
+## Compared with MathZetta CAS
 
-calcrules (`../calcrules`) uses the same idea — whitespace-separated postfix
+MathZetta CAS (`../cas`) uses the same idea — whitespace-separated postfix
 — with a smaller vocabulary. Where they differ:
 
-| | MathZetta | calcrules |
+| | MathZetta | MathZetta CAS |
 | --- | --- | --- |
 | unary minus | `neg` | `neg` (same) |
 | eˣ | `e x ^` | `x exp` |
@@ -117,7 +117,7 @@ calcrules (`../calcrules`) uses the same idea — whitespace-separated postfix
 | sin, sqrt, abs | `x sin` (no count) | `x sin` (same) |
 | everything else in its table | same token, same order | |
 
-Making calcrules read MathZetta postfix directly means renaming `D` to
+Making MathZetta CAS read MathZetta postfix directly means renaming `D` to
 `der` (or mapping it on input) and treating `e x ^` as `x exp`.
 
 ## Changes from MathZetta 1

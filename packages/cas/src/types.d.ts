@@ -1,5 +1,5 @@
-// calcrules' declarations. index.d.ts ('calcrules'), cas/index.d.ts ('calcrules/cas') and yaml.d.ts
-// ('calcrules/yaml') pick from here.
+// @mathzetta/cas's declarations. index.d.ts ('@mathzetta/cas/engine'), cas/index.d.ts ('@mathzetta/cas') and yaml.d.ts
+// ('@mathzetta/cas/yaml') pick from here.
 
 // ---- expressions -----------------------------------------------------------------------------
 
@@ -243,13 +243,13 @@ export function simplify(expr: Expr | string, ruleset: RuleSet, options?: { maxS
 /** Postfix in, postfix out. */
 export function simplifyText(text: string, ruleset: RuleSet, options?: { maxSteps?: number; order?: 'pre' | 'post' }): string;
 
-// ---- YAML (also 'calcrules/yaml') -------------------------------------------------------------
+// ---- YAML (also '@mathzetta/cas/yaml') -------------------------------------------------------------
 
 export class YamlError extends Error {}
 export function parseYaml(text: string): unknown;
 export function stringifyYaml(value: unknown): string;
 
-// ---- the CAS ('calcrules/cas') ---------------------------------------------------------------
+// ---- the CAS ('@mathzetta/cas') ---------------------------------------------------------------
 
 /** Which steps to keep: a detail level, false for none, or a selection by step id or tag. */
 export type StepOption = boolean | 'full' | 'normal' | 'brief' | {

@@ -1,6 +1,6 @@
-// calcrules/cas — a small computer algebra system on calcrules' rules.
+// @mathzetta/cas/cas — a small computer algebra system on @mathzetta/cas's rules.
 //
-//   import { createCAS } from 'calcrules/cas';
+//   import { createCAS } from '@mathzetta/cas';
 //   const cas = createCAS();                       // the shipped rules (rules/calculus.yaml, rules/cas/*.yaml)
 //   cas.simplify('x x + 2 *').text                  '4x'
 //   cas.diff('x 3 ^', 'x').text                     '3x^2'
@@ -8,7 +8,7 @@
 //   cas.integrate('x x sin *', 'x').text            '-x·cos(x) + sin(x)'
 //   cas.approximate('2 sqrt', { digits: 50 }).text  '1.4142135623730950488016887242096980785696718753769'
 //
-// Input is MathZetta's postfix (a string, its tokens, or a calcrules node); pass
+// Input is MathZetta's postfix (a string, its tokens, or a @mathzetta/cas node); pass
 // `read: (text) => parse(text)` (MathZetta's parse) to give it ordinary maths.
 // Everything is exact (fractions of any size, √2, π stay as they are); ask for
 // a decimal with approximate() or { approximate: digits } on any call.

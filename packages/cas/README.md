@@ -1,35 +1,44 @@
-# calcrules
+# MathZetta CAS
 
-Simplifies math expressions by applying rules you can add and change without
-touching the engine. Rules live in YAML; the library figures out which one
-applies where, what the result is, and how to say it in words.
+Exact computer algebra with steps you can read: simplify, expand, factor, cancel, differentiate,
+integrate, solve, approximate to any number of digits, and complex numbers if you ask for them. What
+it knows about functions is YAML rules you can read, change, add to or replace; the engine under it
+applies any rules you give it.
 
 Zero dependencies, ES modules with TypeScript declarations, works in the browser and in Node.
 
 ```bash
-npm install calcrules
+npm install @mathzetta/cas
+```
+
+```js
+import { createCAS } from '@mathzetta/cas';
+const cas = createCAS();
+cas.solve('x 2 ^ 5 x * - 6 + 0 =', 'x', { steps: 'brief' })   // x = 2 or x = 3, with steps
+cas.integrate('x x sin *', 'x').text                           // -x·cos(x) + sin(x)
+
+import { parse } from 'mathzetta';                              // or read ordinary maths first
+const typed = createCAS({ read: (text) => parse(text) });
+typed.diff('x^3 sin(x)', 'x').text                             // x^3·cos(x) + 3x^2·sin(x)
 ```
 
 Expressions are [MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta)
-postfix, so `parse()` from `mathzetta` turns typed maths into input for calcrules, and
-[Inline Math](https://github.com/triplelog/mathzetta/tree/main/packages/inlinemath) draws the results
-(`inlinemath/cas` puts the CAS in drawn maths).
+postfix, and [Inline Math](https://github.com/triplelog/mathzetta/tree/main/packages/inlinemath)
+draws the results (`@mathzetta/inlinemath/cas` puts the CAS and its steps in drawn maths). The
+guide to the CAS is [docs/cas.md](docs/cas.md); try it at [mathzetta.com/cas/](https://mathzetta.com/cas/).
 
-Two modes ship with it: **simplify** tidies an expression up, **differentiate**
-breaks a derivative down. They are just rules, in the same format, tagged with
-a `mode`.
+## The rule engine: `@mathzetta/cas/engine`
 
-**A CAS on top** (`calcrules/cas`, [docs/cas.md](docs/cas.md)): exact simplify,
-expand, factor, cancel, differentiate, integrate, solve and approximate to any
-number of digits, complex numbers optionally (`complex: true`), with steps you choose (and explanations), and everything it
-knows about functions in YAML rules (rules/cas/*.yaml) you can change, add to, or
-replace:
+Under the CAS is a rule engine you can use on its own:
 
 ```js
-import { createCAS } from 'calcrules/cas';
-const cas = createCAS({ rules: [myRules] });
-cas.solve('x 2 ^ 5 x * - 6 + 0 =', 'x', { steps: 'brief' })   // x = 2 or x = 3, with steps
+import { RuleSet, parse, simplify } from '@mathzetta/cas/engine';
 ```
+
+It simplifies expressions by applying rules you can add and change without touching the engine.
+Rules live in YAML; the engine figures out which one applies where, what the result is, and how to
+say it in words. Two modes ship with it: **simplify** tidies an expression up, **differentiate**
+breaks a derivative down. They are just rules, in the same format, tagged with a `mode`.
 
 ## The idea
 
@@ -129,12 +138,12 @@ editor's dropdown immediately.
 ## The postfix dialect
 
 Expressions are MathZetta postfix ([its docs/postfix.md](https://github.com/triplelog/mathzetta/blob/main/packages/mathzetta/docs/postfix.md)),
-so anything MathZetta parses can be rewritten here and anything calcrules
+so anything MathZetta parses can be rewritten here and anything MathZetta CAS
 produces can be drawn or read aloud there — `fromPostfix(parse('e^(2x)'))`
 is the whole bridge. The operator names and arities in `src/ops.js` mirror
 MathZetta's: `neg` for unary minus, `e u ^` for e^u (there is no `exp`),
 `der` for d/dx, counts before variadic operators (`a b c 3 max`) and
-`\:name` for user functions (`x 1 \:f` is f(x)). calcrules has no
+`\:name` for user functions (`x 1 \:f` is f(x)). MathZetta CAS has no
 dependency on MathZetta; it only agrees on the names.
 
 ## Differentiating
@@ -188,11 +197,11 @@ a `der`, and running to a fixed point removes them all.
 ## Using it
 
 ```js
-import { RuleSet, parse, findMatches, simplify } from 'calcrules';
+import { RuleSet, parse, findMatches, simplify } from '@mathzetta/cas/engine';
 import { readFileSync } from 'node:fs';
 
 // The shipped rule files (in a browser, fetch them); a RuleSet can hold several modes.
-const load = (name) => RuleSet.fromYaml(readFileSync(new URL(import.meta.resolve(`calcrules/rules/${name}.yaml`)), 'utf8'));
+const load = (name) => RuleSet.fromYaml(readFileSync(new URL(import.meta.resolve(`@mathzetta/cas/rules/${name}.yaml`)), 'utf8'));
 const S = load('arithmetic').view('simplify');      // one mode's rules, indexed on their own
 const D = load('calculus').view('differentiate');
 
@@ -226,7 +235,7 @@ rather than hanging.
 
 ## The two pages
 
-[mathzetta.com/calcrules/web/](https://mathzetta.com/calcrules/web/) has a playground (enter an
+[mathzetta.com/cas/](https://mathzetta.com/cas/) has a playground (enter an
 expression, see every rule that applies and where, apply them one at a time or run to a fixed point,
 read the step-by-step explanation, with the structure keys it is looked up under) and a rule editor
 (build a rule with live feedback: which keys it lands under, which rules share them, whether it fires
@@ -235,7 +244,7 @@ on your samples; Download writes the ruleset back out as YAML).
 ## Layout
 
 ```
-src/index.js       the engine's exports ('calcrules'); src/cas/index.js is 'calcrules/cas'
+src/index.js       the engine's exports ('@mathzetta/cas/engine'); src/cas/index.js is '@mathzetta/cas'
 src/ops.js         operator registry: arity, commutativity, numeric folding
 src/expr.js        nodes and postfix parsing; every node caches its canonical
                    text, which doubles as structural identity
@@ -246,7 +255,7 @@ src/ruleset.js     the key -> rules index
 src/match.js       binding slots and checking requirements
 src/apply.js       building the replacement, numeric folding, explanations
 src/simplify.js    stepping and running to a fixed point
-src/yaml.js        small YAML reader/writer (no dependencies; also 'calcrules/yaml')
+src/yaml.js        small YAML reader/writer (no dependencies; also '@mathzetta/cas/yaml')
 src/types.d.ts     the TypeScript declarations
 src/cas/           the CAS: form.js (the normal form: exact fractions, like terms, roots),
                    rules.js (loading rule files, the rewrite driver), steps.js, poly.js

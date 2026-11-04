@@ -136,7 +136,7 @@ npm run coverage        # what the test tables don't cover yet
 and operators in reverse Polish order; fixed-arity operators are bare
 (`x sin`, `a b ^`), variadic ones follow a count (`a b c 3 max`), unary
 minus is `neg`. It is the format every sibling library speaks: Inline Math
-draws it, calcrules rewrites it, speech segments are tagged by it.
+draws it, MathZetta CAS rewrites it, speech segments are tagged by it.
 
 ## How it works
 

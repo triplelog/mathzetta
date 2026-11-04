@@ -7,9 +7,9 @@ This repository holds three JavaScript libraries that share one format, MathZett
 
 | Package | What it does | npm |
 | --- | --- | --- |
-| [**mathzetta**](packages/mathzetta) | Parses maths written almost any way (plain text, LaTeX, unicode, JavaScript, Python, SQL, GLSL, spreadsheet formulas, plain English) into standard postfix, and writes it out as LaTeX, MathML, HTML, spoken English, JavaScript, Python, SQL, Excel/Sheets, GLSL or plain text, with exact or numeric evaluation. No dependencies. | [`mathzetta`](https://www.npmjs.com/package/mathzetta) |
-| [**inlinemath**](packages/inlinemath) | Draws those trees as HTML and CSS, every part addressable: highlight, colour, animate between steps, speech segments; Markdown with maths. `inlinemath/lite` is the drawing alone (about a third smaller). | not yet published |
-| [**calcrules**](packages/calcrules) | Rewrites postfix with readable YAML rules (derivatives, simplification), and an exact CAS on top: simplify, factor, solve, integrate, with steps. | not yet published |
+| [**mathzetta**](packages/mathzetta) | Parses maths written almost any way (plain text, LaTeX, unicode, JavaScript, Python, SQL, GLSL, spreadsheet formulas, plain English) into standard postfix, and writes it out as LaTeX, MathML, spoken English, JavaScript, Python, SQL, Excel/Sheets, GLSL or plain text, with exact or numeric evaluation. No dependencies. | [`mathzetta`](https://www.npmjs.com/package/mathzetta) |
+| [**Inline Math**](packages/inlinemath) | Draws those trees as HTML and CSS, every part addressable: highlight, colour, animate between steps, speech segments; Markdown with maths. `@mathzetta/inlinemath/lite` is the drawing alone (about a third smaller). | [`@mathzetta/inlinemath`](https://www.npmjs.com/package/@mathzetta/inlinemath) |
+| [**MathZetta CAS**](packages/cas) | Exact computer algebra with explained steps: simplify, expand, factor, solve, differentiate, integrate, any-precision decimals, complex numbers. What it knows is readable YAML rules over the postfix, on a rule engine you can use directly. | [`@mathzetta/cas`](https://www.npmjs.com/package/@mathzetta/cas) |
 
 ```bash
 npm install mathzetta

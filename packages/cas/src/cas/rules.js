@@ -1,7 +1,7 @@
 // Rules in the CAS: loading rule files, the predicates rules use, and the
 // driver that rewrites with them.
 //
-// A rule file is the usual calcrules YAML (see rules/cas/*.yaml), plus two
+// A rule file is the usual @mathzetta/cas YAML (see rules/cas/*.yaml), plus two
 // optional sections that need no code:
 //
 //   operators:                  new functions, so patterns can use them

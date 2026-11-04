@@ -2,13 +2,13 @@
 /**
  * `npm run build` — Inline Math with everything it needs inside, for a static host:
  *
- *   dist/inlinemath.js, dist/markdown.js, dist/cas.js   ES modules, minified (mathzetta, and calcrules for
+ *   dist/inlinemath.js, dist/markdown.js, dist/cas.js   ES modules, minified (mathzetta, and MathZetta CAS for
  *                                                     cas.js, bundled in; shared code in dist/chunks/)
  *   dist/inlinemath.external.js, dist/markdown.external.js, dist/cas.external.js
  *                                     the same with MathZetta left out (bare imports 'mathzetta',
  *                                     'mathzetta/speech', 'mathzetta/text', 'mathzetta/calculate' remain):
  *                                     for a page that loads MathZetta itself and maps the names with an
- *                                     import map; cas.external.js still holds calcrules
+ *                                     import map; cas.external.js still holds the CAS (@mathzetta/cas)
  *   dist/inlinemath.external.global.min.js, dist/inlinemath-cas.external.global.min.js
  *                                     classic <script>s without MathZetta: they read window.MathZetta,
  *                                     which a MathZetta <script> put there first (mathzetta.min.js, or the
@@ -23,7 +23,7 @@
  *                                     if the MathZetta <script> before it has calculate)
  *   dist/inlinemath.css, dist/fonts/    the styles and fonts (both needed on the page)
  *
- * Bare imports ('mathzetta', 'mathzetta/speech', 'calcrules/cas' …) resolve as Node resolves them
+ * Bare imports ('mathzetta', 'mathzetta/speech', '@mathzetta/cas' …) resolve as Node resolves them
  * (import.meta.resolve: the packages' ES module sources). The inlinemath.com pages are built from
  * dist/ by the website (not in this repository).
  */
@@ -36,12 +36,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
 const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
-const banner = `/* Inline Math ${pkg.version} — MIT licence; includes mathzetta (and calcrules, for the CAS) */`;
+const banner = `/* Inline Math ${pkg.version} — MIT licence; includes mathzetta (and @mathzetta/cas, for the CAS) */`;
 
-// the sibling packages, resolved as Node resolves them (in the workspace: packages/mathzetta, packages/calcrules)
+// the sibling packages, resolved as Node resolves them (in the workspace: packages/mathzetta, packages/cas)
 const resolveLikeThePage = {
     name: 'packages',
-    resolveId: (id) => (/^(mathzetta|calcrules)(\/|$)/.test(id) ? fileURLToPath(import.meta.resolve(id)) : null),
+    resolveId: (id) => (/^(mathzetta|@mathzetta\/cas)(\/|$)/.test(id) ? fileURLToPath(import.meta.resolve(id)) : null),
 };
 const VIRTUAL = '\0inlinemath-global';
 // the stylesheet as a string, for the classic builds to carry and add to the page
@@ -77,11 +77,11 @@ await modules.close();
 // the same without MathZetta: for a page that already has it (an import map supplies the names)
 const external = await rollup({
     input: { 'inlinemath.external': join(ROOT, 'src/index.js'), 'markdown.external': join(ROOT, 'src/markdown.js'), 'cas.external': join(ROOT, 'src/cas.js'), 'lite.external': join(ROOT, 'src/lite.js') },
-    plugins: [resolveLikeThePage],   // calcrules still bundled into cas.external.js
+    plugins: [resolveLikeThePage],   // @mathzetta/cas still bundled into cas.external.js
     external: (id) => id.startsWith('mathzetta'),
     onwarn: quiet,
 });
-await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and calcrules, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate with an import map'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
+await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate with an import map'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
 await external.close();
 
 // classic <script> builds
@@ -94,7 +94,7 @@ for (const [file, kind] of [['inlinemath.global.min.js', 'full'], ['inlinemath-c
 // the classic builds without MathZetta: every import of it becomes a read of window.MathZetta
 for (const [file, kind] of [['inlinemath.external.global.min.js', 'full'], ['inlinemath-cas.external.global.min.js', 'cas'], ['inlinemath-lite.external.global.min.js', 'lite']]) {
     const bundle = await rollup({ input: VIRTUAL, plugins: [globalEntry(kind), cssAsText, resolveLikeThePage], external: (id) => id.startsWith('mathzetta'), onwarn: quiet });
-    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', globals: () => 'MathZetta', banner: banner.replace('; includes mathzetta (and calcrules, for the CAS)', '; MathZetta not included: load a MathZetta <script> (mathzetta.min.js or mathzetta.maths-display.min.js) first'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
+    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', globals: () => 'MathZetta', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: load a MathZetta <script> (mathzetta.min.js or mathzetta.maths-display.min.js) first'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
     await bundle.close();
 }
 

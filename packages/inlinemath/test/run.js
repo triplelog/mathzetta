@@ -161,8 +161,8 @@ test('numberTree gives the ids MathZetta gives', () => {
         fromPostfix(['a', '1', '+']));
 });
 
-test('a rewrite site from calcrules highlights by path', () => {
-    // calcrules speaks the same postfix, so its child-index paths are Inline Math's paths.
+test('a rewrite site from @mathzetta/cas highlights by path', () => {
+    // @mathzetta/cas speaks the same postfix, so its child-index paths are Inline Math's paths.
     const postfix = 'x 2 ^ e x ^ * x der'.split(' ');
     const tree = treeOf(postfix);
     assert.equal(tree.op, 'der');
@@ -175,7 +175,7 @@ test('a rewrite site from calcrules highlights by path', () => {
 // ---- the CAS (inlinemath/cas) ------------------------------------------------------------
 
 const { casBlocks, stepsHTML, mathCAS, tokensOf } = await import('../src/cas.js');
-const calcrulesModule = await import('calcrules');
+const engineModule = await import('@mathzetta/cas/engine');
 
 test('{{…}} blocks simplify, solve, differentiate and integrate with the CAS', () => {
     const blocks = casBlocks();
@@ -212,7 +212,7 @@ test('complex numbers: arithmetic, Re/Im/conj, solving, drawn', () => {
     assert.equal(drawn('{{simplify((2+3i)(1-i))}}'), '5+i');
     assert.equal(drawn('{{simplify(Re(3+4i) + |3+4i|)}}'), '8');
     assert.equal(drawn('{{solve(x^2 + 2x + 5 = 0, x)}}'), 'x=−1−2i∨x=−1+2i');
-    const { parse: postfix } = calcrulesModule;
+    const { parse: postfix } = engineModule;
     assert.ok(toHTML(tokensOf(postfix('z conj'))).includes('mv-over'), 'the conjugate is drawn with an overline');
     assert.equal(text(toHTML(tokensOf(postfix('z re')))), 'Rez');
 });

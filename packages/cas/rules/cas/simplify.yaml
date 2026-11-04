@@ -1,7 +1,7 @@
 name: Values and identities
 
 # The CAS's simplify rules (mode: simplify). They see expressions in normal form
-# (calcrules/src/cas/form.js), as drawn: x/2, 2x - 3, -x, √x is "x sqrt",
+# (src/cas/form.js), as drawn: x/2, 2x - 3, -x, √x is "x sqrt",
 # ∛x is "3 x root", π/6 is "=pi 6 /", 2π/3 is "2 =pi * 3 /", e^x is "=e x ^".
 #
 #   - a word is a slot (u, v, n …); a fixed symbol is written =pi, =e
