@@ -23,6 +23,7 @@ npm run check:sympy   # CAS answers vs real SymPy (python3 + sympy)
 
 ## Rules
 
+- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (`src/index.d.ts`, `src/cas/index.d.ts`, `src/yaml.d.ts`); README examples are written against the published package (`from 'calcrules'`), so keep them runnable.
 - Postfix in, postfix out; nothing here evaluates transcendental functions (folds are exact-only).
 - A rule file change must keep `npm test` green and `calcvidnew`'s pipeline test (it drives these rules).
 - calcvidnew is the main consumer: it wraps input in `der` and runs `differentiate` then `simplify` with its own driver (`web/js/solver.js`).

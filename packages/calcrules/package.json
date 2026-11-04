@@ -1,20 +1,31 @@
 {
   "name": "calcrules",
   "version": "0.1.0",
-  "description": "Rule-driven simplification of postfix math expressions, indexed by collapsed structure keys.",
+  "description": "Rewrite maths with rules you can read: differentiation and simplification as YAML rules over MathZetta postfix, with explained steps — and an exact CAS on top (simplify, expand, factor, solve, differentiate, integrate, any-precision decimals, complex numbers).",
   "type": "module",
   "main": "src/index.js",
+  "types": "src/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./cas": "./src/cas/index.js",
-    "./yaml": "./src/yaml.js",
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./cas": {
+      "types": "./src/cas/index.d.ts",
+      "default": "./src/cas/index.js"
+    },
+    "./yaml": {
+      "types": "./src/yaml.d.ts",
+      "default": "./src/yaml.js"
+    },
     "./rules/*": "./rules/*",
     "./package.json": "./package.json"
   },
   "scripts": {
     "test": "node test/run.mjs",
     "build:rules": "node tools/bundle-rules.mjs",
-    "check:sympy": "node tools/check-sympy.mjs"
+    "check:sympy": "node tools/check-sympy.mjs",
+    "prepublishOnly": "npm test"
   },
   "files": [
     "src",
@@ -44,5 +55,22 @@
   "bugs": {
     "url": "https://github.com/triplelog/mathzetta/issues",
     "email": "rwilcox@mathzetta.com"
+  },
+  "keywords": [
+    "math",
+    "cas",
+    "computer-algebra",
+    "symbolic",
+    "simplify",
+    "derivative",
+    "integral",
+    "solve",
+    "rewrite-rules",
+    "steps",
+    "postfix",
+    "mathzetta"
+  ],
+  "engines": {
+    "node": ">=18"
   }
 }

@@ -4,13 +4,16 @@ Simplifies math expressions by applying rules you can add and change without
 touching the engine. Rules live in YAML; the library figures out which one
 applies where, what the result is, and how to say it in words.
 
-Zero dependencies, vanilla ES modules, works in the browser and in node.
+Zero dependencies, ES modules with TypeScript declarations, works in the browser and in Node.
 
+```bash
+npm install calcrules
 ```
-npm test          # the engine, the shipped rules and the CAS (mathzetta, a dev dependency, reads the CAS tests' inputs)
-npm run check:sympy   # the CAS against SymPy (python3 with sympy)
-npm run build:rules   # after editing rules/*.yaml: regenerates src/cas/default-rules.js
-```
+
+Expressions are [MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta)
+postfix, so `parse()` from `mathzetta` turns typed maths into input for calcrules, and
+[Inline Math](https://github.com/triplelog/mathzetta/tree/main/packages/inlinemath) draws the results
+(`inlinemath/cas` puts the CAS in drawn maths).
 
 Two modes ship with it: **simplify** tidies an expression up, **differentiate**
 breaks a derivative down. They are just rules, in the same format, tagged with
@@ -125,7 +128,7 @@ editor's dropdown immediately.
 
 ## The postfix dialect
 
-Expressions are [MathZetta](../mathzetta) postfix (`mathzetta/docs/postfix.md`),
+Expressions are MathZetta postfix ([its docs/postfix.md](https://github.com/triplelog/mathzetta/blob/main/packages/mathzetta/docs/postfix.md)),
 so anything MathZetta parses can be rewritten here and anything calcrules
 produces can be drawn or read aloud there — `fromPostfix(parse('e^(2x)'))`
 is the whole bridge. The operator names and arities in `src/ops.js` mirror
@@ -180,19 +183,18 @@ picks the one that reads better:
 | `2 3 ^ x der` | `_ _ der` | constant | priority 10 beats the deeper power rule |
 
 Differentiation always terminates: every rule strictly shrinks what sits under
-a `D`, and running to a fixed point removes them all.
+a `der`, and running to a fixed point removes them all.
 
 ## Using it
 
 ```js
-import { RuleSet, parse, findMatches, simplify } from './src/index.js';
+import { RuleSet, parse, findMatches, simplify } from 'calcrules';
+import { readFileSync } from 'node:fs';
 
-const rules = RuleSet.fromYaml(yamlText);
-
-// One mode's rules, indexed on their own.
-const D = rules.view('differentiate');
-const S = rules.view('simplify');
-rules.modes();                     // ['simplify', 'differentiate']
+// The shipped rule files (in a browser, fetch them); a RuleSet can hold several modes.
+const load = (name) => RuleSet.fromYaml(readFileSync(new URL(import.meta.resolve(`calcrules/rules/${name}.yaml`)), 'utf8'));
+const S = load('arithmetic').view('simplify');      // one mode's rules, indexed on their own
+const D = load('calculus').view('differentiate');
 
 // What could apply, and where?
 for (const m of findMatches('x 0 + 2 *', S)) {
@@ -206,7 +208,7 @@ out.steps.map(s => s.explanation); // one sentence per step
 out.stopped;                       // 'fixpoint' | 'cycle' | 'maxSteps'
 
 // Differentiate to completion, then tidy — the two modes in sequence.
-const d = simplify(parse('x 2 ^ x sin * x D'), D, { order: 'pre' });
+const d = simplify(parse('x 2 ^ x sin * x der'), D, { order: 'pre' });
 simplify(d.expr, S).expr.s;        // '2 x * x sin * x 2 ^ x cos * +'
 ```
 
@@ -233,6 +235,7 @@ on your samples; Download writes the ruleset back out as YAML).
 ## Layout
 
 ```
+src/index.js       the engine's exports ('calcrules'); src/cas/index.js is 'calcrules/cas'
 src/ops.js         operator registry: arity, commutativity, numeric folding
 src/expr.js        nodes and postfix parsing; every node caches its canonical
                    text, which doubles as structural identity
@@ -243,23 +246,46 @@ src/ruleset.js     the key -> rules index
 src/match.js       binding slots and checking requirements
 src/apply.js       building the replacement, numeric folding, explanations
 src/simplify.js    stepping and running to a fixed point
-src/yaml.js        small YAML reader/writer (no dependencies)
+src/yaml.js        small YAML reader/writer (no dependencies; also 'calcrules/yaml')
+src/types.d.ts     the TypeScript declarations
+src/cas/           the CAS: form.js (the normal form: exact fractions, like terms, roots),
+                   rules.js (loading rule files, the rewrite driver), steps.js, poly.js
+                   (expand, factor, cancel), solve.js, integrate.js, approx.js, rational.js,
+                   text.js, default-rules.js (rules/ bundled; npm run build:rules)
+rules/             arithmetic.yaml and calculus.yaml (the engine's two modes);
+                   cas/*.yaml (what the CAS knows about functions), cas/complex/ (complex: true)
+docs/cas.md        the CAS guide
+```
+
+## Working on it
+
+```bash
+npm test              # the engine, the shipped rules and the CAS (mathzetta, a dev dependency, reads the CAS tests' inputs)
+npm run check:sympy   # the CAS against SymPy (python3 with sympy)
+npm run build:rules   # after editing rules/*.yaml: regenerates src/cas/default-rules.js (a test fails if it is stale)
 ```
 
 ## Notation
 
 Input is postfix, whitespace separated: `3 4 5 6 - * +`. Any token that is not
-a registered operator is an operand, so `3`, `-2`, `x` and `theta` all work.
+a registered operator is an operand, so `3`, `-2`, `x` and `theta` all work; `=pi`
+in a rule pattern is the literal symbol π.
 
-Built-in operators are `+ - * / ^` and `D` (binary), and
-`neg abs sqrt exp sin cos tan ln` (unary). Add more with `defineOperator`.
+The built-in operators are MathZetta's, with the same names and arities:
 
-Every operator token is taken out of the operand namespace, which is why the
-derivative operator is capital `D` — lowercase `d` is far too useful as a
-variable to reserve. Rename it in one line in `src/ops.js` if you disagree.
+```
+binary    + - * / ^ mod root log _ der round atan2 perm comb  = ≠ < > ≤ ≥ ≈ ∈ ∉ ∪ ∩ & | …
+unary     neg abs floor ceil sqrt ! ln sin cos tan csc sec cot sinh cosh tanh
+          arcsin arccos arctan arcsinh arccosh arctanh expm1 …
+ternary   ?: (a piecewise choice)
+variadic  int lim max min gcd sum prod, and the groups () [] {} — a count comes first: a b c 3 max
+```
+
+`der` is d/dx (`u x der`), and e^u is `e u ^` (there is no `exp`). `\:name` is a function of
+your own: `x 1 \:f` is f(x). Add operators with `defineOperator`; `operators()` lists them.
 
 Division and powers fold only when the result stays exact, so `1/3` and `2^0.5`
-survive as they are instead of turning into floats. `D` never folds at all.
+survive as they are instead of turning into floats. `der` never folds at all.
 
 ## Rule files
 
