@@ -4,12 +4,28 @@
   "description": "Draw calculus-level maths as HTML and CSS from anything MathZetta reads, with every part addressable.",
   "type": "module",
   "main": "src/index.js",
+  "types": "src/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./lite": "./src/lite.js",
-    "./lite-calc": "./src/lite-calc.js",
-    "./cas": "./src/cas.js",
-    "./markdown": "./src/markdown.js",
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./lite": {
+      "types": "./src/lite.d.ts",
+      "default": "./src/lite.js"
+    },
+    "./lite-calc": {
+      "types": "./src/lite-calc.d.ts",
+      "default": "./src/lite-calc.js"
+    },
+    "./cas": {
+      "types": "./src/cas.d.ts",
+      "default": "./src/cas.js"
+    },
+    "./markdown": {
+      "types": "./src/markdown.d.ts",
+      "default": "./src/markdown.js"
+    },
     "./inlinemath.css": "./inlinemath.css",
     "./fonts/fonts.css": "./fonts/fonts.css",
     "./dist/*": "./dist/*",
@@ -29,8 +45,8 @@
     "prepublishOnly": "npm test && npm run build"
   },
   "peerDependencies": {
-    "calcrules": ">=0.1.0",
-    "mathzetta": ">=1.0.0"
+    "calcrules": "^0.1.0",
+    "mathzetta": "^1.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",

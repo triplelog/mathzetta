@@ -25,6 +25,8 @@ npm run build   # dist/ (ES modules + <script> builds, mathzetta/calcrules bundl
 
 ## Rules
 
+- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (index, lite, lite-calc, markdown, cas); peers are `mathzetta ^1` and, optional, `calcrules ^0.1`.
+
 - Check looks with a headless-Chrome screenshot of the gallery (the demos are inlinemath.com's pages, in the private
   mathzetta-website repository; its dev server serves them over this package). The tests can't see layout.
 - A calcrules expression draws as `toHTML(expr.s.split(' '))`; its rewrite `path` is a Inline Math `{ path }` — no adapter.

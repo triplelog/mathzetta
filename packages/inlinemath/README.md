@@ -1,7 +1,7 @@
 # Inline Math
 
 Draws calculus-level maths as plain HTML and CSS (the `inlinemath` package, at inlinemath.com). The input is anything
-[MathZetta](../mathzetta) reads (`sin^2 x`, `\frac{d}{dx}(x^2)`, `x**2/2`, `√x`).
+[MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta) reads (`sin^2 x`, `\frac{d}{dx}(x^2)`, `x**2/2`, `√x`).
 Every part of the drawing can be found, coloured, clicked and animated.
 
 Inline Math is not a LaTeX engine. It covers what a Calculus course writes:
@@ -12,6 +12,14 @@ Inline Math is not a LaTeX engine. It covers what a Calculus course writes:
 
 It needs nothing besides MathZetta: no KaTeX, no fonts (Latin Modern is
 optional), and no build step.
+
+```bash
+npm install inlinemath mathzetta     # mathzetta 1.x is a peer dependency; add calcrules for inlinemath/cas
+```
+
+Inline Math is ES modules (`import`). TypeScript declarations come with it. `require('inlinemath')`
+works where Node can require ES modules (Node 20.19+ and 22.12+); in the browser, use the bundles
+in `dist/` (below).
 
 ```js
 import { toHTML, render } from './inlinemath/src/index.js';
@@ -241,21 +249,18 @@ playground: any input, any operation, detail level, and a live rule editor).
 
 ## What still needs doing
 
-**Parser gaps in MathZetta** (Inline Math can only draw what parses):
-- **Evaluation bars.** `[F(x)]_0^1` and `\left. F \right|_0^1` don't parse; the first gives `x^2_0^1`. The antiderivative steps need them.
-- **Piecewise.** `\begin{cases}` comes out garbled. Today, piecewise only works via `c ? a : b` or `if c then a else b`.
-- **Matrices.** `\begin{pmatrix}` becomes nested lists.
-- **Other notation:**
-  - `\partial` becomes a symbol times `f`;
-  - `\text{…}` becomes a product of letters;
-  - `f^{(4)}` becomes a power;
-  - `x = 2, x = -3` (lists of answers) is rejected;
-  - `\dot x` doesn't parse.
+**Notation MathZetta doesn't read yet** (Inline Math can only draw what parses):
+- **Evaluation bars:** `[F(x)]_0^1` reads as a power of a subscript, and `\left. F \right|_0^1` is rejected.
+- **Matrices:** `\begin{pmatrix}` becomes nested lists.
+- **Partial derivatives:** `\partial f / \partial x` becomes products.
+- **Derivative orders:** `f^{(4)}` becomes a power.
+- **Lists of answers:** `x = 2, x = -3` is rejected.
+- **Accents:** `\dot x` becomes a product.
 
 **Inline Math features worth adding next:**
 1. **Exit animation.** Parts that disappear in a step should fade out where they were (ghost copies). Today they vanish, and new signs and bars just appear.
 2. **Step-diff helper.** Given `step.before`, `step.after` and `step.path`, return what changed, then highlight → animate → un-highlight in one call. That would be the video's main move.
-3. **Narration sync.** Something like `view.follow(segments, timings)`: drive highlights from the TTS word timings calcvidnew already gets (`words: [{start, end, i, j}]`).
+3. **Narration sync.** Something like `view.follow(segments, timings)`: drive highlights from a text-to-speech engine's word timings (`words: [{start, end, i, j}]`).
 4. **Click-to-edit.** Swap a clicked node for an input box showing its text (`toText` / LaTeX), re-parse, and splice it back in. This was a good inline-math idea.
 5. **Copy as LaTeX or text** from a selection.
 6. **Line breaking and alignment.** Multi-line derivations with the `=` signs lined up (an `align` helper), and breaking long sums.
