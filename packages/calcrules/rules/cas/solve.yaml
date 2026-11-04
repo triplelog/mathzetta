@@ -130,6 +130,7 @@ rules:
     pattern: n u root r =
     when:
       u: [hasVariable]
+      n: [freeOfVariable]
     output: u r n ^ =
     explain: "Raise each side to the power {n}."
     tags: [inverse]
@@ -190,3 +191,7 @@ rules:
   - { id: iso-arctan, name: Undo arctan, mode: isolate, pattern: u arctan r =, when: { u: [hasVariable] }, output: u r tan =, tags: [inverse], explain: "Take tan of each side." }
   - { id: iso-sinh, name: Undo sinh, mode: isolate, pattern: u sinh r =, when: { u: [hasVariable] }, output: u r arcsinh =, tags: [inverse], explain: "Take arcsinh of each side." }
   - { id: iso-tanh, name: Undo tanh, mode: isolate, pattern: u tanh r =, when: { u: [hasVariable] }, output: u r arctanh =, tags: [inverse], explain: "Take arctanh of each side." }
+  - { id: iso-cosh, name: Undo cosh, mode: isolate, pattern: u cosh r =, when: { u: [hasVariable] }, output: u r arccosh pm =, tags: [inverse], explain: "Two numbers have cosh {r}: ±arccosh {r}." }
+  - { id: iso-arcsinh, name: Undo arcsinh, mode: isolate, pattern: u arcsinh r =, when: { u: [hasVariable] }, output: u r sinh =, tags: [inverse], explain: "Take sinh of each side." }
+  - { id: iso-arccosh, name: Undo arccosh, mode: isolate, pattern: u arccosh r =, when: { u: [hasVariable] }, output: u r cosh =, tags: [inverse], explain: "Take cosh of each side." }
+  - { id: iso-arctanh, name: Undo arctanh, mode: isolate, pattern: u arctanh r =, when: { u: [hasVariable] }, output: u r tanh =, tags: [inverse], explain: "Take tanh of each side." }

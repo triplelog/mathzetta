@@ -26,6 +26,8 @@ export function findMatches(expr, ruleset, { order = 'post' } = {}) {
   const out = [];
   for (const m of matches) {
     const after = rewriteOf(m);
+    // a rule that matched but changes nothing (fold: true on 1/3, which has no exact decimal) isn't on offer
+    if (after.s === m.node.s) continue;
     const sig = `${m.path.join('.')}|${m.rule.id}|${after.s}`;
     if (seen.has(sig)) continue;
     seen.add(sig);
@@ -93,8 +95,10 @@ export function simplify(expr, ruleset, { maxSteps = 100, order = 'post' } = {})
   for (let i = 0; i < maxSteps; i++) {
     const applied = step(current, ruleset, { order, avoid: seen });
     if (!applied) {
-      // Distinguish "nothing matched" from "everything matched looped back".
-      stopped = matchAll(current, ruleset, { order }).length ? 'cycle' : 'fixpoint';
+      // Distinguish "nothing applies" from "everything that applies leads back somewhere we've been";
+      // a match that rewrites to the same thing (fold: true on 1/3) is no rewrite at all.
+      const root = current;
+      stopped = matchAll(current, ruleset, { order }).some((m) => applyMatch(root, m).expr.s !== root.s) ? 'cycle' : 'fixpoint';
       break;
     }
     steps.push({

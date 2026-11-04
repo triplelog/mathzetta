@@ -24,6 +24,8 @@ npm run check:sympy   # CAS answers vs real SymPy (python3 + sympy)
 ## Rules
 
 - A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (`src/index.d.ts`, `src/cas/index.d.ts`, `src/yaml.d.ts`); README examples are written against the published package (`from 'calcrules'`), so keep them runnable.
+- **Nothing runs away on a short input** (test/limits.test.js): polynomials past degree 256 (`MAX_DEGREE`, poly.js) aren't made dense; complex powers are multiplied out to the 60th; an exact power n^(a/s) too large for `MAX_BITS` stays as written; `approximate` refuses results past 4·MAX_BITS bits (exp, whole powers, factorials) with a CasError, takes roots past index 64 by logarithms, and calls residue that shrinks as precision grows 0.
+- Structure keys are written like postfix: a variadic operator's count comes before it (`_ _ _ 3 max`). The engine folds +, -, *, neg and whole powers on the exact decimal tokens (apply.js), never on doubles.
 - Postfix in, postfix out; nothing here evaluates transcendental functions (folds are exact-only).
 - A rule file change must keep `npm test` green and `calcvidnew`'s pipeline test (it drives these rules).
 - calcvidnew is the main consumer: it wraps input in `der` and runs `differentiate` then `simplify` with its own driver (`web/js/solver.js`).

@@ -19,6 +19,7 @@
 // 26 keys per node.
 
 import { OP } from './expr.js';
+import { getOperator, VARIADIC } from './ops.js';
 
 export const SLOT = '_';
 
@@ -26,6 +27,16 @@ export const SLOT = '_';
 export const MAX_COLLAPSINGS = 4096;
 
 const cache = new WeakMap();
+
+/**
+ * An operation's key from its operands' keys, written like its postfix: a variadic operator's
+ * operand count comes before it (`_ _ _ 3 max`), so max(a, max(b, c, d)) and max(a, b, max(c, d))
+ * have different keys; an operator with no operands is just its name (`random`).
+ */
+function opKey(node, operandKeys) {
+  const variadic = getOperator(node.op)?.arity === VARIADIC;
+  return [...operandKeys, ...(variadic ? [String(node.args.length)] : []), node.op].join(' ');
+}
 
 /**
  * All ways of collapsing `node`, as `{ key, slots }` where `slots` holds the
@@ -54,14 +65,14 @@ function compute(node, maxDepth) {
   // Odometer over the per-child collapsing lists.
   const counter = new Array(childSets.length).fill(0);
   for (;;) {
-    let key = '';
+    const keys = [];
     const slots = [];
     for (let i = 0; i < childSets.length; i++) {
       const pick = childSets[i][counter[i]];
-      key += pick.key + ' ';
+      keys.push(pick.key);
       for (const s of pick.slots) slots.push(s);
     }
-    out.push({ key: key + node.op, slots });
+    out.push({ key: opKey(node, keys), slots });
     if (out.length >= MAX_COLLAPSINGS) break;
 
     let i = childSets.length - 1;
@@ -88,7 +99,7 @@ export function keysAt(node, maxDepth) {
 /** The full-depth skeleton of a tree — what a rule pattern is indexed under. */
 export function shapeKey(node) {
   if (node.type !== OP) return SLOT;
-  return `${node.args.map(shapeKey).join(' ')} ${node.op}`;
+  return opKey(node, node.args.map(shapeKey));
 }
 
 /** Leaves left to right; these line up 1:1 with the `_`s in shapeKey. */

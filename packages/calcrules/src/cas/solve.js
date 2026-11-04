@@ -114,6 +114,8 @@ function solveBranch(cas, equation, v, options, record, found, unsolved, depth) 
     for (const e of split) solveBranch(cas, e, v, options, record, found, unsolved, depth + 1);
     return;
   }
+  // ±0 is one answer, 0: carry on with it (x² = 0 has the solution 0)
+  if (split.length === 1 && split[0].s !== equation.s) return solveBranch(cas, split[0], v, options, record, found, unsolved, depth + 1);
   const [L, R] = equation.args;
   // done: x = value
   if (L.type === 'sym' && L.token === v && !mentions(canon(R), v)) {
@@ -267,7 +269,7 @@ function solvePolynomial(cas, E, cs, v, options, record, found, unsolved, depth,
   const degree = Math.max(...cs.keys());
   const rational = rationalCoefficients(cs);
   // complex: a xⁿ + b = 0 has n roots, |r|^(1/n)·(cos θ + i sin θ) with θ = (arg r + 2πk)/n
-  if (settings.complex && degree >= 3 && rational && rational.every((c, d) => d === 0 || d === degree || c.isZero) && !rational[0].isZero) {
+  if (settings.complex && degree >= 3 && degree <= 64 && rational && rational.every((c, d) => d === 0 || d === degree || c.isZero) && !rational[0].isZero) {
     const r = rational[0].neg().div(rational[degree]);
     const size = pow(N(r.abs()), N(new Q(1n, BigInt(degree))));
     const roots = [];

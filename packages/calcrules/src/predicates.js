@@ -80,7 +80,7 @@ definePredicate('lessThan', (n, x) => isN(n) && n.value < Number(x), 'below a gi
 definePredicate('isValue', (n, x) => isN(n) && n.value === Number(x), 'equals a given number');
 
 /* -- content ------------------------------------------------------------ */
-definePredicate('isNumeric', isNumeric, 'contains no symbols, so it folds to a number');
+definePredicate('isNumeric', isNumeric, 'contains no symbols: a constant (it need not fold to a number: 1 sin)');
 definePredicate('hasSymbol', (n) => !isNumeric(n), 'mentions a symbol somewhere, so it is not just a number');
 definePredicate('isVar', (n, name) => n.type === SYM && n.token === String(name), 'is exactly this symbol');
 definePredicate('contains', (n, token) => leafTokens(n).includes(String(token)), 'mentions this operand somewhere');

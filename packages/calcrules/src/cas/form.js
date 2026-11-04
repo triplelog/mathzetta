@@ -16,7 +16,10 @@
 
 import { op, sym, exactNum, isOp } from '../expr.js';
 import { isOperator, getOperator } from '../ops.js';
-import { Q, CasError, fromToken, extractPower, gcd } from './rational.js';
+import { Q, CasError, fromToken, extractPower, gcd, bitLength, MAX_BITS } from './rational.js';
+
+// (a + bi)^n is multiplied out only up to this power, like real powers (poly.js MAX_EXPAND_POWER)
+const MAX_COMPLEX_POWER = 60n;
 
 /** Symbols that are numbers: they never count as unknowns. */
 export const CONSTANTS = new Set(['pi', 'e', 'π']);
@@ -180,6 +183,8 @@ function numPow(q, e) {
   // n^(k + a/s) = n^k · (n^a)^(1/s), and (n^a)^(1/s) = outside · inside^(1/s)
   const whole = r.floor();
   const frac = r.sub(whole);
+  // 2^(99999999/100000000): n^a would be enormous (and its s-th root no simpler): leave it as written
+  if (BigInt(bitLength(q.n)) * frac.n > BigInt(MAX_BITS) || frac.d > 1000n) return { coef: Q.ONE, fs: [{ b: N(q), e }] };
   let coef = whole.isZero ? Q.ONE : q.pow(whole.n);
   const { outside, inside } = extractPower(q.n ** frac.n, Number(frac.d));
   coef = coef.mul(new Q(outside));
@@ -260,7 +265,8 @@ export function mul(items) {
     // complex numbers multiplied together are multiplied out: (2 + 3i)(1 - i) = 5 + i
     const complexSums = list.filter((f) => f.b.k === 'add' && isN(f.e) && f.e.q.isInteger && isComplexConstant(f.b));
     const hasUnit = list.some((f) => isI(f.b));
-    if (complexSums.length && (complexSums.length > 1 || hasUnit || !complexSums[0].e.q.isOne)) {
+    const small = complexSums.every((f) => (f.e.q.sign < 0 ? -f.e.q.n : f.e.q.n) <= MAX_COMPLEX_POWER);
+    if (complexSums.length && small && (complexSums.length > 1 || hasUnit || !complexSums[0].e.q.isOne)) {
       const rest = list.filter((f) => !complexSums.includes(f) && !isI(f.b));
       let product = hasUnit ? [I] : [ONE];
       for (const f of complexSums) {

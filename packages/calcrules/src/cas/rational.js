@@ -117,6 +117,8 @@ export function exactRoot(n, k) {
 /** floor(n^(1/k)) for n ≥ 0. */
 export function intRoot(n, k) {
   if (n < 2n) return n;
+  // 2^k > n: the root is 1 (Newton's first step would otherwise build 2^(k-1), however large k is)
+  if (k >= bitLength(n)) return 1n;
   const K = BigInt(k);
   // Newton's method from an over-estimate.
   let x = 1n << BigInt(Math.ceil(bitLength(n) / k));

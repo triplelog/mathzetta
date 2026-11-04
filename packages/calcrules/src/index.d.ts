@@ -1,5 +1,5 @@
 // 'calcrules' — the rule engine: expressions, operators, structure keys, requirements, rules, rewriting. See types.d.ts.
-export type { Expr, NumNode, SymNode, OpNode, ExprInput, OperatorSpec, Collapsing, Predicate, RuleSpec, Rule, Match, Candidate, Applied, Step } from './types.js';
+export type { Expr, NumNode, SymNode, OpNode, ExprInput, OperatorSpec, Collapsing, Predicate, RuleSpec, Rule, Match, Candidate, NodeMatch, Applied, Step } from './types.js';
 export {
     NUM, SYM, OP, ExprError, numToken, num, sym, exactNum, leaf, op, isNum, isSym, isOp, isLeaf, equal, tokenize, parse, fromPostfix,
     format, depth, nodeCount, leafTokens, isNumeric, walk, at, replaceAt,

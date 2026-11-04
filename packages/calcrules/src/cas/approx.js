@@ -8,7 +8,13 @@
 // approximated (approximateParts).
 
 import { op, sym, exactNum, isOp } from '../expr.js';
-import { Q, CasError, fromToken, intRoot } from './rational.js';
+import { Q, CasError, fromToken, intRoot, bitLength, MAX_BITS } from './rational.js';
+
+// a value beyond this many bits (about 10^1,200,000) is too large to work out: refused, not attempted
+const MAX_RESULT_BITS = 4 * MAX_BITS;
+const tooLarge = () => new CasError('a number too large to approximate');
+// roots with a larger index go through e^(ln b / q) rather than an integer q-th root
+const MAX_ROOT_INDEX = 64n;
 import { CONSTANTS, freeSymbols, settings, COMPLEX_NAMES } from './form.js';
 
 const babs = (n) => (n < 0n ? -n : n);
@@ -74,6 +80,8 @@ class Fixed {
   exp(x) {
     // x = n ln2 + r with |r| ≤ ln2/2: e^x = 2^n e^r
     const n = (x + (x >= 0n ? this.ln2 / 2n : -this.ln2 / 2n)) / this.ln2;
+    if (n > BigInt(MAX_RESULT_BITS)) throw tooLarge();
+    if (n < -BigInt(MAX_RESULT_BITS)) return 0n;   // below every digit kept
     const r = x - n * this.ln2;
     const er = this.series(this.S, (t, k) => (t * r) / this.S / BigInt(k));
     if (n >= 0n) return er << n;
@@ -252,6 +260,8 @@ const FUNCTIONS = {
     return F.ln(F.div(F.S + x, F.S - x)) / 2n;
   },
   ln: (F, x) => F.ln(x),
+  loglog: (F, x) => F.ln(F.ln(x)),
+  logloglog: (F, x) => F.ln(F.ln(F.ln(x))),
   expm1: (F, x) => F.exp(x) - F.S,
 };
 
@@ -289,10 +299,40 @@ function evaluate(node, F, scope) {
     case 'ceil': return exact(a[0].q ? a[0].q.ceil() : new Q(-floorDiv(-a[0].f, F.S)));
     case 'log': return { f: F.div(F.ln(f(1)), F.ln(f(0))) };   // log(base, x)
     case 'atan2': return { f: atan2(F, f(0), f(1)) };
+    // the list functions and mod, with irrational arguments too (max(π, 3))
+    case 'max': case 'min': {
+      if (!a.length) throw new CasError(`${node.op} of nothing`);
+      if (allExact) return exact(a.map((v) => v.q).reduce((m, q) => ((node.op === 'max' ? q.sub(m).sign > 0 : q.sub(m).sign < 0) ? q : m)));
+      return { f: a.map((_, i) => f(i)).reduce((m, x) => (node.op === 'max' ? (x > m ? x : m) : (x < m ? x : m))) };
+    }
+    case 'sum': return allExact ? exact(a.reduce((s, v) => s.add(v.q), Q.ZERO)) : { f: a.reduce((s, _, i) => s + f(i), 0n) };
+    case 'prod': return allExact ? exact(a.reduce((s, v) => s.mul(v.q), Q.ONE)) : { f: a.reduce((s, _, i) => F.mul(s, f(i)), F.S) };
+    case 'mean': {
+      if (!a.length) throw new CasError('mean of nothing');
+      return allExact ? exact(a.reduce((s, v) => s.add(v.q), Q.ZERO).div(new Q(BigInt(a.length)))) : { f: a.reduce((s, _, i) => s + f(i), 0n) / BigInt(a.length) };
+    }
+    case 'mod': {
+      if (allExact) { if (a[1].q.isZero) throw new CasError('mod 0 is undefined'); return exact(a[0].q.sub(a[1].q.mul(a[0].q.div(a[1].q).floor()))); }
+      const y = f(1);
+      if (y === 0n) throw new CasError('mod 0 is undefined');
+      return { f: f(0) - F.mul(y, floorDiv(F.div(f(0), y), F.S) * F.S) };
+    }
+    case 'round': {   // round(x, d): to d decimal places
+      if (!a[1].q?.isInteger) throw new CasError('round needs a whole number of places');
+      const scale = 10n ** babs(a[1].q.n);
+      const x = a[0].q ?? new Q(f(0), F.S);
+      const up = a[1].q.sign >= 0;
+      const scaled = up ? x.mul(new Q(scale)) : x.div(new Q(scale));
+      const nearest = scaled.add(Q.HALF).floor();   // half rounds up, as Math.round
+      return exact(up ? nearest.div(new Q(scale)) : nearest.mul(new Q(scale)));
+    }
     case '!': {
       if (!a[0].q?.isInteger || a[0].q.sign < 0) throw new CasError('factorial is only worked out for whole numbers');
       let r = 1n;
-      for (let i = 2n; i <= a[0].q.n; i++) r *= i;
+      for (let i = 2n; i <= a[0].q.n; i++) {
+        r *= i;
+        if ((i & 255n) === 0n && bitLength(r) > MAX_RESULT_BITS) throw tooLarge();
+      }
       return exact(new Q(r));
     }
     default: {
@@ -319,6 +359,10 @@ function power(F, base, exponent) {
     while (k > 0n) {
       if (k & 1n) result = F.mul(result, b);
       b = F.mul(b, b);
+      if (bitLength(result) > MAX_RESULT_BITS + F.P * 4 || bitLength(b) > 2 * MAX_RESULT_BITS) {
+        if (invert) return { f: 0n };   // 1 / (something enormous): below every digit kept
+        throw tooLarge();
+      }
       k >>= 1n;
     }
     return { f: invert ? F.div(F.S, result) : result };
@@ -336,7 +380,7 @@ function power(F, base, exponent) {
     }
     throw new CasError('a negative number to a fractional power is not real');
   }
-  if (exponent.q && babs(exponent.q.n) === 1n) {
+  if (exponent.q && babs(exponent.q.n) === 1n && exponent.q.d <= MAX_ROOT_INDEX) {
     // b^(±1/q): a q-th root by integer arithmetic
     const root = intRoot(b * F.S ** (exponent.q.d - 1n), Number(exponent.q.d));
     return { f: exponent.q.n < 0n ? F.div(F.S, root) : root };
@@ -371,6 +415,18 @@ function writeDecimal({ sign, digits, point }) {
 }
 
 /** Does q's decimal end (only 2s and 5s in the denominator)? */
+/** How many significant digits a terminating fraction's decimal has: 1/8 = 0.125 has 3. */
+function significantDigits(q) {
+  let twos = 0n, fives = 0n, d = q.d;
+  while (d % 2n === 0n) { d /= 2n; twos++; }
+  while (d % 5n === 0n) { d /= 5n; fives++; }
+  const m = twos > fives ? twos : fives;
+  let n = babs(q.n) * 10n ** m / q.d;   // the decimal's digits as a whole number
+  if (n === 0n) return 1;
+  while (n % 10n === 0n) n /= 10n;
+  return n.toString().length;
+}
+
 function terminates(q) {
   let d = q.d;
   while (d % 2n === 0n) d /= 2n;
@@ -392,6 +448,7 @@ export function decimalNode(text) {
 export function approximate(node, { digits = 15, scope } = {}) {
   if (!Number.isInteger(digits) || digits < 1 || digits > 100000) throw new CasError('digits must be a whole number from 1 to 100000');
   let P = digits + 25;
+  let previous = null;   // the last attempt's { point, P }: a value that shrinks as fast as P grows is residue around 0
   for (let attempt = 0; attempt < 4; attempt++) {
     const F = new Fixed(P);
     const v = evaluate(node, F, scope);
@@ -401,11 +458,24 @@ export function approximate(node, { digits = 15, scope } = {}) {
       if (out.real === undefined) return out;
       return decimalResult(out.real, F, digits, null);
     }
-    if (v.q && v.q.isInteger) return { text: v.q.n.toString(), node: exactNum(v.q.n.toString()), number: Number(v.q.n), re: Number(v.q.n), im: 0, exact: true };
+    // a whole number with no more figures than asked for is given in full; a longer one is rounded below
+    if (v.q && v.q.isInteger && babs(v.q.n).toString().length <= digits) return { text: v.q.n.toString(), node: exactNum(v.q.n.toString()), number: Number(v.q.n), re: Number(v.q.n), im: 0, exact: true };
     const f = fixedOf(F, v);
+    // below the working precision (1/10^50, e^-100): look again with far more room, unless it is exactly 0
+    if (f === 0n && !(v.q && v.q.isZero) && attempt < 3) {
+      previous = null;
+      P *= 4;
+      continue;
+    }
     const d = decimal(f, F, digits);
-    // Small results lose figures to leading zeros: work again with more room.
-    if (d.point < -10 && attempt < 3) {
+    // sin(π), ln(e) − 1: exactly 0, seen as rounding residue just below the working precision.
+    // With more room the residue only moves further down (as far as the room grew): it is 0.
+    if (previous && d.point < -10 && previous.point - d.point >= (P - previous.P) / 2) {
+      return { text: '0', node: exactNum('0'), number: 0, re: 0, im: 0, exact: false };
+    }
+    // Small results lose figures to leading zeros: work again with more room (once the point has settled, it's done).
+    if (d.point < -10 && attempt < 3 && !(previous && previous.point === d.point)) {
+      previous = { point: d.point, P };
       P += -d.point + 10;
       continue;
     }
@@ -417,7 +487,7 @@ export function approximate(node, { digits = 15, scope } = {}) {
 function decimalResult(f, F, digits, q) {
   const d = decimal(f, F, digits);
   const text = writeDecimal(d);
-  return { text, node: decimalNode(text), number: Number(text), re: Number(text), im: 0, exact: Boolean(q) && terminates(q) && d.digits.length < digits };
+  return { text, node: decimalNode(text), number: Number(text), re: Number(text), im: 0, exact: Boolean(q) && terminates(q) && significantDigits(q) <= digits };
 }
 
 /**

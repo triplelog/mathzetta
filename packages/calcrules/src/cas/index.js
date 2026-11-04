@@ -38,6 +38,7 @@ export const MESSAGES = {
   'simplify.expand': 'Multiplying out gives something shorter.',
   'simplify.factor': 'Factoring gives something shorter.',
   expand: 'Multiply out the brackets.',
+  factor: 'Write it as a product of factors.',
   'factor.common': 'Take out the common factor {common}.',
   'factor.polynomial': 'Factor what is left: {roots}.',
   'together': 'Write it as one fraction over a common denominator.',
@@ -145,7 +146,7 @@ class CAS {
     const base = rewrite(start, this.set.view('simplify'), { format: this.format });
     raw.push(...base.steps);
     let best = base.node;
-    let extra = [];
+    let extra = null;
     // other shapes, kept only when shorter: cancelled, multiplied out, factored
     const x = canon(best);
     const tries = [];
@@ -154,15 +155,15 @@ class CAS {
     const c = plain ? null : cancelForm(x);
     if (c) tries.push({ node: drawFactored(c), id: 'simplify.cancel', name: 'Cancel' });
     const ex = rewrite(display(expandForm(x)), this.set.view('simplify'), { format: this.format });
-    tries.push({ node: ex.node, id: 'simplify.expand', name: 'Multiply out', more: ex.steps });
+    tries.push({ node: ex.node, id: 'simplify.expand', name: 'Multiply out' });
     if (x.k === 'add' && !plain) tries.push({ node: drawFactored(factorForm(x)), id: 'simplify.factor', name: 'Factor' });
     for (const t of tries) {
       if (nodeCount(t.node) < nodeCount(best)) {
-        extra = [this.step(t.id, t.name, ['shorter'], best, t.node), ...(t.more ?? []).map((s) => ({ ...s }))];
+        extra = this.step(t.id, t.name, ['shorter'], best, t.node);   // the one step that names the shorter form
         best = t.node;
       }
     }
-    raw.push(...extra.slice(0, 1));
+    if (extra) raw.push(extra);
     return this.result(best, raw, options);
   }
 
@@ -203,11 +204,17 @@ class CAS {
   diff(input, v, options = {}) {
     const start = this.node(input);
     const variable = this.variable(start, v);
+    // one derivative at a time, tidied before the next: the outer derivative's rules then see a
+    // finished expression (d/dx x is 1 before the product rule meets it)
     let node = start;
-    for (let i = 0; i < (options.order ?? 1); i++) node = op('der', [node, sym(variable)]);
-    const r = rewrite(node, this.set.view('differentiate'), { format: this.format, order: 'pre' });
-    const tidy = rewrite(r.node, this.set.view('simplify'), { format: this.format });
-    return this.result(tidy.node, [...r.steps, ...tidy.steps], options, { variable });
+    const raw = [];
+    for (let i = 0; i < (options.order ?? 1); i++) {
+      const r = rewrite(op('der', [node, sym(variable)]), this.set.view('differentiate'), { format: this.format, order: 'pre' });
+      const tidy = rewrite(r.node, this.set.view('simplify'), { format: this.format });
+      raw.push(...r.steps, ...tidy.steps);
+      node = tidy.node;
+    }
+    return this.result(node, raw, options, { variable });
   }
 
   /** The derivative node alone (for by-parts and other internal use). */
@@ -222,8 +229,10 @@ class CAS {
    */
   integrate(input, v, options = {}) {
     let start = this.node(input);
-    let from = options.from !== undefined ? this.node(String(options.from)) : null;
-    let to = options.to !== undefined ? this.node(String(options.to)) : null;
+    // a limit is a number, postfix text, tokens or a node
+    const limit = (x) => (x === undefined ? null : this.node(typeof x === 'number' ? String(x) : x));
+    let from = limit(options.from);
+    let to = limit(options.to);
     if (isOp(start) && start.op === 'int') {
       const [f, w, a, b] = start.args;
       v = w.token;

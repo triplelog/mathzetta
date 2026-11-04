@@ -164,7 +164,7 @@ export function leafTokens(node, out = []) {
   return out;
 }
 
-/** True when the subtree contains no operator without a numeric fold path. */
+/** True when the subtree contains no symbols: a constant (2 3 +, 1 sin, random), whether or not it folds to a number. */
 export function isNumeric(node) {
   if (node.type === NUM) return true;
   if (node.type === SYM) return false;

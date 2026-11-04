@@ -71,10 +71,14 @@ export function coefficients(x, v) {
 
 export const mentions = (x, v) => freeSymbols(display(x)).has(v);
 
-/** The coefficients as exact numbers, lowest degree first, or null if one isn't a number. */
+/** Above this degree an expression isn't treated as a polynomial (x^100000000 - 1 stays as it is). */
+export const MAX_DEGREE = 256;
+
+/** The coefficients as exact numbers, lowest degree first, or null if one isn't a number (or the degree is past MAX_DEGREE). */
 export function rationalCoefficients(map) {
   if (!map) return null;
   const deg = Math.max(0, ...map.keys());
+  if (deg > MAX_DEGREE) return null;
   const out = [];
   for (let d = 0; d <= deg; d++) {
     const c = map.get(d) ?? N(Q.ZERO);

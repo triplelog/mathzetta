@@ -41,7 +41,7 @@ export function format(node: Expr): string;
 export function depth(node: Expr): number;
 export function nodeCount(node: Expr): number;
 export function leafTokens(node: Expr, out?: string[]): string[];
-/** True when the subtree has no operator without a numeric fold. */
+/** True when the subtree contains no symbols: a constant (2 3 +, 1 sin), whether or not it folds to a number. */
 export function isNumeric(node: Expr): boolean;
 /** Every node with its path, root first ('pre') or leaves first ('post'). */
 export function walk(node: Expr, order?: 'pre' | 'post'): Array<{ node: Expr; path: number[] }>;
@@ -68,7 +68,7 @@ export const VARIADIC: -1;
 export const CUSTOM_PREFIX: string;
 export function isCustomFunction(token: string): boolean;
 export function defineOperator(spec: OperatorSpec): OperatorSpec;
-export function getOperator(symbol: string): OperatorSpec | undefined;
+export function getOperator(symbol: string): OperatorSpec | null;
 export function isOperator(symbol: string): boolean;
 export function operators(): OperatorSpec[];
 export function clearOperators(): void;
@@ -95,8 +95,8 @@ export interface Predicate { name: string; doc: string; fn: (node: Expr, ...args
 export function definePredicate(name: string, fn: (node: Expr, ...args: unknown[]) => boolean, doc?: string): void;
 /** A test relating several slots, for a rule's `require`. */
 export function defineRelation(name: string, fn: (...nodes: Expr[]) => boolean, doc?: string): void;
-export function getPredicate(name: string): Predicate | undefined;
-export function getRelation(name: string): Predicate | undefined;
+export function getPredicate(name: string): Predicate | null;
+export function getRelation(name: string): Predicate | null;
 export function predicateNames(): string[];
 export function relationNames(): string[];
 export function predicateList(): Predicate[];
@@ -151,12 +151,15 @@ export const MAX_VARIANTS: number;
 export class RuleError extends Error { ruleId?: string }
 export function compileRule(spec: RuleSpec): Rule;
 export function ruleToSpec(rule: Rule): RuleSpec;
-export function freeSymbols(template: Expr, out?: string[]): string[];
+/** The slot names a compiled rule's output template uses (`rule.outputTemplate`). */
+export function freeSymbols(template: unknown, out?: string[]): string[];
 
 /** Rules indexed by structure key. */
 export class RuleSet {
     constructor(rules?: Array<RuleSpec | Rule>);
     rules: Rule[];
+    /** How many rules it holds. */
+    readonly size: number;
     maxDepth: number;
     name: string;
     add(spec: RuleSpec | Rule): Rule;
@@ -165,13 +168,14 @@ export class RuleSet {
     /** Modes present, simplify first. */
     modes(): string[];
     remove(id: string): boolean;
-    setEnabled(id: string, enabled: boolean): void;
+    /** False when there is no rule with that id. */
+    setEnabled(id: string, enabled: boolean): boolean;
     reindex(): void;
-    get(id: string): Rule | undefined;
+    get(id: string): Rule | null;
     /** A bare list of rules, or { name, rules }; every compile error is collected (strict: throw them together). */
     static fromYaml(text: string, options?: { strict?: boolean }): RuleSet;
     static fromSpecs(doc: RuleSpec[] | { name?: string; rules: RuleSpec[] }, options?: { strict?: boolean }): RuleSet;
-    toSpecs(): { name: string; rules: RuleSpec[] };
+    toSpecs(): RuleSpec[];
     toYaml(): string;
     keyReport(): unknown;
 }
@@ -190,6 +194,16 @@ export interface Match {
 export interface Candidate extends Match {
     after: Expr;
     explanation: string;
+    /** The whole expression after the rewrite (built when first read). */
+    readonly result: Expr;
+}
+/** A rule that applies at one node (matchNode, matchesAt): no path yet, nothing built. */
+export interface NodeMatch {
+    rule: Rule;
+    key: string;
+    /** The subtrees each slot bound to. */
+    bound: Record<string, Expr>;
+    [internal: string]: unknown;
 }
 export interface Applied {
     expr: Expr;
@@ -210,7 +224,7 @@ export interface Step {
     explanation: string;
 }
 /** Every rule that applies at this exact node, best first. */
-export function matchNode(node: Expr, ruleset: RuleSet): Match[];
+export function matchNode(node: Expr, ruleset: RuleSet): NodeMatch[];
 /** Every match anywhere in the tree, by site ('post': innermost first; 'pre': outermost first). */
 export function matchAll(root: Expr, ruleset: RuleSet, options?: { order?: 'pre' | 'post' }): Match[];
 export function instantiate(template: Expr, bound: Record<string, Expr>): Expr;
@@ -221,11 +235,11 @@ export function rewriteOf(match: Match): Expr;
 export function applyMatch(root: Expr, match: Match): Applied;
 /** Everything that could be applied now, with what each would produce. */
 export function findMatches(expr: Expr | string, ruleset: RuleSet, options?: { order?: 'pre' | 'post' }): Candidate[];
-export function matchesAt(node: Expr, ruleset: RuleSet): Candidate[];
+export function matchesAt(node: Expr, ruleset: RuleSet): NodeMatch[];
 /** Apply exactly one rule, or null when none applies. */
-export function step(expr: Expr, ruleset: RuleSet, options?: { order?: 'pre' | 'post'; choose?: (matches: Match[]) => Match | undefined; avoid?: Set<string> }): Applied | null;
+export function step(expr: Expr | string, ruleset: RuleSet, options?: { order?: 'pre' | 'post'; choose?: (matches: Match[]) => Match | undefined; avoid?: Set<string> }): Applied | null;
 /** Rewrite until nothing applies (or a cycle, or maxSteps). */
-export function simplify(expr: Expr, ruleset: RuleSet, options?: { maxSteps?: number; order?: 'pre' | 'post' }): { expr: Expr; start: Expr; steps: Step[]; stopped: 'fixpoint' | 'cycle' | 'maxSteps' };
+export function simplify(expr: Expr | string, ruleset: RuleSet, options?: { maxSteps?: number; order?: 'pre' | 'post' }): { expr: Expr; start: Expr; steps: Step[]; stopped: 'fixpoint' | 'cycle' | 'maxSteps' };
 /** Postfix in, postfix out. */
 export function simplifyText(text: string, ruleset: RuleSet, options?: { maxSteps?: number; order?: 'pre' | 'post' }): string;
 
@@ -242,7 +256,8 @@ export type StepOption = boolean | 'full' | 'normal' | 'brief' | {
     detail?: 'full' | 'normal' | 'brief';
     show?: 'all' | string[];
     hide?: string[];
-    explain?: boolean;
+    /** Explanations for every step (true), none (false), or only these rule ids or tags. */
+    explain?: boolean | string[];
 };
 export interface CASStep {
     /** The rule id, or the CAS's own step id ('solve.quadratic' …). */
@@ -252,11 +267,14 @@ export interface CASStep {
     /** The whole expression before and after, as postfix. */
     from: string;
     to: string;
-    /** Where the rewrite happened. */
-    path: number[];
+    /** Where the rewrite happened; null for a step that stands for several hidden ones. */
+    path: number[] | null;
     before: string;
     after: string;
-    explanation: string;
+    /** Absent when `explain` leaves it out. */
+    explanation?: string;
+    /** The rules of the hidden steps this one stands for. */
+    also?: string[];
 }
 /** Options every CAS call takes. */
 export interface CallOptions {
@@ -310,11 +328,13 @@ export interface CAS {
         unsolved: Expr[];
     };
     /** Linear equations in several unknowns. */
-    solveSystem(equations: ExprInput[], vars?: string[], options?: CallOptions): { solution: Record<string, Expr>; status: 'none' | 'one' | 'many'; text: string; steps: CASStep[] };
+    /** `solution` is null unless there is exactly one. */
+    solveSystem(equations: ExprInput[], vars?: string[], options?: CallOptions): { solution: Record<string, Expr> | null; status: 'none' | 'one' | 'many'; text: string; steps: CASStep[] };
     /** Put values in ({ x: 2 } or { x: 'y 1 +' }) and simplify. */
     substitute(input: ExprInput, values: Record<string, number | string | Expr>, options?: CallOptions): CASResult;
     /** A decimal to `digits` significant figures (default 15; any number). */
-    approximate(input: ExprInput, options?: { digits?: number; scope?: Record<string, number> }): { result: Expr; text: string; number: number; exact: boolean; re?: unknown; im?: unknown };
+    /** `number` is null when unknowns are left (they stay, the constants around them become decimals). */
+    approximate(input: ExprInput, options?: { digits?: number; scope?: Record<string, number | string | bigint> }): { result: Expr; text: string; number: number | null; exact: boolean; re?: number; im?: number };
     /** Are a and b the same? */
     equivalent(a: ExprInput, b: ExprInput): { equal: boolean; how: string };
     /** Mode names in its rules. */
@@ -330,7 +350,7 @@ export class CasError extends Error {}
 /** A node as readable text ('3x^2·sin(x)'). */
 export function toText(node: Expr): string;
 /** A constant expression to `digits` significant figures; exact: no rounding happened. */
-export function approximate(node: Expr, options?: { digits?: number; scope?: Record<string, number> }): { text: string; node: Expr; number: number; exact: boolean };
+export function approximate(node: Expr, options?: { digits?: number; scope?: Record<string, number | string | bigint> }): { text: string; node: Expr; number: number; exact: boolean; re: number; im: number };
 /** The shipped rule files, bundled (rules/calculus.yaml and rules/cas/*.yaml). */
 export const DEFAULT_RULES: string[];
 /** rules/cas/complex/*.yaml, added by createCAS({ complex: true }). */

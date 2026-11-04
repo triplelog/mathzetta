@@ -13,18 +13,27 @@ function wrap(part, need, right = false) {
   return part.prec < need || (right && part.prec === need) ? `(${part.text})` : part.text;
 }
 
+// a + (b + c) is written a + b + c, and 2·(x·y) 2·x·y: the same value however it's grouped.
+// A negative on the right keeps its brackets (a + (-b), 2·(-3)), and so does anything looser.
+const opOf = (node) => (node.type === 'op' ? node.op : null);
+const negative = (part) => part.text.startsWith('-');
+const BRACKETS = { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ']'], '[)': ['[', ')'] };
+
 function print(node) {
   if (node.type === 'num') return { text: node.token, prec: node.token.startsWith('-') ? 4 : 9 };
   if (node.type === 'sym') return { text: SYMBOLS[node.token] ?? node.token, prec: 9 };
   const a = node.args.map(print);
   const p = PREC[node.op];
   switch (node.op) {
-    case '+': case '-': case '±':
-      return { text: `${wrap(a[0], p)} ${node.op === '±' ? '±' : node.op} ${wrap(a[1], p, true)}`, prec: p };
+    case '+': case '-': case '±': {
+      const tight = node.op === '+' && ['+', '-'].includes(opOf(node.args[1]));
+      const right = negative(a[1]) ? `(${a[1].text})` : tight ? a[1].text : wrap(a[1], p, true);
+      return { text: `${wrap(a[0], p)} ${node.op === '±' ? '±' : node.op} ${right}`, prec: p };
+    }
     case '*': {
       // 2x, 2 sqrt(3), but x·y and 2·3
       const left = wrap(a[0], p);
-      const right = wrap(a[1], p, true);
+      const right = negative(a[1]) ? `(${a[1].text})` : opOf(node.args[1]) === '*' ? a[1].text : wrap(a[1], p, true);
       // and πi, 2πi: the imaginary unit after a symbol
       const juxtapose = (node.args[0].type === 'num' && node.args[1].type !== 'num' && !/^[\d(-]/.test(right))
         || (node.args[1].type === 'sym' && node.args[1].token === 'i' && !/[\dA-Za-z]$/.test(left));
@@ -42,6 +51,9 @@ function print(node) {
     case 'int':
       return { text: a.length === 4 ? `∫ from ${a[2].text} to ${a[3].text} of ${a[0].text} d${a[1].text}` : `∫ ${a[0].text} d${a[1].text}`, prec: 1 };
     case '|': return { text: `${a[0].text} or ${a[1].text}`, prec: 0 };
+    case '_': return { text: `${wrap(a[0], 9)}_${a[1].prec >= 9 && !/\s/.test(a[1].text) ? a[1].text : `(${a[1].text})`}`, prec: 9 };
+    case '()': case '[]': case '{}': case '(]': case '[)':
+      return { text: `${BRACKETS[node.op][0]}${a.map((x) => x.text).join(', ')}${BRACKETS[node.op][1]}`, prec: 9 };
     case '&': return { text: `${a[0].text} and ${a[1].text}`, prec: 0 };
     default:
       if (p !== undefined) return { text: `${wrap(a[0], p)} ${node.op} ${wrap(a[1], p, true)}`, prec: p };

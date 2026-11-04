@@ -159,6 +159,7 @@ rules:
     pattern: n u root v 2 int
     require:
       - [sameAs, u, v]
+      - [freeOf, n, v]
     output: v 1 n / 1 + ^ 1 n / 1 + /
     explain: "The {n}th root of {v} is {v}^(1/{n}): add 1 to the power and divide by it."
     tags: [power]

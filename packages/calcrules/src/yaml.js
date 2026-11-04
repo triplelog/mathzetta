@@ -117,12 +117,17 @@ export function parseYaml(text) {
   return value;
 }
 
+/** `|`, `>`, with a chomping sign and an indent: the header of a block of text. */
+const BLOCK_HEADER = /^[|>][-+]?\d*$/;
+
 function parseBlock(ctx, indent) {
   const rec = ctx.peek();
   if (!rec || rec.indent < indent) return null;
   if (isSeqItem(rec.text)) return parseSeq(ctx, rec.indent);
   if (splitKey(rec.text)) return parseMap(ctx, rec.indent);
   ctx.next();
+  // a block of text on its own (`|-` then the lines): what stringifyYaml writes for a multiline string
+  if (BLOCK_HEADER.test(rec.text)) return parseBlockScalar(ctx, rec.text, rec.indent - 1);
   return parseScalar(rec.text, rec.n);
 }
 
@@ -135,6 +140,11 @@ function parseSeq(ctx, indent) {
     if (rec.text === '-') {
       const nxt = ctx.peek();
       out.push(nxt && nxt.indent > indent ? parseBlock(ctx, nxt.indent) : null);
+      continue;
+    }
+    // `- |-`: a block of text, its lines indented past the dash
+    if (BLOCK_HEADER.test(rec.text.slice(2).trim())) {
+      out.push(parseBlockScalar(ctx, rec.text.slice(2).trim(), indent));
       continue;
     }
     // `- id: foo` starts a nested block whose column is where the content begins.
@@ -162,7 +172,7 @@ function parseMap(ctx, indent) {
       // YAML allows a sequence to sit at the same column as its key.
       else if (nxt && nxt.indent === indent && isSeqItem(nxt.text)) out[key] = parseSeq(ctx, indent);
       else out[key] = null;
-    } else if (/^[|>][-+]?\d*$/.test(rest)) {
+    } else if (BLOCK_HEADER.test(rest)) {
       out[key] = parseBlockScalar(ctx, rest, indent);
     } else {
       out[key] = parseScalar(rest, rec.n);
@@ -323,6 +333,7 @@ const RESERVED = /^(true|false|null|yes|no|on|off|~)$/i;
 function needsQuote(text) {
   if (text === '') return true;
   if (/^\s|\s$/.test(text)) return true;
+  if (/[\u0000-\u001f\u007f]/.test(text)) return true;   // a line break or tab: written with escapes, "x\ny"
   if (/^[-?:,[\]{}#&*!|>'"%@`]/.test(text)) return true;
   if (/: |\s#/.test(text)) return true;
   if (RESERVED.test(text)) return true;

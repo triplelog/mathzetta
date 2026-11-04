@@ -208,6 +208,28 @@ export function definite(cas, F, v, a, b, f) {
     const lo = approximate(a, { digits: 20 }).number;
     const hi = approximate(b, { digits: 20 }).number;
     const others = [...freeSymbols(f)].filter((s) => s !== v);
+    // where a denominator is zero (1/x at 0, tan x at π/2): found by solving, so a pole between
+    // the limits is caught wherever it falls; sampling below catches the rest (ln of a negative)
+    if (!others.length) {
+      const [low, high] = lo <= hi ? [lo, hi] : [hi, lo];
+      for (const d of denominators(f, v)) {
+        let roots = [];
+        try { roots = cas.solve(op('=', [d, exactNum('0')]), v, { steps: false }).solutions; } catch { continue; }
+        for (const root of roots) {
+          const r = approximate(root, { digits: 20 });
+          if (!Number.isFinite(r.number) || r.im || r.number < low || r.number > high) continue;
+          if (r.number > low && r.number < high) {
+            throw new CasError(`the integrand has no value at ${v} = ${cas.format(root)}, between the limits, so F(b) - F(a) would be wrong`);
+          }
+          // at a limit the integral may still converge (∫ 1/√x from 0 to 1 = 2): only if F has a value there
+          let value = NaN;
+          try { value = approximate(normal(substitute(F, v, root)), { digits: 15 }).number; } catch { /* no value */ }
+          if (!Number.isFinite(value)) {
+            throw new CasError(`the integral diverges at ${v} = ${cas.format(root)}: F has no value at that limit`);
+          }
+        }
+      }
+    }
     for (let i = 0; !others.length && i <= 64; i++) {
       const t = lo + ((hi - lo) * (i + 0.5)) / 65;
       try {
@@ -222,6 +244,22 @@ export function definite(cas, F, v, a, b, f) {
   const value = normal(op('-', [at(b), at(a)]));
   const shown = op('-', [at(b), at(a)]);
   return { value, step: cas.step('integrate.evaluate', 'Between the limits', ['evaluate'], F, shown, { a, b, F, v }) };
+}
+
+/** The parts of f that divide (a denominator, a negative power's base, tan's cos …) and mention v. */
+function denominators(f, v) {
+  const out = [];
+  const POLES = { tan: 'cos', sec: 'cos', csc: 'sin', cot: 'sin' };
+  walk(f, 'pre').forEach(({ node: n }) => {
+    if (!isOp(n)) return;
+    let d = null;
+    if (n.op === '/') d = n.args[1];
+    else if (n.op === '^' && n.args[1].type === 'num' && n.args[1].value < 0) d = n.args[0];
+    else if (n.op === '^' && isOp(n.args[1]) && n.args[1].op === 'neg') d = n.args[0];
+    else if (POLES[n.op]) d = op(POLES[n.op], [n.args[0]]);
+    if (d && freeSymbols(d).has(v) && !out.some((x) => x.s === d.s)) out.push(d);
+  });
+  return out;
 }
 
 export { N, Q, add, neg };
