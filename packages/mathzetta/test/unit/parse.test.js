@@ -63,6 +63,24 @@ suite('parser fixes', () => {
     test('wrong argument counts are reported', () => throws(() => parse('sin(1,2)'), /takes 1 argument/));
 });
 
+suite('unchanged: the value of a case nobody wrote', () => {
+    // if … then with no else, \\begin{cases} with no otherwise row and IF(c, a) all end in the name `unchanged`;
+    // LaTeX input splits letter runs into products, and it once split this one into u·n·c·h·a·n·g·e·d
+    const tail = (s) => parse(s).slice(-3);
+    test('it stays one name, with or without LaTeX in the input', () => {
+        eq(tail('if x > 0 then 1'), ['1', 'unchanged', '?:']);
+        eq(tail('if x \\le 0 then 1'), ['1', 'unchanged', '?:']);
+        eq(tail('if x > 0 then \\frac{1}{2}'), ['/', 'unchanged', '?:']);
+        eq(tail('IF(x \\le 0, 1)'), ['1', 'unchanged', '?:']);
+        eq(parse('\\begin{cases}x & x>0\\\\-x & x\\le 0\\end{cases}'), ['x', '0', '>', 'x', 'x', '0', '≤', 'x', 'neg', 'unchanged', '?:', '?:']);
+        eq(tail('\\begin{cases}\\frac{1}{x} & x>0\\end{cases}'), ['/', 'unchanged', '?:']);
+    });
+    test('other letter runs in LaTeX are still products', () => {
+        eq(parse('\\frac{ab}{2}'), ['a', 'b', '*', '2', '/']);
+        eq(parse('\\sqrt{xy}'), ['x', 'y', '*', 'sqrt']);
+    });
+});
+
 suite('strings and {{blocks}}', () => {
     test('quoted strings are kept whole', () => eq(parse('x = "2+2<5"'), ['x', '"2+2<5"', '=']));
     test('ten or more strings restore correctly', () => {

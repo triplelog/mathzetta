@@ -57,7 +57,9 @@ const WORD_LIST = `
 `.trim().split(/\s+/);
 
 /** Words that are never split. */
-const WHOLE = new Set([...NAMES, ...WORD_LIST, 'true', 'false', 'null', 'undefined', 'deg', 'mod', 'pmod', 'NaN', 'Infinity']);
+// `unchanged` is MathZetta's own: the value of a case nobody wrote (if … then with no else, \begin{cases} with no
+// otherwise row, IF(c, a)); the rewrites insert it into input that may be LaTeX, where it must not become u·n·c·h·a·n·g·e·d.
+const WHOLE = new Set([...NAMES, ...WORD_LIST, 'true', 'false', 'null', 'undefined', 'unchanged', 'deg', 'mod', 'pmod', 'NaN', 'Infinity']);
 
 const LETTER = /^[a-zA-ZͰ-Ͽ]$/;
 export const isLetters = (text) => text.length > 0 && [...text].every((c) => LETTER.test(c));
