@@ -326,7 +326,8 @@ class Layout {
     decorate(name, b) {
         switch (name) {
             case 'boxed': return box(this.el('boxed', b.html), b.h + 0.22, b.d + 0.22);
-            case 'cancel': return box(this.el('cancel', b.html), b.h, b.d);
+            // a drawn stroke, not a background: Windows high contrast drops backgrounds, and a cancelled term would look kept
+            case 'cancel': return box(this.el('cancel', b.html + svg('cancel', `${this.p}-cancel-line`)), b.h, b.d);
             case 'underline': return box(this.el('underline', b.html), b.h, b.d + 0.12);
             case 'overline': case 'bar': return box(this.el('over', b.html), b.h + 0.14, b.d);
             default: return box(this.el('accent', this.el('accent-mark', ACCENTS[name]) + b.html), b.h + 0.3, b.d);

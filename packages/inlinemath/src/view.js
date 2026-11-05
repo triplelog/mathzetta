@@ -9,9 +9,13 @@
  *   view.on('click', ({ node }) => …);
  *   view.set('2x + 2', { animate: true });    // next step (instant for readers who ask for reduced motion)
  *   view.segments()                           // [{ text, id }] spoken pieces
+ *
+ * With { announce: true }, each set() after the first reads the new expression
+ * to a screen reader through a polite live region placed after the element
+ * (or pass your own live-region element as `announce`).
  */
 
-import { toSpeechSegments } from './mathzetta.js';
+import { toSpeechSegments, toAudioSpeech } from './mathzetta.js';
 import { treeOf, layoutOptions } from './html.js';
 import { layout } from './layout.js';
 import { select, signature, pathOf } from './select.js';
@@ -27,6 +31,7 @@ export class View {
         this.options = options;
         this.p = options.prefix || 'mv';
         this.handlers = [];
+        this.live = liveRegionFor(element, options.announce, this.p);
         this.set(input);
     }
 
@@ -39,11 +44,35 @@ export class View {
      */
     set(input, { animate = false, duration = 600, easing = 'ease-in-out' } = {}) {
         const before = shouldAnimate(animate) && this.tree ? this.snapshot() : null;
+        const isStep = this.tree !== undefined;
         this.tree = treeOf(input, this.options);
         this.element.innerHTML = layout(this.tree, layoutOptions(this.tree, this.options)).html;
         this.root = this.element.firstElementChild;
         if (this.handlers.length) this.root.classList.add(`${this.p}-clickable`);
         if (before) this.morph(before, { duration, easing });
+        if (isStep && this.live) this.announce(this.spoken());
+        return this;
+    }
+
+    /** The expression as a listener hears it: its accessible name, else MathZetta's audio speech. */
+    spoken() {
+        const label = this.root && this.root.getAttribute && this.root.getAttribute('aria-label');
+        if (label) return label;
+        try { return toAudioSpeech(this.tree); } catch { return ''; }
+    }
+
+    /**
+     * Say something through the view's live region ({ announce } must be set): the new step is
+     * announced this way, and a page can add its own words ("Step 3: …"). The region is emptied
+     * first, so the same words twice are still read.
+     */
+    announce(text) {
+        if (!this.live) return this;
+        const live = this.live;
+        live.textContent = '';
+        const put = () => { live.textContent = text; };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(put));
+        else setTimeout(put, 50);
         return this;
     }
 
@@ -157,6 +186,22 @@ export class View {
         };
         visit(this.tree);
     }
+}
+
+/**
+ * The live region steps are announced through: the element given, or a visually hidden polite
+ * region created right after the view's element (its contents are replaced by every set()).
+ */
+function liveRegionFor(element, announce, prefix) {
+    if (!announce) return null;
+    if (typeof announce === 'object' && announce.nodeType === 1) return announce;
+    if (typeof document === 'undefined' || !element.insertAdjacentElement) return null;
+    const live = document.createElement('span');
+    live.className = `${prefix}-sr-only`;
+    live.setAttribute('aria-live', 'polite');
+    live.setAttribute('aria-atomic', 'true');
+    element.insertAdjacentElement('afterend', live);
+    return live;
 }
 
 /**

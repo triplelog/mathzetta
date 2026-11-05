@@ -103,13 +103,20 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-boxed { display: inline-block; border: 0.06em solid currentColor; padding: 0.16em 0.2em; }
 .mv-over { display: inline-block; border-top: 0.06em solid currentColor; padding-top: 0.08em; }
 .mv-underline { display: inline-block; border-bottom: 0.06em solid currentColor; padding-bottom: 0.06em; }
-.mv-cancel { display: inline-block; background: linear-gradient(to top right, transparent calc(50% - 0.04em), currentColor calc(50% - 0.03em), currentColor calc(50% + 0.03em), transparent calc(50% + 0.04em)); }
+.mv-cancel { display: inline-block; position: relative; }
+.mv-cancel-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .mv-accent { display: inline-block; position: relative; padding-top: 0.3em; }
 .mv-accent-mark { position: absolute; top: 0; left: 0; right: 0; text-align: center; font-size: 0.7em; line-height: 0.6; }
 
 /* ---- interaction -------------------------------------------------------------- */
 .mv-hl { background: var(--mv-hl, rgba(255, 200, 0, 0.35)); box-shadow: 0 0 0 0.08em var(--mv-hl, rgba(255, 200, 0, 0.35)); }
+/* Windows high contrast (and other forced colours) drops backgrounds and shadows: outline a highlight instead */
+@media (forced-colors: active) {
+  .mv-hl { outline: 0.08em solid Highlight; outline-offset: 0.04em; }
+}
 .mv-clickable .mv-n { cursor: pointer; }
+/* the live region a view announces steps through ({ announce: true }): read, never seen */
+.mv-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .mv-clickable .mv-n:hover { outline: 1px dashed rgba(0, 0, 0, 0.25); }
 
 /* ---- steps (stepsHTML from '@mathzetta/inlinemath/cas') ---------------------------------------- */

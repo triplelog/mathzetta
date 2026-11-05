@@ -31,6 +31,8 @@ view.highlight('2x');                       // name a part by writing it
 view.color('x^2', 'crimson');
 view.on('click', ({ node, id, path }) => …);
 view.set('2x + x^2', { animate: true });    // the next step: matching parts glide over (instant under reduced motion; 'always' to insist)
+render(div, 'x^2', { announce: true });     // read each new step to a screen reader (a polite live region after the div)
+view.announce('Step 2: expand');            // your own words, through the same region
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
 ```
 

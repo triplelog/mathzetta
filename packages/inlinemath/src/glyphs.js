@@ -18,6 +18,8 @@ export const PATHS = {
     '}': { fill: 'M0,0 C0.55,0 0.5,0.05 0.5,0.2 L0.5,0.38 C0.5,0.46 0.65,0.49 0.95,0.5 C0.65,0.51 0.5,0.54 0.5,0.62 L0.5,0.8 C0.5,0.95 0.55,1 0,1 L0,0.985 C0.32,0.985 0.36,0.95 0.36,0.8 L0.36,0.62 C0.36,0.53 0.45,0.505 0.7,0.5 C0.45,0.495 0.36,0.47 0.36,0.38 L0.36,0.2 C0.36,0.05 0.32,0.015 0,0.015 Z' },
     // Radical: short tick, long down-stroke, long up-stroke to the top right.
     'sqrt': { stroke: 'M0,0.62 L0.18,0.55 L0.45,0.97 L0.98,0.015' },
+    // \cancel: one stroke, bottom left to top right, stretched over what it crosses out.
+    'cancel': { stroke: 'M0,1 L1,0' },
     // Integral: an S slanted to the right with small hooks at each end.
     'int': { stroke: 'M0.95,0.09 C0.9,0.01 0.72,0 0.66,0.12 C0.6,0.25 0.42,0.75 0.34,0.88 C0.28,0.99 0.1,0.99 0.05,0.91' },
     'sum': { fill: 'M0.04,0 L0.94,0 L0.98,0.24 L0.94,0.24 C0.9,0.1 0.8,0.07 0.62,0.07 L0.24,0.07 L0.58,0.5 L0.2,0.93 L0.64,0.93 C0.82,0.93 0.92,0.9 0.95,0.76 L0.99,0.76 L0.94,1 L0.02,1 L0.47,0.47 Z' },

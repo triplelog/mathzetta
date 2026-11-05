@@ -47,6 +47,13 @@ export interface DrawOptions extends LayoutOptions {
     blocks?: BlockHandler;
 }
 
+/** Options for a live view: everything toHTML takes, plus how steps reach a screen reader. */
+export interface ViewOptions extends DrawOptions {
+    /** Read each new step (every set() after the first) to a screen reader: true places a polite live
+     *  region after the element; or pass your own live-region element. Off by default. */
+    announce?: boolean | Element;
+}
+
 export const DEFAULTS: Required<LayoutOptions>;
 
 /** Anything MathZetta reads, as HTML (a string; works in Node). Needs inlinemath.css on the page. */
@@ -71,12 +78,16 @@ export interface ClickInfo { node: Node; id: number; path: number[] | null; elem
 
 /** A live drawing: highlight, colour, listen, step with animation. */
 export class View {
-    constructor(element: Element, input: Input, options?: DrawOptions);
+    constructor(element: Element, input: Input, options?: ViewOptions);
     readonly element: Element;
     readonly tree: Node;
     /** Show a new expression; with animate, matching parts glide over and new ones fade in. `true` is instant
      *  when the reader's system asks for reduced motion; `'always'` animates regardless. */
     set(input: Input, options?: { animate?: boolean | 'always'; duration?: number; easing?: string }): this;
+    /** The expression as a listener hears it (its accessible name, else MathZetta's audio speech). */
+    spoken(): string;
+    /** Say something through the live region ({ announce } must be set); steps are announced this way. */
+    announce(text: string): this;
     nodes(target: Target): Node[];
     elements(target: Target): Element[];
     elementOf(node: Node): Element | null;
@@ -90,7 +101,7 @@ export class View {
     showSegment(segment: { id?: number } | null, className?: string): this;
 }
 /** Draw into an element and return the live view. */
-export function render(element: Element, input: Input, options?: DrawOptions): View;
+export function render(element: Element, input: Input, options?: ViewOptions): View;
 /** Should a step animate: true honours prefers-reduced-motion, 'always' does not, false never. */
 export function shouldAnimate(animate?: boolean | 'always'): boolean;
 
