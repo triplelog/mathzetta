@@ -255,6 +255,21 @@ suite('speech segments', () => {
     });
 });
 
+suite('MathML decorations', () => {
+    test('\\boxed, \\cancel, bars and accents are drawn as what they are, not as functions', () => {
+        const m = (s) => toMathML(parse(s)).replace(/ id="mz-\d+"/g, '');
+        eq(m('\\boxed{x}'), '<math><mrow><menclose notation="box"><mi>x</mi></menclose></mrow></math>');
+        eq(m('\\cancel{x}'), '<math><mrow><menclose notation="updiagonalstrike"><mi>x</mi></menclose></mrow></math>');
+        eq(m('\\overline{x}'), '<math><mrow><mover accent="true"><mi>x</mi><mo>¯</mo></mover></mrow></math>');
+        eq(m('\\underline{x}'), '<math><mrow><munder accentunder="true"><mi>x</mi><mo>_</mo></munder></mrow></math>');
+        eq(m('\\vec{v}'), '<math><mrow><mover accent="true"><mi>v</mi><mo>→</mo></mover></mrow></math>');
+        eq(m('\\hat{x} + 1').includes('<mover accent="true"><mi>x</mi><mo>^</mo></mover>'), true);
+    });
+    test('a function that happens to have no decoration name is still a call', () => {
+        eq(toMathML(parse('f(x)')).replace(/ id="mz-\d+"/g, ''), '<math><mrow><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow></math>');
+    });
+});
+
 suite('audio speech: the grouping in the words, for a listener who cannot see the maths', () => {
     // pairs toSpeech() reads alike (the drawing tells them apart) that a listener alone could not
     const PAIRS = [

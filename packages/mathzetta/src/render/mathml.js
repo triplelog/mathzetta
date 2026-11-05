@@ -26,6 +26,18 @@ const row = (s) => `<mrow>${s}</mrow>`;
 const fenced = (s, open = '(', close = ')') => row(mo(open) + s + mo(close));
 const commas = (parts) => parts.join(mo(','));
 const DISPLAY = ' displaystyle="true"';
+
+// Decorations, written \boxed{x}, \cancel{x}, \vec{v} … and parsed as one-argument functions: drawn as what they are,
+// so a screen reader says "x with a bar over it", not "overline of x".
+const over = (mark) => (c) => `<mover accent="true">${c}<mo>${mark}</mo></mover>`;
+const DECORATIONS = {
+    boxed: (c) => `<menclose notation="box">${c}</menclose>`,
+    cancel: (c) => `<menclose notation="updiagonalstrike">${c}</menclose>`,
+    overline: over('¯'), bar: over('¯'),
+    underline: (c) => `<munder accentunder="true">${c}<mo>_</mo></munder>`,
+    vec: over('→'), hat: over('^'), widehat: over('^'), tilde: over('~'), dot: over('˙'), ddot: over('¨'),
+};
+Object.setPrototypeOf(DECORATIONS, null);
 const MINUS = '−';   // U+2212, the minus sign MathML expects rather than a hyphen
 
 /** Render a node to MathML (exported for the per-node map in index.js). */
@@ -62,7 +74,10 @@ function operation(node) {
     const call = (name) => el('mrow', node, mi(name) + mo('(') + commas(args.map(render)) + mo(')'));
 
     if (NAMED[op]) return call(NAMED[op]);
-    if (isCustomFunction(op)) return call(customName(op));
+    if (isCustomFunction(op)) {
+        const decorate = args.length === 1 && DECORATIONS[customName(op)];
+        return decorate ? el('mrow', node, decorate(render(a))) : call(customName(op));
+    }
     if (GROUPS[op]) return el('mrow', node, mo(GROUPS[op][0]) + commas(args.map(render)) + mo(GROUPS[op][1]));
 
     switch (op) {
