@@ -74,8 +74,9 @@ export class View {
     constructor(element: Element, input: Input, options?: DrawOptions);
     readonly element: Element;
     readonly tree: Node;
-    /** Show a new expression; with animate, matching parts glide over and new ones fade in. */
-    set(input: Input, options?: { animate?: boolean; duration?: number; easing?: string }): this;
+    /** Show a new expression; with animate, matching parts glide over and new ones fade in. `true` is instant
+     *  when the reader's system asks for reduced motion; `'always'` animates regardless. */
+    set(input: Input, options?: { animate?: boolean | 'always'; duration?: number; easing?: string }): this;
     nodes(target: Target): Node[];
     elements(target: Target): Element[];
     elementOf(node: Node): Element | null;
@@ -90,6 +91,8 @@ export class View {
 }
 /** Draw into an element and return the live view. */
 export function render(element: Element, input: Input, options?: DrawOptions): View;
+/** Should a step animate: true honours prefers-reduced-motion, 'always' does not, false never. */
+export function shouldAnimate(animate?: boolean | 'always'): boolean;
 
 // ---- inlinemath/markdown --------------------------------------------------------------------
 

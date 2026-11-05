@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as nodeFs from 'node:fs';
-import { toHTML, treeOf, select, signature, nodeAt, pathOf, numberTree } from '../src/index.js';
+import { toHTML, treeOf, select, signature, nodeAt, pathOf, numberTree, shouldAnimate } from '../src/index.js';
 import { parseTree, fromPostfix, walk } from '../src/mathzetta.js';
 
 let passed = 0;
@@ -129,6 +129,11 @@ test('the whole expression has its spoken form as its accessible name', () => {
     assert.match(toHTML('x', { label: (tree) => `tree with ${tree.id + 1} nodes` }), /aria-label="tree with 1 nodes"/);
     assert.ok(!toHTML('x', { label: false }).includes('aria-'));
     assert.match(toHTML('\\int_0^1 x^2 dx'), /aria-label="the integral from 0 to 1 of x squared, d x"|aria-label="[^"]*integral[^"]*"/);
+    // the label is for a listener who can't see the drawing: the grouping is in the words
+    const label = (input) => toHTML(input).match(/aria-label="([^"]*)"/)[1];
+    assert.equal(label('\\sqrt{x+1}+2'), 'the square root of the quantity x plus 1, end root, plus 2');
+    assert.notEqual(label('\\sqrt{x+1}'), label('\\sqrt{x}+1'));
+    assert.notEqual(label('x_{n+1}'), label('x_n+1'));
 });
 
 // ---- addressing ---------------------------------------------------------------------
@@ -344,6 +349,23 @@ test('markdown: another renderer, with the maths put back into its output', () =
         assert.ok(/=\s*7/.test(text(run('lite-calc'))), 'lite-calc draws 3 + 4 = 7');
     });
 }
+
+test('a step animates unless the reader asked for reduced motion (or the page insists)', () => {
+    const had = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
+    const prefer = (reduce) => { globalThis.matchMedia = (q) => ({ matches: reduce && q === '(prefers-reduced-motion: reduce)' }); };
+    try {
+        prefer(false);
+        assert.equal(shouldAnimate(true), true);
+        assert.equal(shouldAnimate(false), false);
+        prefer(true);
+        assert.equal(shouldAnimate(true), false);
+        assert.equal(shouldAnimate('always'), true);
+        delete globalThis.matchMedia;   // no matchMedia (Node, old browsers): animate as asked
+        assert.equal(shouldAnimate(true), true);
+    } finally {
+        if (had) Object.defineProperty(globalThis, 'matchMedia', had); else delete globalThis.matchMedia;
+    }
+});
 
 // ---- report -------------------------------------------------------------------------
 

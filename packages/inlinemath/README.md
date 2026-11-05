@@ -30,7 +30,7 @@ const view = render(div, 'x^2 + 2x');       // a live view
 view.highlight('2x');                       // name a part by writing it
 view.color('x^2', 'crimson');
 view.on('click', ({ node, id, path }) => …);
-view.set('2x + x^2', { animate: true });    // the next step: matching parts glide over
+view.set('2x + x^2', { animate: true });    // the next step: matching parts glide over (instant under reduced motion; 'always' to insist)
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
 ```
 
@@ -108,7 +108,7 @@ These go to `toHTML(input, options)` and `render(el, input, options)`.
 | `colors` | | `{ 'x^2': 'red', 5: 'blue' }` (number keys are ids) or `[[target, colour]]` |
 | `highlight` | | target(s) that get the `mv-hl` class |
 | `attributes`, `style` | | `(node) => ({…})` / `(node) => 'css'` for each node's element |
-| `label` | `true` | the accessible name of the expression (`role="math" aria-label`): `true` = its spoken form from MathZetta, or a string, `(tree) => string`, or `false` |
+| `label` | `true` | the accessible name of the expression (`role="math" aria-label`): `true` = its spoken form for a listener who can't see it (MathZetta's `toAudioSpeech`: "the square root of the quantity x plus 1, end root, plus 2"), or a string, `(tree) => string`, or `false` |
 | `prefix` | `'mv'` | class prefix |
 
 A *target* can be any of these:

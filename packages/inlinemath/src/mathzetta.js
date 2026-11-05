@@ -14,4 +14,4 @@ export {
     GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable,
     firstLeaf, customName, derivativeOrder, bracketedSides, bracketOp,
 } from 'mathzetta';
-export { toSpeech, toSpeechSegments } from 'mathzetta/speech';
+export { toSpeech, toSpeechSegments, toAudioSpeech } from 'mathzetta/speech';

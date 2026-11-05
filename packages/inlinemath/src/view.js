@@ -7,7 +7,7 @@
  *   view.highlight('2x');                     // or an id, path, key, test
  *   view.color('x^2', 'crimson');
  *   view.on('click', ({ node }) => …);
- *   view.set('2x + 2', { animate: true });    // next step
+ *   view.set('2x + 2', { animate: true });    // next step (instant for readers who ask for reduced motion)
  *   view.segments()                           // [{ text, id }] spoken pieces
  */
 
@@ -32,10 +32,13 @@ export class View {
 
     /**
      * Show a new expression. With { animate: true }, parts that appear in
-     * both move from their old place to their new one, and new parts fade in.
+     * both move from their old place to their new one, and new parts fade in —
+     * unless the reader's system asks for reduced motion, when the new step
+     * simply appears. { animate: 'always' } animates regardless (a page whose
+     * point is the motion, started by the reader).
      */
     set(input, { animate = false, duration = 600, easing = 'ease-in-out' } = {}) {
-        const before = animate && this.tree ? this.snapshot() : null;
+        const before = shouldAnimate(animate) && this.tree ? this.snapshot() : null;
         this.tree = treeOf(input, this.options);
         this.element.innerHTML = layout(this.tree, layoutOptions(this.tree, this.options)).html;
         this.root = this.element.firstElementChild;
@@ -154,6 +157,16 @@ export class View {
         };
         visit(this.tree);
     }
+}
+
+/**
+ * Should a step animate? true honours prefers-reduced-motion (no motion for a reader who asked
+ * for none), 'always' does not, false never animates.
+ */
+export function shouldAnimate(animate) {
+    if (!animate) return false;
+    if (animate === 'always') return true;
+    return !(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
 /** Draw an expression into an element and return a View for it. */

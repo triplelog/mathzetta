@@ -21,7 +21,7 @@
 import {
     GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable,
     firstLeaf, customName, derivativeOrder, bracketedSides, bracketOp, firstVariable,
-    isCustomFunction, precedenceOf, toSpeech,
+    isCustomFunction, precedenceOf, toAudioSpeech,
 } from './mathzetta.js';
 import { svg } from './glyphs.js';
 
@@ -74,7 +74,7 @@ export const DEFAULTS = {
     derivativeBrackets: '[', // d/dx [x² + 1], or '(' for d/dx (x² + 1)
     scriptFractions: 'slash',// x^{1/2} written x^{1/2} with a slash; 'stack' stacks it
     cases: true,             // c ? a : b drawn as a piecewise brace
-    label: true,             // accessible name of the whole expression: true = the spoken form, a string, (tree) => string, or false
+    label: true,             // accessible name of the whole expression: true = MathZetta's toAudioSpeech (the grouping in the words), a string, (tree) => string, or false
     attributes: null,        // (node) => ({ ... }) extra attributes for a node's element
     style: null,             // (node) => 'css' inline style for a node's element
 };
@@ -113,7 +113,8 @@ function accessibleName(tree, label) {
     if (label === false || label === null) return null;
     if (typeof label === 'string') return label;
     try {
-        return typeof label === 'function' ? label(tree) : toSpeech(tree);
+        // a screen reader is speech with no drawing in view: the grouping has to be in the words
+        return typeof label === 'function' ? label(tree) : toAudioSpeech(tree);
     } catch {
         return null;
     }

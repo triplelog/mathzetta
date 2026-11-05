@@ -12,6 +12,6 @@
 
 export { toHTML, treeOf } from './html.js';
 export { layout, DEFAULTS } from './layout.js';
-export { View, render } from './view.js';
+export { View, render, shouldAnimate } from './view.js';
 export { select, signature, nodeAt, pathOf, numberTree } from './select.js';
 export { PATHS } from './glyphs.js';
