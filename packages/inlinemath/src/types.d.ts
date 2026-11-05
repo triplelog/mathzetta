@@ -95,7 +95,14 @@ export class View {
     unhighlight(target?: Target | null, className?: string): this;
     color(target: Target, colour: string): this;
     /** Listen for an event on a part; returns a function that stops listening. */
+    /** Listen for an event on the parts. A 'click' listener also makes the drawing work from the keyboard:
+     *  one tab stop, arrow keys walk the parts (each spoken), Enter or Space calls the listener for the
+     *  current part — `event` is then the KeyboardEvent. */
     on(type: string, fn: (info: ClickInfo) => void): () => void;
+    /** The part the arrow keys are on (null: the whole expression). */
+    readonly active: Node | null;
+    /** Put the keyboard on a part (null: the whole expression) and say it. */
+    focusPart(node: Node | null): this;
     /** The expression read aloud in pieces, each tagged with the node it describes. */
     segments(options?: SpeechOptions): { text: string; id?: number }[];
     showSegment(segment: { id?: number } | null, className?: string): this;

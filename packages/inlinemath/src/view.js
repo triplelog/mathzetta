@@ -10,6 +10,11 @@
  *   view.set('2x + 2', { animate: true });    // next step (instant for readers who ask for reduced motion)
  *   view.segments()                           // [{ text, id }] spoken pieces
  *
+ * Once something listens for 'click', the drawing works from the keyboard too:
+ * Tab to it, arrow keys walk its parts (Down into a part, Up out of it,
+ * Left/Right between neighbours, Home or Escape back to the whole), Enter or
+ * Space fires the click handlers for the current part, and each part is spoken.
+ *
  * With { announce: true }, each set() after the first reads the new expression
  * to a screen reader through a polite live region placed after the element
  * (or pass your own live-region element as `announce`).
@@ -18,7 +23,7 @@
 import { toSpeechSegments, toAudioSpeech } from './mathzetta.js';
 import { treeOf, layoutOptions } from './html.js';
 import { layout } from './layout.js';
-import { select, signature, pathOf } from './select.js';
+import { select, signature, pathOf, nodeAt } from './select.js';
 
 export class View {
     /**
@@ -31,6 +36,8 @@ export class View {
         this.options = options;
         this.p = options.prefix || 'mv';
         this.handlers = [];
+        this.clicks = [];        // the 'click' handlers, which Enter and Space call too
+        this.active = null;      // the part the keyboard is on (null: the whole expression)
         this.live = liveRegionFor(element, options.announce, this.p);
         this.set(input);
     }
@@ -49,6 +56,8 @@ export class View {
         this.element.innerHTML = layout(this.tree, layoutOptions(this.tree, this.options)).html;
         this.root = this.element.firstElementChild;
         if (this.handlers.length) this.root.classList.add(`${this.p}-clickable`);
+        this.active = null;
+        if (this.clicks.length) this.focusable();
         if (before) this.morph(before, { duration, easing });
         if (isStep && this.live) this.announce(this.spoken());
         return this;
@@ -67,8 +76,11 @@ export class View {
      * first, so the same words twice are still read.
      */
     announce(text) {
-        if (!this.live) return this;
-        const live = this.live;
+        return this.say(this.live, text);
+    }
+
+    say(live, text) {
+        if (!live) return this;
         live.textContent = '';
         const put = () => { live.textContent = text; };
         if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(put));
@@ -124,7 +136,92 @@ export class View {
         this.element.addEventListener(type, listener);
         this.handlers.push([type, listener]);
         this.root.classList.add(`${this.p}-clickable`);
-        return () => this.element.removeEventListener(type, listener);
+        if (type === 'click') { this.clicks.push(fn); this.keyboard(); }
+        return () => {
+            this.element.removeEventListener(type, listener);
+            this.clicks = this.clicks.filter((f) => f !== fn);
+        };
+    }
+
+    // ---- the keyboard: what a click does, without a pointer -----------------------
+
+    /** Make the expression one tab stop, with the keys explained to a screen reader. */
+    focusable() {
+        if (!this.root || !this.root.setAttribute) return;
+        this.root.setAttribute('tabindex', '0');
+        this.root.setAttribute('aria-description', 'Arrow keys move between parts, Enter selects one.');
+    }
+
+    /** Listen for the keys once, on the element (it outlives every set()). */
+    keyboard() {
+        this.focusable();
+        if (this.keysOn || !this.element.addEventListener) return;
+        this.keysOn = true;
+        this.partsLive = this.live || liveRegionFor(this.element, true, this.p);
+        this.element.addEventListener('keydown', (event) => this.key(event));
+    }
+
+    key(event) {
+        if (!this.root || !this.root.contains(event.target)) return;
+        const at = this.active;
+        let next;
+        switch (event.key) {
+            case 'ArrowDown': next = at ? this.partsOf(at)[0] : this.partsOf(this.tree)[0]; break;
+            case 'ArrowUp': next = at ? this.outerOf(at) : undefined; break;
+            case 'ArrowRight': next = at ? this.neighbour(at, 1) : this.partsOf(this.tree)[0]; break;
+            case 'ArrowLeft': next = at ? this.neighbour(at, -1) : undefined; break;
+            case 'Home': case 'Escape': next = null; break;
+            case 'Enter': case ' ': {
+                event.preventDefault();
+                const node = at || this.tree;
+                const element = this.elementOf(node) || this.root;
+                const info = { node, id: node.id, path: pathOf(this.tree, node.id), element, event };
+                for (const fn of this.clicks) fn(info);
+                return;
+            }
+            default: return;
+        }
+        event.preventDefault();
+        if (next === undefined) return;     // nowhere to go: stay put
+        this.focusPart(next);
+    }
+
+    /** Put the keyboard on a part (null: the whole expression) and say it. */
+    focusPart(node) {
+        const cls = `${this.p}-focus`;
+        this.root.querySelectorAll(`.${cls}`).forEach((e) => e.classList.remove(cls));
+        this.active = node;
+        const element = node && this.elementOf(node);
+        if (element) element.classList.add(cls);
+        let words = '';
+        try { words = node ? toAudioSpeech(node) : this.spoken(); } catch { words = ''; }
+        this.say(this.partsLive, words);
+        return this;
+    }
+
+    /** The parts directly inside a node that are drawn (an undrawn wrapper is looked through). */
+    partsOf(node) {
+        const out = [];
+        const visit = (n) => { if (this.elementOf(n)) out.push(n); else if (n.type === 'op') n.args.forEach(visit); };
+        if (node && node.type === 'op') node.args.forEach(visit);
+        return out;
+    }
+
+    /** The drawn part a node sits in, or null for the whole expression. */
+    outerOf(node) {
+        const path = pathOf(this.tree, node.id);
+        for (let k = path ? path.length - 1 : -1; k > 0; k--) {
+            const up = nodeAt(this.tree, path.slice(0, k));
+            if (up && this.elementOf(up)) return up;
+        }
+        return null;
+    }
+
+    /** The part beside this one (dir 1 next, -1 previous), or undefined at the end. */
+    neighbour(node, dir) {
+        const siblings = this.partsOf(this.outerOf(node) || this.tree);
+        const i = siblings.indexOf(node);
+        return i < 0 ? undefined : siblings[i + dir];
     }
 
     /** The expression read aloud in pieces, each tagged with the node it describes. */

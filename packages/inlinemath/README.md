@@ -29,12 +29,18 @@ toHTML('\\int_0^1 x^2\\,dx');              // HTML string; works in Node too
 const view = render(div, 'x^2 + 2x');       // a live view
 view.highlight('2x');                       // name a part by writing it
 view.color('x^2', 'crimson');
-view.on('click', ({ node, id, path }) => …);
+view.on('click', ({ node, id, path }) => …);   // also from the keyboard: Tab to it, arrows walk the parts, Enter picks one
 view.set('2x + x^2', { animate: true });    // the next step: matching parts glide over (instant under reduced motion; 'always' to insist)
 render(div, 'x^2', { announce: true });     // read each new step to a screen reader (a polite live region after the div)
 view.announce('Step 2: expand');            // your own words, through the same region
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
 ```
+
+**Keyboard and screen readers.** Every drawing has an accessible name (`role="math"`, its spoken form for a listener
+who can't see it). Once a view listens for `'click'`, the drawing is one tab stop: the arrow keys walk its parts (Down
+into a part, Up out, Left/Right between neighbours, Home or Escape back to the whole), each part is spoken through a
+polite live region and ringed, and Enter or Space calls the click listener for the current part (`event` is then the
+KeyboardEvent). `view.focusPart(node)` moves there from code.
 
 Inline Math needs its stylesheet on the page (the fonts are optional):
 
