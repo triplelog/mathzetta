@@ -43,8 +43,16 @@ export function bracketOp(node) {
     return node.op;
 }
 
-/** Does `child` need brackets as the `side` operand of `parent`? */
-export const needsBrackets = (parent, child, side) => needsParens(parent.op, bracketOp(child), side);
+/** Relations a drawn piecewise function can stand beside without brackets: its brace already groups it. */
+const RELATIONS = new Set(['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≈', '≡', '→']);
+
+/**
+ * Does `child` need brackets as the `side` operand of `parent`? For the drawn formats (LaTeX, MathML, Inline Math):
+ * f(x) = {cases} needs none — the brace groups the cases — though 2·({cases}) and ({cases}) + 1 keep theirs, or what
+ * follows could read as part of the last case. Code outputs do not ask this (there `y === (c ? a : b)` needs them).
+ */
+export const needsBrackets = (parent, child, side) =>
+    child.type === 'op' && child.op === '?:' && RELATIONS.has(parent.op) ? false : needsParens(parent.op, bracketOp(child), side);
 
 /**
  * Does a prefix or postfix operator (neg, !, \not) need brackets around its

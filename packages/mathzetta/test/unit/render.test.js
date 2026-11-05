@@ -50,6 +50,17 @@ suite('fixed: round, then exactly that many decimals', () => {
 });
 
 suite('piecewise: a ?: is a cases block in every maths display', () => {
+    test('beside = or another relation it needs no brackets (the brace groups it); in a sum or product it keeps them', () => {
+        const mml = (x) => toMathML(parse(x)).replace(/ id="mz-\d+"/g, '');
+        eq(toLaTeX(parse('y = (x > 0 ? 1 : 0)')), 'y = \\begin{cases}1 & \\text{if } x > 0 \\\\ 0 & \\text{otherwise} \\end{cases}');
+        eq(mml('y = (x > 0 ? 1 : 0)').startsWith('<math><mrow><mi>y</mi><mo>=</mo><mrow><mo>{</mo>'), true);
+        eq(toLaTeX(parse('y < (x > 0 ? 1 : 0)')).includes('\\left('), false);
+        eq(toLaTeX(parse('2 \\cdot (x > 0 ? 1 : 0)')), '2\\left(\\begin{cases}1 & \\text{if } x > 0 \\\\ 0 & \\text{otherwise} \\end{cases}\\right)');
+        eq(toLaTeX(parse('(x > 0 ? 1 : 0) + 1')).startsWith('\\left(\\begin{cases}'), true);
+        // code still needs them: y == x > 0 ? 1 : 0 would mean (y == x > 0) ? 1 : 0
+        eq(toJavaScript(parse('y = (x > 0 ? 1 : 0)')), 'y == (x > 0 ? 1 : 0)');
+        eq(toPython(parse('y = (x > 0 ? 1 : 0)')), 'y == (1 if x > 0 else 0)');
+    });
     const cases = 'x > 0 ? 1 : x < 0 ? -1 : 0';
     test('LaTeX flattens an else-chain into one cases', () => {
         eq(toLaTeX(cases), '\\begin{cases}1 & \\text{if } x > 0 \\\\ -1 & \\text{if } x < 0 \\\\ 0 & \\text{otherwise} \\end{cases}');
