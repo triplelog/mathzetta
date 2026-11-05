@@ -176,10 +176,14 @@ export function derivativeOrder(node) {
 
 const sameLeaf = (a, b) => a.type === b.type && a.value === b.value && a.type !== 'op';
 
+/** The value of a case nobody wrote (`if … then` with no else, cases with no otherwise row, IF(c, a)). */
+export const isUnchanged = (node) => node.type === 'symbol' && node.value === 'unchanged';
+
 /**
  * A `?:` as the branches of a piecewise function: [{ value, when }, …, { value, when: null }],
  * an else-chain (a ? b : c ? d : e) flattened into one list. The display renderers (LaTeX,
- * MathML, Inline Math) draw this as a cases block; code and text keep the ternary.
+ * MathML, Inline Math) draw this as a cases block; code and text keep the ternary. A final
+ * branch nobody wrote (its value `unchanged`) is left out: the drawing shows the cases written.
  */
 export function piecewise(node) {
     const branches = [];
@@ -188,7 +192,7 @@ export function piecewise(node) {
         branches.push({ value: n.args[1], when: n.args[0] });
         n = n.args[2];
     }
-    branches.push({ value: n, when: null });
+    if (!isUnchanged(n)) branches.push({ value: n, when: null });
     return branches;
 }
 

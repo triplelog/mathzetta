@@ -583,7 +583,8 @@ class Layout {
             rows.push([this.render(n.args[1], ctx), row(this.word('if'), this.text('space', ''), this.render(n.args[0], ctx))]);
             n = n.args[2];
         }
-        rows.push([this.render(n, ctx), this.word('otherwise')]);
+        // a case nobody wrote (`unchanged`: no else, no otherwise row) is not drawn
+        if (!(n.type === 'symbol' && n.value === 'unchanged')) rows.push([this.render(n, ctx), this.word('otherwise')]);
         const ROWGAP = 0.25;
         const heights = rows.map(([v, c]) => ({ h: Math.max(v.h, c.h), d: Math.max(v.d, c.d) }));
         const total = heights.reduce((s, x) => s + x.h + x.d, 0) + ROWGAP * (rows.length - 1);

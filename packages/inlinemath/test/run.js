@@ -359,6 +359,13 @@ test('markdown: another renderer, with the maths put back into its output', () =
     });
 }
 
+test('a case nobody wrote (unchanged) is not drawn; a written otherwise row is', () => {
+    const unwritten = toHTML('f(x)=\\begin{cases}x & x>0\\\\-x & x\\le 0\\end{cases}');
+    assert.equal((unwritten.match(/mv-case-value/g) || []).length, 2);
+    assert.ok(!/otherwise|unchanged/.test(unwritten.replace(/aria-label="[^"]*"/, '')), 'no otherwise row');
+    assert.match(toHTML('x > 0 ? 1 : 0'), /otherwise/);
+});
+
 test('a step animates unless the reader asked for reduced motion (or the page insists)', () => {
     const had = Object.getOwnPropertyDescriptor(globalThis, 'matchMedia');
     const prefer = (reduce) => { globalThis.matchMedia = (q) => ({ matches: reduce && q === '(prefers-reduced-motion: reduce)' }); };

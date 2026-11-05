@@ -79,4 +79,5 @@ x \to 0	x approaches 0	x approaches 0
 \cos 2x	cosine of 2 x	cosine of 2 x
 (fg)' = f'g + fg'	the derivative with respect to x of f g equals f prime g plus f g prime	the derivative with respect to x of f g equals f prime g plus f g prime
 if x < 0.5 then 1 - r else r	if x is less than 0.5, then 1 minus r, otherwise r	if x is less than 0.5, then 1 minus r, otherwise r
-IF(r > 0.5, 1)	if r is greater than 0.5, then 1, otherwise unchanged	if r is greater than 0.5, then 1, otherwise unchanged
+# a case nobody wrote (IF with no third argument, if … then with no else) is not read out (Nov 2026)
+IF(r > 0.5, 1)	if r is greater than 0.5, then 1	if r is greater than 0.5, then 1

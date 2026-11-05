@@ -45,7 +45,7 @@
  * every rule except these.
  */
 
-import { isMinusOneTimes, derivativeOrder, customName, GREEK } from '../common.js';
+import { isMinusOneTimes, derivativeOrder, customName, GREEK, isUnchanged } from '../common.js';
 import { operator, isCustomFunction, precedenceOf } from '../operators.js';
 import { firstVariable } from '../tree.js';
 
@@ -347,8 +347,11 @@ class Speaker {
                 return [me(w.randomNumber)];
             case 'expm1':
                 return [me(w.eToThe), ...this.speak(a), me(`${w.comma} ${w.minus} 1`)];
-            case '?:':
-                return [me(w.if), ...this.speak(a), me(`${w.comma} ${w.then}`), ...this.speak(b), me(`${w.comma} ${w.otherwise}`), ...this.speak(args[2])];
+            case '?:': {
+                const branch = [me(w.if), ...this.speak(a), me(`${w.comma} ${w.then}`), ...this.speak(b)];
+                // a case nobody wrote is not read out: "if x is greater than 0, then 1", not "…, otherwise unchanged"
+                return isUnchanged(args[2]) ? branch : [...branch, me(`${w.comma} ${w.otherwise}`), ...this.speak(args[2])];
+            }
             case 'sum':
                 return args.flatMap((x, i) => (i ? [me(w.plus), ...this.speak(x)] : this.speak(x)));
             case 'prod':

@@ -50,6 +50,16 @@ suite('fixed: round, then exactly that many decimals', () => {
 });
 
 suite('piecewise: a ?: is a cases block in every maths display', () => {
+    test('a case nobody wrote (unchanged) is not drawn or read out; code keeps it', () => {
+        const input = 'f(x)=\\begin{cases}x & x>0\\\\-x & x\\le 0\\end{cases}';
+        eq(toLaTeX(parse(input)), 'f\\left(x\\right) = \\begin{cases}x & \\text{if } x > 0 \\\\ -x & \\text{if } x \\leq 0 \\end{cases}');
+        eq(toMathML(parse(input)).includes('otherwise'), false);
+        eq(toMathML(parse(input)).includes('unchanged'), false);
+        eq(toSpeech(parse('if x > 0 then 1')), 'if x is greater than 0, then 1');
+        eq(toJavaScript(parse('if x > 0 then 1')), '(x > 0 ? 1 : unchanged)');
+        // a written otherwise row stays
+        eq(toLaTeX(parse('x > 0 ? 1 : 0')).includes('\\text{otherwise}'), true);
+    });
     test('beside = or another relation it needs no brackets (the brace groups it); in a sum or product it keeps them', () => {
         const mml = (x) => toMathML(parse(x)).replace(/ id="mz-\d+"/g, '');
         eq(toLaTeX(parse('y = (x > 0 ? 1 : 0)')), 'y = \\begin{cases}1 & \\text{if } x > 0 \\\\ 0 & \\text{otherwise} \\end{cases}');
