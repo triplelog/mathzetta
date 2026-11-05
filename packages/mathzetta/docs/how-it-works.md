@@ -230,6 +230,33 @@ toSpeech(x, { names: { ln: 'log', arcsin: 'arc sine' } })
 toSpeech(x, { say: { sqrt: ([a]) => `root ${a}` } })     // a whole phrase
 ```
 
+**Without the drawing: `toAudioSpeech()`.** Everything above assumes the
+listener can see the maths — a pause is enough to end "the square root of x
+plus 1," because the radical shows where it ends. A screen reader or an
+audio-only lesson has no picture, and a pause is easy to miss, so
+`toAudioSpeech()` puts the grouping in the words. It is the same speaker with
+two more rules:
+
+- anything compound inside a radical, exponent, subscript, absolute value,
+  floor, ceiling, denominator, factor, function argument, limit, sum or
+  derivative opens with "the quantity" (as a fraction's parts already do), and
+- closes with an end word — "end root", "end exponent", "end sub", "end
+  absolute value", "end fraction", "end quantity", … (in SPEECH_WORDS, so they
+  can be changed) — which is dropped when nothing follows.
+
+```
+√(x+1)        toSpeech: the square root of x plus 1           toAudioSpeech: the square root of the quantity x plus 1
+√x + 1        toSpeech: the square root of x plus 1           toAudioSpeech: the square root of x plus 1
+√(x+1) + 2    toSpeech: the square root of x plus 1, plus 2   toAudioSpeech: … of the quantity x plus 1, end root, plus 2
+x^(n+1) + 2   toSpeech: x to the power of n plus 1, plus 2    toAudioSpeech: … of the quantity n plus 1, end exponent, plus 2
+```
+
+Inline Math's `aria-label` uses `toAudioSpeech()`; its live view's
+`segments()` (narration that lights up the part being read) stays on
+`toSpeech()`. test/cases/speech.tsv has both columns, and
+test/unit/render.test.js checks that every pair the eye tells apart reads
+differently by ear.
+
 `SPEECH_WORDS` and `SPEECH_NAMES` are the defaults, exported so you can
 see every key. A `say` entry gets the operands already spoken, the node,
 and a `speak(node)` helper, and returns the phrase; keys are operator

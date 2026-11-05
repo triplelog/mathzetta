@@ -43,7 +43,7 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   `{{…}}` blocks are filled by the handler set with `setBlockHandler()`; loading `src/calculate.js` sets it.
 - `src/tree.js` — tree ⇄ postfix. Node `id` = postfix index; every outputter and Inline Math use it.
 - `src/common.js` — how a tree reads when written: brackets, implicit products. Exported from the core for Inline Math.
-- `src/render/` — tree → string, one file per format. speech.js is what the calculus videos read aloud; phrasing is in test/cases/speech.tsv.
+- `src/render/` — tree → string, one file per format. speech.js is what the calculus videos read aloud (`toSpeech`, the drawing in view) and, with its `audio` flag, what a screen reader hears (`toAudioSpeech`: compound groups opened with "the quantity" and closed with an end word, dropped at the very end) — one Speaker, two entry points; Inline Math's aria-label uses the audio one. Phrasing is in test/cases/speech.tsv (Speech and Audio columns); keep the video wording unchanged when touching the audio rules.
 - `src/evaluate.js` — doubles; `src/calculate.js` — exact (BigInt fractions, surds, π) and numeric calculus.
 - `src/formulas.js` — strToFunction / strToSQL for formulas over table columns (tabview, sqldn). Column-name matching is `src/columns.js`, shared with Python.
 - `test/cases/` — the table tests, one file per subject (consolidated 2026-11-02 from 24 files; every distinct check kept):

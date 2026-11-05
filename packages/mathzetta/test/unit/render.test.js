@@ -14,6 +14,8 @@ import {
     parse,
     toSpeech,
     toSpeechSegments,
+    toAudioSpeech,
+    toAudioSpeechSegments,
     toGLSL,
     GLSL_HELPERS,
     filterShader,
@@ -250,6 +252,41 @@ suite('speech segments', () => {
         const segments = toSpeechSegments(parse('\\frac{x+1}{x-1} + 2'));
         eq(segments.every((s) => s.text.trim() && !s.text.startsWith(',')), true, JSON.stringify(segments));
         eq(segments.map((s) => s.text).join(' '), toSpeech('\\frac{x+1}{x-1} + 2'));
+    });
+});
+
+suite('audio speech: the grouping in the words, for a listener who cannot see the maths', () => {
+    // pairs toSpeech() reads alike (the drawing tells them apart) that a listener alone could not
+    const PAIRS = [
+        ['\\sqrt{x+1}', '\\sqrt{x}+1'], ['\\sqrt{x+1}+2', '\\sqrt{x+1+2}'], ['\\sqrt[3]{x+1}', '\\sqrt[3]{x}+1'],
+        ['\\sqrt{x^2+y^2}', '\\sqrt{x^2}+y^2'], ['x_{n+1}', 'x_n+1'], ['x^{n+1}', 'x^n+1'], ['x^{n+1}+2', 'x^{n+1+2}'],
+        ['e^{-x^2}', '(e^{-x})^2'], ['\\frac{1}{x+1}+2', '\\frac{1}{x+1+2}'], ['|x-1|+2', '|x-1+2|'],
+        ['\\sin(x+1)+2', '\\sin(x+1+2)'], ['\\lim_{x\\to0}(x+1)', '\\lim_{x\\to0}x+1'],
+    ];
+    test('every pair the eye tells apart, the ear can too', () => {
+        for (const [a, b] of PAIRS) {
+            const A = toAudioSpeech(a), B = toAudioSpeech(b);
+            eq(A === B, false, `${a} and ${b} both read "${A}"`);
+        }
+    });
+    test('a group opens with "the quantity" and closes with an end word only when something follows', () => {
+        eq(toAudioSpeech('\\sqrt{x+1}'), 'the square root of the quantity x plus 1');
+        eq(toAudioSpeech('\\sqrt{x+1}+2'), 'the square root of the quantity x plus 1, end root, plus 2');
+        eq(toAudioSpeech('x^{n+1}+2'), 'x to the power of the quantity n plus 1, end exponent, plus 2');
+        eq(toAudioSpeech('x_{n+1}'), 'x sub the quantity n plus 1');
+        for (const input of ['\\sqrt{x+1}', '\\frac{1}{x+1}', '|x-1|', 'x^{n+1}', '\\sin(x+1)']) {
+            eq(/end \w+$/.test(toAudioSpeech(input)), false, `${input} ends on an end word`);
+        }
+    });
+    test('the video reading is untouched, and simple maths reads the same both ways', () => {
+        eq(toSpeech('\\sqrt{x+1}+2'), 'the square root of x plus 1, plus 2');
+        for (const input of ['x^2 + 1', '2x', '\\sin x', '\\frac{1}{2}', '\\int_0^1 x^2\\,dx']) eq(toAudioSpeech(input), toSpeech(input), input);
+    });
+    test('end words are words: changed with the words option, pauses attached like any other', () => {
+        eq(toAudioSpeech('\\sqrt{x+1}+2', { words: { endRoot: 'close root' } }), 'the square root of the quantity x plus 1, close root, plus 2');
+        const segments = toAudioSpeechSegments(parse('\\sqrt{x+1}+2'));
+        eq(segments.every((s) => s.text.trim() && !s.text.startsWith(',')), true, JSON.stringify(segments));
+        eq(segments.map((s) => s.text).join(' '), toAudioSpeech('\\sqrt{x+1}+2'));
     });
 });
 

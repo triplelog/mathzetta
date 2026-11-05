@@ -134,6 +134,11 @@ export interface SpeechOptions {
 export function toSpeech(input: Input, options?: SpeechOptions): string;
 /** The same phrase in pieces, each tagged with the node it belongs to. */
 export function toSpeechSegments(input: Input, options?: SpeechOptions): { text: string; id?: number }[];
+/** For a listener who cannot see the maths (a screen reader, audio only): groups are opened with
+ *  "the quantity" and closed with an end word — "the square root of the quantity x plus 1, end root, plus 2". */
+export function toAudioSpeech(input: Input, options?: SpeechOptions): string;
+/** toAudioSpeech() in pieces tagged with node ids. */
+export function toAudioSpeechSegments(input: Input, options?: SpeechOptions): { text: string; id?: number }[];
 export const SPEECH_WORDS: Record<string, unknown>;
 export const SPEECH_NAMES: Record<string, string>;
 

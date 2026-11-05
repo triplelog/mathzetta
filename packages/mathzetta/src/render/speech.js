@@ -25,6 +25,24 @@
  * toSpeechSegments() returns the phrase in pieces, each tagged with the id
  * of the node it belongs to, so a karaoke caption can light up the part of
  * the expression being spoken.
+ *
+ * Two versions
+ * ------------
+ * toSpeech() is for speech WITH the drawing in view — narration over a video,
+ * captions beside the maths — where the picture shows what a group holds, so a
+ * pause is enough: "the square root of x plus 1" next to a drawn radical.
+ *
+ * toAudioSpeech() is for speech ALONE — a screen reader, an audio-only lesson —
+ * where the words must carry the grouping by themselves:
+ *   √(x+1)       "the square root of the quantity x plus 1"
+ *   √x + 1       "the square root of x plus 1"
+ *   √(x+1) + 2   "the square root of the quantity x plus 1, end root, plus 2"
+ * Anything compound inside a radical, exponent, subscript, absolute value,
+ * floor, ceiling, fraction, factor, function argument, limit, sum or
+ * derivative opens with "the quantity" and closes with an end word ("end
+ * root", "end exponent", …, in WORDS). An end word with nothing after it is
+ * dropped, so a group at the end of the expression stays short. The two share
+ * every rule except these.
  */
 
 import { isMinusOneTimes, derivativeOrder, customName, GREEK } from '../common.js';
@@ -58,6 +76,10 @@ export const WORDS = {
     writtenTo: 'written to', asWholeNumber: 'written as a whole number',
     reals: 'the real numbers', integers: 'the integers', naturals: 'the natural numbers', rationals: 'the rational numbers',
     complexes: 'the complex numbers', repeating: 'repeating', eToThe: 'e to the',
+    // where a group ends, said by toAudioSpeech() only (and dropped at the end of the expression)
+    endQuantity: 'end quantity', endFraction: 'end fraction', endRoot: 'end root', endExponent: 'end exponent',
+    endSub: 'end sub', endAbsoluteValue: 'end absolute value', endFloor: 'end floor', endCeiling: 'end ceiling',
+    endLimit: 'end limit', endSum: 'end sum', endProduct: 'end product', endDerivative: 'end derivative',
     // "one half", "two thirds": numerators 1–9 and denominators 2–10 (ordinals[d] names 1/d)
     half: 'half', halves: 'halves', ordinals: ['', '', 'half', 'third', 'quarter', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'],
     numerators: ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
@@ -93,7 +115,21 @@ export function toSpeech(node, options = {}) {
  * from"; a leaf's id for its name).
  */
 export function toSpeechSegments(node, options = {}) {
-    const speaker = new Speaker({ ...WORDS, ...options.words }, { ...NAMES, ...options.names }, options.say || {});
+    return segmentsOf(node, options, false);
+}
+
+/** The expression for a listener who cannot see it (a screen reader, audio only): groups opened and closed in words. */
+export function toAudioSpeech(node, options = {}) {
+    return join(toAudioSpeechSegments(node, options));
+}
+
+/** toAudioSpeech() in pieces, [{ text, id }], like toSpeechSegments(). */
+export function toAudioSpeechSegments(node, options = {}) {
+    return segmentsOf(node, options, true);
+}
+
+function segmentsOf(node, options, audio) {
+    const speaker = new Speaker({ ...WORDS, ...options.words }, { ...NAMES, ...options.names }, options.say || {}, audio);
     return tidy(speaker.speak(node));
 }
 
@@ -103,8 +139,11 @@ export function toSpeechSegments(node, options = {}) {
  * empty pieces, so every segment is a word or phrase.
  */
 function tidy(segments) {
+    // an end word with nothing after it says nothing: drop the trailing ones (and their pauses)
+    let end = segments.length;
+    while (end > 0 && (segments[end - 1].close || !segments[end - 1].text.replace(/,/g, '').trim())) end--;
     const out = [];
-    for (const { text, id } of segments) {
+    for (const { text, id } of segments.slice(0, end)) {
         const trimmed = text.trim();
         if (!trimmed) continue;
         const pause = trimmed.startsWith(',');
@@ -137,10 +176,11 @@ const COMPARISONS = {
 const SETS = { 'ℝ': 'reals', 'ℤ': 'integers', 'ℕ': 'naturals', 'ℚ': 'rationals', 'ℂ': 'complexes' };
 
 class Speaker {
-    constructor(words, names, say) {
+    constructor(words, names, say, audio = false) {
         this.w = words;
         this.names = names;
         this.say = say;
+        this.audio = audio;
     }
 
     /** Speak a node as segments. */
@@ -197,10 +237,25 @@ class Speaker {
         return prec !== undefined && prec <= 50 && !operator(node.op).group;
     }
 
-    /** "the quantity x plus 1," — a compound node fenced off with words. */
-    quantity(node) {
+    /** "the quantity x plus 1," — a compound node fenced off with words. `end` names the
+     *  end word toAudioSpeech() says after it (null where the next word already closes it, like "over"). */
+    quantity(node, end = 'endQuantity') {
         if (!this.isCompound(node)) return this.speak(node);
-        return [this.seg(node, this.w.quantity), ...this.speak(node), this.seg(node, this.w.comma)];
+        return [this.seg(node, this.w.quantity), ...this.speak(node), ...this.closer(node, end)];
+    }
+
+    /** The pause after a group, and in toAudioSpeech() its end word: ", end root,". */
+    closer(node, end) {
+        const pause = this.seg(node, this.w.comma);
+        if (!this.audio || !end) return [pause];
+        return [pause, { text: this.w[end], id: node.id, close: true }, pause];
+    }
+
+    /** What a radical, |…|, limit or sum holds. Spoken plain with a pause after it
+     *  for toSpeech(); in toAudioSpeech() a compound one is "the quantity …, end <word>". */
+    contents(node, end) {
+        if (!this.audio || !this.isCompound(node)) return [...this.speak(node), ...this.pauseAfter(node)];
+        return this.quantity(node, end);
     }
 
     /** A function's argument: "x", "2 x", or "the quantity x plus 1,". */
@@ -240,10 +295,10 @@ class Speaker {
             case '^':
                 return this.power(node);
             case '_':
-                return [...this.speak(a), me(w.sub), ...this.speak(b)];
+                return [...this.speak(a), me(w.sub), ...(this.audio ? this.quantity(b, 'endSub') : this.speak(b))];
             case 'neg':
                 return this.isCompound(a) || a.type === 'op' && a.op === 'neg'
-                    ? [me(`${w.negative} ${w.quantity}`), ...this.speak(a), me(w.comma)]
+                    ? [me(`${w.negative} ${w.quantity}`), ...this.speak(a), ...this.closer(a, 'endQuantity')]
                     : [me(w.negative), ...this.speak(a)];
             case 'pm':
                 return [me(w.plusOrMinus), ...this.speak(a)];
@@ -252,18 +307,18 @@ class Speaker {
             case '\\not':
                 return [me(w.not), ...this.quantity(a)];
             case 'sqrt':
-                return [me(w.squareRoot), ...this.speak(a), ...this.pauseAfter(a)];
+                return [me(w.squareRoot), ...this.contents(a, 'endRoot')];
             case 'root': {
                 const n = a.type === 'number' ? Number(a.value) : NaN;
                 const root = n === 3 ? w.cubeRoot : n === 2 ? w.squareRoot : w.nthRoot(n ? this.ordinal(n) : join(this.speak(a)) + 'th');
-                return [me(root), ...this.speak(b), ...this.pauseAfter(b)];
+                return [me(root), ...this.contents(b, 'endRoot')];
             }
             case 'abs':
-                return [me(w.absoluteValue), ...this.speak(a), ...this.pauseAfter(a)];
+                return [me(w.absoluteValue), ...this.contents(a, 'endAbsoluteValue')];
             case 'floor':
-                return [me(w.floor), ...this.speak(a), ...this.pauseAfter(a)];
+                return [me(w.floor), ...this.contents(a, 'endFloor')];
             case 'ceil':
-                return [me(w.ceiling), ...this.speak(a), ...this.pauseAfter(a)];
+                return [me(w.ceiling), ...this.contents(a, 'endCeiling')];
             case 'log':
                 if (a.type === 'symbol' && a.value === 'e') return [me(`${this.names.ln} ${w.of}`), ...this.argument(b)];
                 return [me(`${w.logBase}`), ...this.speak(a), me(w.of), ...this.argument(b)];
@@ -317,9 +372,9 @@ class Speaker {
             case 'lim':
                 return this.limit(node);
             case '\\sumidx':
-                return this.bigOperator(node, w.sumFrom, w.sumOver, w.sumOf);
+                return this.bigOperator(node, w.sumFrom, w.sumOver, w.sumOf, 'endSum');
             case '\\prodidx':
-                return this.bigOperator(node, w.productFrom, w.productOver, w.productOf);
+                return this.bigOperator(node, w.productFrom, w.productOver, w.productOf, 'endProduct');
         }
         throw new Error(`No speech for '${op}'`);
     }
@@ -375,9 +430,9 @@ class Speaker {
             const unit = d === 2 ? (n === 1 ? w.half : w.halves) : w.ordinals[d] + (n === 1 ? '' : 's');
             return [me(`${w.numerators[n]} ${unit}`)];
         }
-        const top = this.quantity(a);
+        const top = this.quantity(a, null);   // "over" closes the numerator
         const pause = this.isCall(a) ? [me(w.comma)] : [];
-        return [...top, ...pause, me(w.over), ...this.quantity(b)];
+        return [...top, ...pause, me(w.over), ...this.quantity(b, 'endFraction')];
     }
 
     /** "x squared", "e to the 2 x", "x to the n minus 1, power", "the quantity x plus 1, squared". */
@@ -385,9 +440,10 @@ class Speaker {
         const [base, exp] = node.args;
         const w = this.w;
         const me = (text) => this.seg(node, text);
-        const spokenBase = this.isCompound(base) || this.isCall(base) || (base.type === 'number' && base.value.startsWith('-')) || base.type === 'op' && base.op === '/'
-            ? [me(w.quantity), ...this.speak(base), me(w.comma)]
-            : this.speak(base);
+        // a power of a power is fenced off for the ear: (e^-x)^2 is not e^(-x^2)
+        const fenceBase = this.isCompound(base) || this.isCall(base) || (base.type === 'number' && base.value.startsWith('-')) || base.type === 'op' && base.op === '/'
+            || (this.audio && base.type === 'op' && base.op === '^');
+        const spokenBase = fenceBase ? [me(w.quantity), ...this.speak(base), ...this.closer(base, 'endQuantity')] : this.speak(base);
         // sin^2 x: "sine squared of x"
         if (this.isCall(base) && this.names[base.op] && exp.type === 'number' && /^[2-3]$/.test(exp.value) && base.args.length === 1) {
             const word = Number(exp.value) === 2 ? w.squared : w.cubed;
@@ -401,6 +457,7 @@ class Speaker {
         if (exp.type === 'number' && /^\d+$/.test(exp.value)) return [...spokenBase, me(`${w.toThe} ${this.ordinal(Number(exp.value))}`)];
         const simpleExponent = !this.isCompound(exp) && !(exp.type === 'op' && exp.op === '/' && this.isCompound(exp.args[0]));
         if (simpleExponent) return [...spokenBase, me(w.toThe), ...this.speak(exp)];
+        if (this.audio) return [...spokenBase, me(w.toThePowerOf), me(w.quantity), ...this.speak(exp), ...this.closer(exp, 'endExponent')];
         return [...spokenBase, me(w.toThePowerOf), ...this.speak(exp), me(w.comma)];
     }
 
@@ -420,7 +477,7 @@ class Speaker {
             return [me(d), ...this.speak(body), me(w.d), ...this.speak(by), me(n === 1 ? '' : (n === 2 ? w.squared : n === 3 ? w.cubed : `${w.toThe} ${this.ordinal(n)}`))];
         }
         const which = n === 1 ? w.derivative : n === 2 ? w.secondDerivative : w.nthDerivative(this.ordinal(n));
-        return [me(`${which} ${w.withRespectTo}`), ...this.speak(by), me(w.of), ...this.speak(body), ...this.pauseAfter(body)];
+        return [me(`${which} ${w.withRespectTo}`), ...this.speak(by), me(w.of), ...this.contents(body, 'endDerivative')];
     }
 
     /** "the integral from 0 to 1 of x squared, d x". */
@@ -462,11 +519,11 @@ class Speaker {
         } else {
             return [me(`${w.limitAs.replace(/ as$/, '')} ${w.of}`), ...this.speak(f)];
         }
-        return [me(w.limitAs), ...approach, me(w.of), ...this.speak(f), ...this.pauseAfter(f)];
+        return [me(w.limitAs), ...approach, me(w.of), ...this.contents(f, 'endLimit')];
     }
 
     /** "the sum from i equals 1 to n of i squared". */
-    bigOperator(node, from, over, of) {
+    bigOperator(node, from, over, of, end) {
         const { args } = node;
         const [f, lower, upper] = args;
         const w = this.w;
@@ -475,7 +532,7 @@ class Speaker {
         if (args.length === 3) head = [me(from), ...this.speak(lower), me(w.to), ...this.speak(upper), me(w.of)];
         else if (args.length === 2) head = [me(over), ...this.speak(lower), me(w.of)];
         else head = [me(of)];
-        return [...head, ...this.speak(f), ...this.pauseAfter(f)];
+        return [...head, ...this.contents(f, end)];
     }
 }
 

@@ -17,6 +17,7 @@
  *   Excel       toExcel(input)
  *   Text        toText(input)
  *   Speech      toSpeech(input)
+ *   Audio       toAudioSpeech(input) — speech with no drawing in view
  *   GLSL        toGLSL(input)
  *   Evaluated   the value of the JavaScript output (numbers compared to
  *               1e-9; "abc" in quotes means the string abc)
@@ -40,6 +41,7 @@
 import {
     parse, clean, toLaTeX, toMathML, toJavaScript, toPython, toSQL, toExcel, toText, toSpeech, toGLSL, strToFunction, createRowEvaluator,
 } from '../src/all.js';
+import { toAudioSpeech } from '../src/speech.js';
 
 /**
  * Split TSV text into rows of cells; blank and `#` lines are skipped.
@@ -64,7 +66,7 @@ export function parseData(csv) {
 
 const COLUMN = {
     clean: 'clean', postfix: 'postfix', latex: 'latex', mathml: 'mathml',
-    javascript: 'javascript', python: 'python', sql: 'sql', excel: 'excel', text: 'text', evaluated: 'evaluated', speech: 'speech', glsl: 'glsl',
+    javascript: 'javascript', python: 'python', sql: 'sql', excel: 'excel', text: 'text', evaluated: 'evaluated', speech: 'speech', audio: 'audio', glsl: 'glsl',
 };
 
 const stripIds = (s) => s.replace(/ id="mz-\d+"/g, '');
@@ -90,6 +92,7 @@ export function actual(column, input, expected = '') {
         case 'excel': return toExcel(parse(input));
         case 'text': return toText(parse(input));
         case 'speech': return toSpeech(parse(input));
+        case 'audio': return toAudioSpeech(parse(input));
         case 'glsl': return toGLSL(parse(input));
         case 'evaluated': return String(new Function(`return (${toJavaScript(parse(input))});`)());
     }

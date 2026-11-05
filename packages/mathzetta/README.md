@@ -14,7 +14,7 @@ npm install mathzetta
 ```js
 import { parse } from 'mathzetta';
 import { toLaTeX } from 'mathzetta/latex';
-import { toSpeech } from 'mathzetta/speech';
+import { toSpeech, toAudioSpeech } from 'mathzetta/speech';
 import { calculate } from 'mathzetta/calculate';
 
 parse('3x^2 + \\sin x')        // ['3', 'x', '2', '^', '*', 'x', 'sin', '+']
@@ -24,6 +24,7 @@ parse('d/dx (x^2 + 1)')        // ['x', '2', '^', '1', '+', 'x', 'der']
 
 toLaTeX('3x^2 + sin(x)')       // '3x^2 + \\sin\\left(x\\right)'
 toSpeech('(x+1)^2')            // 'the quantity x plus 1, squared'
+toAudioSpeech('√(x+1) + 2')     // 'the square root of the quantity x plus 1, end root, plus 2'
 calculate('sqrt(8)').text      // '2*sqrt(2)'
 parse('3+4={{3+4}}')           // ['3', '4', '+', '7', '='] — once mathzetta/calculate is loaded
 ```
@@ -97,7 +98,7 @@ expression string, standard postfix, or a tree.
 | `mathzetta/latex` | `toLaTeX(x, { wrap })` — `wrap(node, latex)` can tag each subexpression |
 | `mathzetta/mathml` | `toMathML(x)` — each node's element has `id="mz-<index>"` |
 | `mathzetta/text` | `toText(x)` — readable text: `√(x)`, `x ∈ {1, 2}` |
-| `mathzetta/speech` | `toSpeech(x, { words, names, say })` — read aloud as a teacher would, every word changeable; `toSpeechSegments(x)` — the same in pieces tagged with node ids, for captions that follow the maths |
+| `mathzetta/speech` | `toSpeech(x, { words, names, say })` — read aloud as a teacher would, beside the drawing (a video, captions), every word changeable; `toAudioSpeech(x)` — for a listener who can't see it (a screen reader): every group opened and closed in words; `toSpeechSegments(x)` / `toAudioSpeechSegments(x)` — the same in pieces tagged with node ids, for captions that follow the maths |
 | `mathzetta/javascript` | `toJavaScript(x)` — code using `Math.*` |
 | `mathzetta/python` | `toPython(x, { numpy, sympy })` — code using `math.*`, numpy element-wise, or SymPy (exact; `diff`, `integrate`, `limit`, `summation`); `toPythonFunction(f, { numpy, sympy, errors })` — a checked `def` (with sympy, the x of d/dx is a Symbol and a parameter x is substituted after) (1/0 raises, or `errors: 'nan'`); `fillPythonTemplate(program, formulas)` / `preparePythonTemplate` (per-slot results for a form) — a Python program with `# mathzetta: growth(P, r, K) = …` slots, including formulas over a dataset's columns (`keep(data: columns) = HR >= 30`); `mathzetta-python chart.py x='H / AB' --run out.png` fills and runs one. `examples/python/logistic.py` is a model; [pyslots](https://tabdn.com/pyslots/) makes templates into web pages (Pyodide or Flask), with matplotlib charts over baseball data |
 | `mathzetta/excel` | `toExcel(x, { cells, ranges })` — an Excel / Google Sheets formula (`=IF(x>0, SQRT(x), 0)`), bracketed for a spreadsheet's own rules; read back too (`=…` is read as a spreadsheet formula); `forXlsxFile` adds `_xlfn.` for an .xlsx file |
