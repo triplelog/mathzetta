@@ -1,6 +1,6 @@
 {
   "name": "mathzetta",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Parse maths written almost any way into standard postfix; add outputters for LaTeX, MathML, speech, JavaScript, Python, SQL, GLSL, text, and exact or numeric evaluation.",
   "author": {
     "name": "Robert Wilcox",

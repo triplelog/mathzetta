@@ -25,7 +25,7 @@ import { fromPostfix } from './tree.js';
 import { operatorNames, precedenceOf } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 
-export const version = '1.0.0';
+export const version = '1.1.0';
 
 export { parse, parse as parseToPostfix, parseSteps, parseTree, clean, setBlockHandler } from './parse/index.js';
 export { fromPostfix, toPostfix, asTree, walk, firstVariable, num, sym, op, leaf } from './tree.js';

@@ -51,8 +51,8 @@ import '@mathzetta/inlinemath/fonts/fonts.css';    // optional: Latin Modern, th
 
 ```html
 <!-- or from the CDN -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/inlinemath.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/fonts/fonts.css">  <!-- optional -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/fonts/fonts.css">  <!-- optional -->
 ```
 
 ### Lite: drawing only
@@ -159,17 +159,17 @@ Every npm release's `dist/` is on jsDelivr (and unpkg); the bundles carry MathZe
 page needs nothing else:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/fonts/fonts.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/fonts/fonts.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.css">
 
 <!-- a script tag: window.InlineMath -->
-<script src="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.global.min.js"></script>
 <script>document.getElementById('out').innerHTML = InlineMath.toHTML('\\frac{d}{dx} x^2');</script>
 
 <!-- or modules: inlinemath.js, markdown.js, cas.js (the CAS one holds MathZetta CAS too) -->
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.js';
-  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/markdown.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.js';
+  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/markdown.js';
 </script>
 ```
 
@@ -209,7 +209,7 @@ map (every name can point at the one MathZetta bundle). The fonts are 94 KB more
                "mathzetta/calculate": "https://cdn.jsdelivr.net/npm/mathzetta@1/build/mathzetta.esm.min.js" } }
 </script>
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.1/dist/inlinemath.external.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.external.js';
 </script>
 ```
 
