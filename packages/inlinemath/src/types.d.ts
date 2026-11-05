@@ -30,6 +30,9 @@ export interface LayoutOptions {
     cases?: boolean;
     /** The accessible name: true = the spoken form, a string, a function of the tree, or false for none. */
     label?: boolean | string | ((tree: Node) => string);
+    /** MathZetta's toMathML (from 'mathzetta/mathml'): also write the expression as visually hidden MathML, which
+     *  screen readers can step through and show in math braille; it takes the place of the label. Off by default. */
+    mathml?: ((input: Node) => string) | null;
     /** Extra attributes for a node's element. */
     attributes?: ((node: Node) => Record<string, string>) | null;
     /** Inline style for a node's element. */

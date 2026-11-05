@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import * as nodeFs from 'node:fs';
 import { toHTML, treeOf, select, signature, nodeAt, pathOf, numberTree, shouldAnimate } from '../src/index.js';
 import { parseTree, fromPostfix, walk } from '../src/mathzetta.js';
+import { toMathML } from 'mathzetta/mathml';   // what a page passes as { mathml } (Inline Math does not import it)
 
 let passed = 0;
 const failures = [];
@@ -134,6 +135,14 @@ test('the whole expression has its spoken form as its accessible name', () => {
     assert.equal(label('\\sqrt{x+1}+2'), 'the square root of the quantity x plus 1, end root, plus 2');
     assert.notEqual(label('\\sqrt{x+1}'), label('\\sqrt{x}+1'));
     assert.notEqual(label('x_{n+1}'), label('x_n+1'));
+    // mathml: the expression as hidden MathML a screen reader can walk, in place of the label
+    const withMathML = toHTML('\\sqrt{x+1} + \\cancel{y}', { mathml: toMathML });
+    assert.match(withMathML, /<math class="mv-sr-math" display="block"><mrow><msqrt>/);
+    assert.match(withMathML, /<menclose notation="updiagonalstrike"><mi>y<\/mi><\/menclose>/);
+    assert.ok(!/ id="mz-/.test(withMathML), 'no ids in the hidden MathML');
+    assert.ok(!/aria-label=/.test(withMathML) && !/role="math"/.test(withMathML), 'MathML replaces the label');
+    assert.match(withMathML, /^<span class="mv mv-display"><span aria-hidden="true" /);
+    assert.ok(!/<math/.test(toHTML('x^2')), 'off by default');
 });
 
 // ---- addressing ---------------------------------------------------------------------

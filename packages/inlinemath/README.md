@@ -116,6 +116,7 @@ These go to `toHTML(input, options)` and `render(el, input, options)`.
 | `colors` | | `{ 'x^2': 'red', 5: 'blue' }` (number keys are ids) or `[[target, colour]]` |
 | `highlight` | | target(s) that get the `mv-hl` class |
 | `attributes`, `style` | | `(node) => ({…})` / `(node) => 'css'` for each node's element |
+| `mathml` | | MathZetta's `toMathML` (`import { toMathML } from 'mathzetta/mathml'`): also write the expression as visually hidden MathML (no ids), which screen readers can step through part by part and show in math braille; the drawing stays hidden from them and the label is dropped (MathML carries the meaning). A keyboard-enabled view keeps its label on the focusable element |
 | `label` | `true` | the accessible name of the expression (`role="math" aria-label`): `true` = its spoken form for a listener who can't see it (MathZetta's `toAudioSpeech`: "the square root of the quantity x plus 1, end root, plus 2"), or a string, `(tree) => string`, or `false` |
 | `prefix` | `'mv'` | class prefix |
 

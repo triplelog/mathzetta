@@ -75,6 +75,7 @@ export const DEFAULTS = {
     scriptFractions: 'slash',// x^{1/2} written x^{1/2} with a slash; 'stack' stacks it
     cases: true,             // c ? a : b drawn as a piecewise brace
     label: true,             // accessible name of the whole expression: true = MathZetta's toAudioSpeech (the grouping in the words), a string, (tree) => string, or false
+    mathml: null,            // MathZetta's toMathML (import it from 'mathzetta/mathml'): also write the expression as visually hidden MathML, which screen readers can step through and show in math braille; it replaces the label
     attributes: null,        // (node) => ({ ... }) extra attributes for a node's element
     style: null,             // (node) => 'css' inline style for a node's element
 };
@@ -102,11 +103,26 @@ export function layout(tree, options = {}) {
     const r = new Layout({ ...DEFAULTS, ...options });
     const b = r.render(tree, { level: 0 });
     const cls = `${r.p}${r.o.display ? ` ${r.p}-display` : ''}`;
-    // Screen readers get the expression read as a teacher would; the spans and glyphs inside are not read piecemeal.
-    const label = accessibleName(tree, r.o.label);
-    const body = label === null ? b.html : b.html.replace(/^<span /, '<span aria-hidden="true" ');
+    // Screen readers get the expression as MathML they can walk (mathml: true), or read as a teacher would (the
+    // label); the spans and glyphs of the drawing are never read piecemeal.
+    const mathml = typeof r.o.mathml === 'function' ? assistiveMathML(r.o.mathml, tree, r.p, r.o.display) : '';
+    const label = mathml ? null : accessibleName(tree, r.o.label);
+    const body = label === null && !mathml ? b.html : b.html.replace(/^<span /, '<span aria-hidden="true" ');
     const attrs = label === null ? '' : ` role="math" aria-label="${escape(label)}"`;
-    return { html: `<span class="${cls}"${attrs}>${body}</span>`, h: b.h, d: b.d };
+    return { html: `<span class="${cls}"${attrs}>${body}${mathml}</span>`, h: b.h, d: b.d };
+}
+
+/**
+ * The expression as MathML for assistive technology: no ids (two drawings on a page must not share them), hidden
+ * from sight. The page passes MathZetta's toMathML, so Inline Math itself imports only what every page maps.
+ */
+function assistiveMathML(toMathML, tree, prefix, display) {
+    try {
+        return String(toMathML(tree)).replace(/ id="mz-\d+"/g, '')
+            .replace(/^<math>/, `<math class="${prefix}-sr-math"${display ? ' display="block"' : ''}>`);
+    } catch {
+        return '';   // nothing MathZetta can write as MathML: the label stands in
+    }
 }
 
 function accessibleName(tree, label) {

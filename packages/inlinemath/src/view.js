@@ -149,6 +149,8 @@ export class View {
     focusable() {
         if (!this.root || !this.root.setAttribute) return;
         this.root.setAttribute('tabindex', '0');
+        // a focusable element needs a name: with { mathml: true } the drawing has none of its own (the MathML has it)
+        if (!this.root.getAttribute('aria-label')) { this.root.setAttribute('role', 'math'); this.root.setAttribute('aria-label', this.spoken()); }
         this.root.setAttribute('aria-description', 'Arrow keys move between parts, Enter selects one.');
     }
 
