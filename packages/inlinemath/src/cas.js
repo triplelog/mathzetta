@@ -9,9 +9,10 @@
  *   toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })   // x = 2 or x = 3
  *   stepsHTML(mathCAS().diff('x^2 sin x', 'x', { steps: 'brief' }).steps)
  *
- * Block functions: simplify, expand, factor, cancel, diff(f, x[, n]), integrate(f, x[, a, b]),
- * solve(equation, x), approx(expr[, digits]); d/dx … and ∫ … without limits go to the CAS
- * too. Everything else is MathZetta's calculator (calculateBlock), as without this.
+ * Block functions: simplify, expand, factor, cancel, diff(f, x[, n]) (or der, derivative,
+ * differentiate), integrate(f, x[, a, b]) (or integral), solve(equation, x), approx(expr[, digits]);
+ * d/dx … and ∫ … without limits go to the CAS too. In Markdown, saved variables ($_f := x^3$)
+ * stand for their expressions: {{diff(f, x)}}. Everything else is MathZetta's calculator (calculateBlock), as without this.
  *
  * Needs @mathzetta/cas (a peer dependency, like mathzetta).
  */
@@ -23,6 +24,8 @@ import { calculateBlock } from './calculator.js';
 // Only this entry needs MathZetta's text writer (so only pages using inlinemath/cas map 'mathzetta/text').
 import { toText } from 'mathzetta/text';
 import { toHTML } from './html.js';
+
+const EXPRESSIONS = Symbol.for('inlinemath.expressions');   // as variables.js
 
 const shared = new Map();
 
@@ -69,6 +72,8 @@ export function mathCAS(options = {}) {
 }
 
 const CALLS = new Set(['simplify', 'expand', 'factor', 'cancel', 'diff', 'integrate', 'solve', 'approx']);
+// other names people write for them
+const ALIASES = { integral: 'integrate', differentiate: 'diff', approximate: 'approx', simp: 'simplify' };
 
 /**
  * A `{{…}}` handler: pass it as toHTML(input, { blocks: casBlocks() }).
@@ -83,8 +88,11 @@ export function casBlocks(options = {}) {
     } catch {
       return calculateBlock(text, scope);
     }
+    // saved variables ($_f := x^3$ in Markdown) stand for their expressions: {{diff(f, x)}}
+    const saved = scope && scope[EXPRESSIONS];
+    if (saved) tokens = tokens.flatMap((t) => (Object.hasOwn(saved, t) ? saved[t] : [t]));
     const head = tokens[tokens.length - 1];
-    const name = head?.startsWith('\\:') ? head.slice(2) : null;
+    const name = head?.startsWith('\\:') ? (ALIASES[head.slice(2)] ?? head.slice(2)) : null;
     const symbolic = name && CALLS.has(name);
     // d/dx …, ∫ … dx and ∫ from a to b … dx (MathZetta writes the limits as int's 3rd and 4th operands)
     const calculus = head === 'der' || head === 'int';

@@ -102,6 +102,14 @@ export class View {
      *  one tab stop, arrow keys walk the parts (each spoken), Enter or Space calls the listener for the
      *  current part — `event` is then the KeyboardEvent. */
     on(type: string, fn: (info: ClickInfo) => void): () => void;
+    /**
+     * Let the reader edit a part at a time: double-click it (or F2 on the keyboard's part) and a
+     * text box opens over it; Enter puts the new text in its place, Escape leaves it.
+     * toText is MathZetta's (import { toText } from 'mathzetta/text'; InlineMath.toText in the <script> build).
+     */
+    editable(how: { toText: (input: Input) => string; onEdit?: (change: { tree: Node; text: string; path: number[]; part: string }) => void }): this;
+    /** Open the editing box over a part (editable() first). */
+    edit(target?: unknown, options?: { returnFocus?: boolean }): HTMLInputElement | null;
     /** The part the arrow keys are on (null: the whole expression). */
     readonly active: Node | null;
     /** Put the keyboard on a part (null: the whole expression) and say it. */
@@ -137,6 +145,12 @@ export interface MarkdownOptions {
      * renderMarkdownInto: the page's `variables` by default, false for none.
      */
     variables?: Variables | false | null;
+    /**
+     * renderMarkdownInto: double-clicking a part drawn from a textbox variable edits it in place
+     * (toText from 'mathzetta/text'); without it the textbox is focused. Any other part fires
+     * 'inlinemath:select' (detail { index, start, end, raw, source, id, path }) on the element.
+     */
+    editable?: { toText: (input: Input) => string };
 }
 /** What a saved variable is: its expression, or the input that sets it. */
 export interface VariableDefinition {
@@ -167,7 +181,7 @@ export function createVariables(): Variables;
 export const variables: Variables;
 export function markdownToHTML(markdown: string, options?: MarkdownOptions): string;
 export function renderMarkdownInto<E extends Element>(element: E, markdown: string, options?: MarkdownOptions): E;
-export function extractMath(markdown: string, options?: { delimiters?: string[] }): { text: string; math: Array<{ source: string; display: boolean; raw: string }> };
+export function extractMath(markdown: string, options?: { delimiters?: string[] }): { text: string; math: Array<{ source: string; display: boolean; raw: string; start: number; end: number }> };
 export function renderMarkdown(markdown: string, options?: MarkdownOptions): string;
 
 // ---- inlinemath/cas (needs @mathzetta/cas) --------------------------------------------------------

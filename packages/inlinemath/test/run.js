@@ -363,6 +363,34 @@ test('markdown: a store of variables shared between parts, and set from code', a
     assert.deepEqual(page.names(), []);
 });
 
+test('editing a part: replaced in the tree, a variable written back in its own terms', async () => {
+    const { replaceAt } = await import('../src/edit.js');
+    const { substitute, unexpand } = await import('../src/variables.js');
+    const { parseTree, toPostfix } = await import('mathzetta');
+    const pf = (t) => toPostfix(t).join(' ');
+    const tree = parseTree('x^2 + 3x');
+    assert.equal(pf(replaceAt(tree, [1], parseTree('7y'))), pf(parseTree('x^2 + 7y')));
+    assert.equal(pf(replaceAt(tree, [], parseTree('1'))), '1', 'the whole expression');
+    // B := 2A, A := x+1: the part drawn for B, written back, keeps A as A
+    const defs = { A: parseTree('x+1'), B: parseTree('2A') };
+    const { tree: drawn } = substitute(parseTree('B^2'), (n) => defs[n] ?? null);
+    const b = drawn.args[0];
+    assert.equal(b.from, 'B');
+    assert.equal(pf(unexpand(b, (n) => parseTree(n))), pf(parseTree('2A')));
+    assert.equal(extractMath('ab $x$ c $$y$$').math.map((m) => `${m.start}-${m.end}`).join(' '), '3-6 9-14', 'where each piece is');
+    const { View } = await import('../src/view.js');
+    assert.throws(() => Object.create(View.prototype).editable({}), /toText/);
+});
+
+test('markdown: CAS blocks see saved variables as their expressions, under any of their names', async () => {
+    const { casBlocks: cas } = await import('../src/cas.js');
+    const md = (t) => spoken(markdownToHTML(t, { blocks: cas() }));
+    assert.deepEqual(md('${{der(x^2, x)}}$ ${{derivative(x^2, x)}}$ ${{integral(x^2, x)}}$'), ['2 x', '2 x', 'x cubed over 3']);
+    assert.deepEqual(md("$_f := x^3 + 2x$ $f' = {{der(f, x)}}$"), ['f prime equals 3 x squared plus 2']);
+    assert.deepEqual(md('$_a := 2$ $_g := a x^2$ ${{diff(g, x)}}$ ${{integrate(g, x, 0, 1)}}$'), ['4 x', 'two thirds'], 'a variable inside a variable');
+    assert.deepEqual(md('$_p := x^2 - 4$ ${{solve(p = 0, x)}}$'), ['x equals negative 2 or x equals 2']);
+});
+
 // ---- untrusted text, links, the CAS blocks (from a review before publishing) ---------------
 
 {

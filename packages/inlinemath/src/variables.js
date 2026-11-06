@@ -9,6 +9,13 @@
  *   variables.get('A');          // 'x^2'
  */
 
+/**
+ * Where a scope carries the saved variables' expressions, for {{…}} handlers that work with
+ * expressions rather than values (casBlocks: {{diff(f, x)}} with f saved): name → MathZetta
+ * postfix, every saved name inside already put in. A symbol, so the calculator never sees it.
+ */
+export const EXPRESSIONS = Symbol.for('inlinemath.expressions');
+
 // ---- names ----------------------------------------------------------------------------------
 
 const LEAF = new Set(['symbol', 'number']);
@@ -23,11 +30,32 @@ export function nameOf(node) {
     return null;
 }
 
-/** A tree with its ids dropped, so it can be numbered again inside another. */
+/** A tree with its ids (and where-it-came-from marks) dropped, so it can be numbered again inside another. */
 export function bare(node) {
-    const { id, ...rest } = node;
+    const { id, from, ...rest } = node;
     if (rest.args) rest.args = rest.args.map(bare);
     return rest;
+}
+
+/** Ids dropped (to be numbered again), `from` marks kept. */
+function renumber(node) {
+    const { id, ...rest } = node;
+    if (rest.args) rest.args = rest.args.map(renumber);
+    return rest;
+}
+
+/**
+ * The part of a substituted tree a variable stands for, written back in its own terms: the
+ * variables inside it put back as their names. `named(name)` gives a name's own tree.
+ */
+export function unexpand(node, named) {
+    const visit = (n, top) => {
+        if (!top && n.from !== undefined) return named(n.from);
+        const { id, from, ...rest } = n;
+        if (rest.args) rest.args = rest.args.map((a) => visit(a, false));
+        return rest;
+    };
+    return visit(node, true);
 }
 
 /**
@@ -46,7 +74,7 @@ export function substitute(tree, lookup) {
                 if (value) {
                     changed = true;
                     seen.add(name);
-                    const out = visit(bare(value));
+                    const out = { ...visit(bare(value)), from: name };   // where it came from, for editing
                     seen.delete(name);
                     return out;
                 }
@@ -57,7 +85,7 @@ export function substitute(tree, lookup) {
         return node;
     };
     const out = visit(tree);
-    return { tree: changed ? bare(out) : tree, changed };
+    return { tree: changed ? renumber(out) : tree, changed };
 }
 
 // ---- inputs ---------------------------------------------------------------------------------

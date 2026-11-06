@@ -30,7 +30,10 @@
 
 import { toHTML, treeOf } from './html.js';
 import { calculate } from './calculator.js';
-import { nameOf, bare, substitute, inputOf, variables as pageVariables } from './variables.js';
+import { nameOf, bare, substitute, unexpand, inputOf, EXPRESSIONS, variables as pageVariables } from './variables.js';
+import { toPostfix } from './mathzetta.js';
+import { numberTree, select, pathOf, nodeAt } from './select.js';
+import { openEditor, replaceAt } from './edit.js';
 
 export { createVariables, variables, Variables } from './variables.js';
 
@@ -44,7 +47,7 @@ const PLACEHOLDER = new RegExp(`${OPEN}(\\d+)${CLOSE}`, 'g');
 /**
  * The maths in a Markdown text, and the text with each piece replaced by a
  * placeholder (private-use characters, which no Markdown renderer touches).
- * @returns {{ text: string, math: Array<{ source, display, raw }> }}
+ * @returns {{ text: string, math: Array<{ source, display, raw, start, end }> }} (start, end: where the raw text is)
  */
 export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] } = {}) {
   const math = [];
@@ -53,7 +56,7 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
   const s = String(markdown);
   const atLineStart = (k) => k === 0 || s[k - 1] === '\n';
   const keep = (source, display, raw) => {
-    math.push({ source, display, raw });
+    math.push({ source, display, raw, start: i, end: i + raw.length });
     return placeholder(math.length - 1);
   };
   while (i < s.length) {
@@ -208,6 +211,7 @@ function drawAll(markdown, options, store, owner) {
     const scope = {};                                // what {{…}} sees: those and the saved variables' values
     const mine = new Map();
     const inputs = new Set();
+    const trees = [];   // each piece's drawn tree, for finding what a double-click landed on
     // the saved variables' values, for {{…}}: worked out until nothing more can be (B := 2A before A := 3)
     const refresh = () => {
         for (const k of Object.keys(scope)) delete scope[k];
@@ -230,8 +234,20 @@ function drawAll(markdown, options, store, owner) {
             if (left.length === pending.length) break;
             pending = left;
         }
+        // and their expressions, for a CAS block: {{diff(f, x)}} differentiates what f stands for
+        const expressions = {};
+        const plain = lookupFor({});
+        for (const name of defs.keys()) {
+            const tree = plain(name);
+            if (!tree) continue;
+            try {
+                expressions[name] = toPostfix(substitute(tree, (n) => (n === name ? null : plain(n))).tree);
+            } catch {
+                // an expression that can't be written as postfix: the CAS sees the name
+            }
+        }
+        scope[EXPRESSIONS] = expressions;
     };
-    refresh();
     const lookupFor = (drawOpts) => {
         const trees = new Map();
         return (name) => {
@@ -250,6 +266,8 @@ function drawAll(markdown, options, store, owner) {
         };
     };
 
+    refresh();
+
     const drawItem = (item, i) => {
         const { source, display } = item;
         const cls = display ? 'mv-md-display' : 'mv-md-math';
@@ -262,7 +280,7 @@ function drawAll(markdown, options, store, owner) {
                 const { name, input, hidden } = save;
                 const def = input
                     ? { name, text: input.default, input, key: `input:${JSON.stringify(input)}` }
-                    : { name, text: save.rhs, input: null, key: `expr:${save.rhs}` };
+                    : { name, text: save.rhs, input: null, key: `expr:${save.rhs}`, start: item.start, end: item.end };
                 let html = '';
                 if (input) {
                     const control = controlHTML(def, textOf(def));
@@ -270,7 +288,11 @@ function drawAll(markdown, options, store, owner) {
                     inputs.add(i);
                 } else {
                     const rhs = substitute(treeOf(save.rhs, drawOpts), lookupFor(drawOpts)).tree;
-                    if (!hidden) html = asDefinition(toHTML({ type: 'op', op: '=', args: [bare(treeOf(save.lhs)), bare(rhs)] }, drawOpts));
+                    if (!hidden) {
+                        const tree = numberTree({ type: 'op', op: '=', args: [bare(treeOf(save.lhs)), rhs.id === undefined ? rhs : bare(rhs)] });
+                        trees[i] = tree;
+                        html = asDefinition(toHTML(tree, drawOpts));
+                    }
                 }
                 defs.delete(name);
                 defs.set(name, def);
@@ -280,6 +302,8 @@ function drawAll(markdown, options, store, owner) {
                 return wrap(html, input ? ' mv-md-input-def' : '');
             }
             const { tree, changed } = substitute(treeOf(source, drawOpts), lookupFor(drawOpts));
+            if (changed) numberTree(tree);
+            trees[i] = tree;
             const html = toHTML(tree, drawOpts);
             if (!changed && options.define !== false && define(source, numbers, defs)) refresh();
             return wrap(html);
@@ -288,7 +312,7 @@ function drawAll(markdown, options, store, owner) {
         }
     };
     const drawn = math.map(drawItem);
-    return { text, math, drawn, defs: mine, inputs };
+    return { text, math, drawn, defs: mine, inputs, trees };
 }
 
 /** $r = 3$: remember r (exactly, as the calculator's text) for later {{…}} — unless r is a saved variable. */
@@ -521,6 +545,9 @@ function sweep() {
  * Draw Markdown with maths into an element, live: its variables join the page's store
  * (options.variables, default `variables`; false for none), its inputs set them, and its maths is
  * drawn again whenever a variable it can see changes. Drawing into the element again replaces it all.
+ * Double-clicking a part drawn from a textbox variable edits it ({ editable: { toText } }, toText
+ * from 'mathzetta/text'); any other part fires 'inlinemath:select' with where its maths is in the
+ * Markdown ({ index, start, end, raw }).
  */
 export function renderMarkdownInto(element, markdown, options = {}) {
     const store = options.variables === undefined ? pageVariables : options.variables || null;
@@ -568,8 +595,59 @@ export function renderMarkdownInto(element, markdown, options = {}) {
         }
         store.set(name, el.value);
     };
+    // double-click a part: a part that came from a textbox variable is edited there (in place,
+    // with options.editable = { toText }; else the textbox is focused); anything else tells the
+    // page where that maths is in the Markdown, as an 'inlinemath:select' event
+    const onDoubleClick = (event) => {
+        const part = event.target.closest?.('[data-node]');
+        const piece = part && part.closest('[data-mv-md]');
+        if (!piece || !element.contains(piece)) return;
+        const index = Number(piece.dataset.mvMd);
+        const tree = result.trees[index];
+        if (!tree) return;
+        const id = Number(part.dataset.node);
+        const path = pathOf(tree, id) || [];
+        // the innermost variable the part sits in
+        let at = null;
+        for (let k = path.length; k >= 0 && !at; k--) {
+            const n = nodeAt(tree, path.slice(0, k));
+            if (n && n.from !== undefined) at = { node: n, depth: k };
+        }
+        const def = at && store.definitions().get(at.node.from);
+        if (def && def.input && def.input.kind === 'textbox') {
+            event.preventDefault();
+            const name = def.name;
+            const box = element.ownerDocument.querySelector(`[data-mv-var="${CSS.escape(name)}"]`);
+            const toText = options.editable && options.editable.toText;
+            if (!toText) {
+                if (box) { box.focus(); box.select(); }
+                return;
+            }
+            const named = (n) => treeOf(n);
+            const node = nodeAt(tree, path);
+            openEditor(part, toText(unexpand(node, named)), {
+                label: `Edit ${name}`,
+                parse: (text) => treeOf(text, { blocks: options.blocks }),
+                commit: (typed) => {
+                    const whole = replaceAt(unexpand(at.node, named), path.slice(at.depth), typed);
+                    store.set(name, toText(whole));
+                },
+            });
+            return;
+        }
+        // a saved variable defined here: point at its definition rather than where it is used
+        const here = def && result.defs.get(def.name);
+        const item = here && here.key === def.key && here.start !== undefined
+            ? { ...result.math[index], start: here.start, end: here.end, raw: markdown.slice(here.start, here.end) }
+            : result.math[index];
+        element.dispatchEvent(new CustomEvent('inlinemath:select', {
+            bubbles: true,
+            detail: { index, start: item.start, end: item.end, raw: item.raw, source: item.source, id, path },
+        }));
+    };
     element.addEventListener('input', onInput);
     element.addEventListener('change', onInput);
+    element.addEventListener('dblclick', onDoubleClick);
     const unsubscribe = store.subscribe((from) => {
         if (from === element) return;
         if (!element.isConnected) {
@@ -584,6 +662,7 @@ export function renderMarkdownInto(element, markdown, options = {}) {
         unsubscribe();
         element.removeEventListener('input', onInput);
         element.removeEventListener('change', onInput);
+        element.removeEventListener('dblclick', onDoubleClick);
         live.delete(binding);
         bindings.delete(element);
         if (drop) store.own(element, null);

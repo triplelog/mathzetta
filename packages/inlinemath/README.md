@@ -34,7 +34,15 @@ view.set('2x + x^2', { animate: true });    // the next step: matching parts gli
 render(div, 'x^2', { announce: true });     // read each new step to a screen reader (a polite live region after the div)
 view.announce('Step 2: expand');            // your own words, through the same region
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
+view.editable({ toText, onEdit: ({ text }) => … }); // double-click a part (or F2 on it) to edit it in place
 ```
+
+**Editing a part.** `view.editable({ toText })` (`import { toText } from 'mathzetta/text'`; in the
+`<script>` build it is `InlineMath.toText`) opens a text box over a part when it is double-clicked,
+or when F2 is pressed on the part the keyboard is on, holding that part as text. Enter puts what
+was typed in its place (the rest of the expression glides over), Escape leaves it as it was, and
+text that doesn't read keeps the box open, marked. `onEdit` gets the new expression as a tree and
+as text, the edited part's path and what was typed; `view.edit(target)` opens the box from code.
 
 **Keyboard and screen readers.** Every drawing has an accessible name (`role="math"`, its spoken form for a listener
 who can't see it). Once a view listens for `'click'`, the drawing is one tab stop: the arrow keys walk its parts (Down
@@ -235,6 +243,10 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
   (Greek too), optionally with a subscript (`A_1`); a variable may use the ones before it
   (`$_B := 2A$`), and saving it again replaces it from there on. A plain `$r = 3$` still only
   remembers the number: r keeps being drawn as r.
+- **With the CAS:** `{ blocks: casBlocks() }` works out `{{der(x^2, x)}}` (also `diff`,
+  `derivative`, `d/dx …`), `{{integral(x^2, x)}}`, `{{solve(…, x)}}`, `{{factor(…)}}` …, and a
+  saved variable stands for its expression there: after `$_f := x^3 + 2x$`, `{{der(f, x)}}` is
+  3x² + 2.
 - **Inputs:** `$A := [[2+2]]$` is a textbox that sets A, `$f := [[x^2 | sin(x) | 2x]]$` a
   dropdown, `$n := [[1..10]]$` a slider (`[[0..1 step 0.05 = 0.5]]`: a step and a starting
   value); with `$_…$` only the input is shown. `renderMarkdownInto(el, text)` makes them live:
@@ -243,6 +255,13 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
   it. `variables.set('A', 'x^2')` sets one from code, `variables.get('A')` reads it;
   `{ variables: createVariables() }` gives a part a store of its own, `{ variables: false }` none.
   `markdownToHTML` is static: inputs drawn at their starting values.
+- **Editing by double-click:** in `renderMarkdownInto`, a part drawn from a textbox variable is
+  edited where it is drawn with `{ editable: { toText } }` (the whole variable is written back
+  into its textbox, so everything using it redraws); without `toText` the textbox is focused.
+  Double-clicking any other part fires `inlinemath:select` on the element with where that maths
+  is in the Markdown (`detail.start`, `detail.end`, `detail.raw`; for a part drawn from a
+  variable saved in the same text, where it was saved), so an editor beside it can select it.
+  `extractMath` gives every piece's `start` and `end` too.
 - **Dollars:** a `$` is maths only when it looks like it (Pandoc's rule): "$5 and $10"
   stays text, and `\$` is a dollar sign. Code spans and fences are left alone.
 - **Bad maths:** maths that doesn't read is shown as written, marked, with the reason as

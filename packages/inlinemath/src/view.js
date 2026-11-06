@@ -15,6 +15,10 @@
  * Left/Right between neighbours, Home or Escape back to the whole), Enter or
  * Space fires the click handlers for the current part, and each part is spoken.
  *
+ * view.editable({ toText }) (toText from 'mathzetta/text') lets the reader change it: double-click
+ * a part, or press F2 on the part the keyboard is on, and a text box opens over it; Enter puts
+ * the new text in its place, Escape leaves it. { onEdit } hears each change.
+ *
  * With { announce: true }, each set() after the first reads the new expression
  * to a screen reader through a polite live region placed after the element
  * (or pass your own live-region element as `announce`).
@@ -24,6 +28,7 @@ import { toSpeechSegments, toAudioSpeech } from './mathzetta.js';
 import { treeOf, layoutOptions } from './html.js';
 import { layout } from './layout.js';
 import { select, signature, pathOf, nodeAt } from './select.js';
+import { openEditor, replaceAt } from './edit.js';
 
 export class View {
     /**
@@ -56,8 +61,9 @@ export class View {
         this.element.innerHTML = layout(this.tree, layoutOptions(this.tree, this.options)).html;
         this.root = this.element.firstElementChild;
         if (this.handlers.length) this.root.classList.add(`${this.p}-clickable`);
+        if (this.editing) this.root.classList.add(`${this.p}-editable`);
         this.active = null;
-        if (this.clicks.length) this.focusable();
+        if (this.clicks.length || this.editing) this.focusable();
         if (before) this.morph(before, { duration, easing });
         if (isStep && this.live) this.announce(this.spoken());
         return this;
@@ -143,6 +149,56 @@ export class View {
         };
     }
 
+    // ---- editing a part in place ---------------------------------------------------
+
+    /**
+     * Let the reader edit the expression a part at a time (double-click, or F2 from the keyboard).
+     * @param {object} how
+     * @param {(node: object) => string} how.toText MathZetta's toText ('mathzetta/text')
+     * @param {(change: { tree, text, path, part }) => void} [how.onEdit] after each change: the
+     *   new expression (tree, and as text), where the edited part is and what was typed
+     */
+    editable({ toText, onEdit } = {}) {
+        if (typeof toText !== 'function') throw new Error("editable needs { toText } (import { toText } from 'mathzetta/text')");
+        this.editing = { toText, onEdit };
+        if (this.root && this.root.classList) this.root.classList.add(`${this.p}-editable`);
+        this.keyboard();
+        if (!this.editOn && this.element.addEventListener) {
+            this.editOn = true;
+            this.element.addEventListener('dblclick', (event) => {
+                const element = event.target.closest?.('[data-node]');
+                if (!element || !this.root.contains(element)) return;
+                event.preventDefault();
+                this.edit(select(this.tree, Number(element.dataset.node))[0]);
+            });
+        }
+        return this;
+    }
+
+    /** Open the text box over a part (a node, or any target select() takes). */
+    edit(target = this.tree, { returnFocus = false } = {}) {
+        if (!this.editing) throw new Error('call editable({ toText }) first');
+        const node = typeof target === 'object' && target && target.type ? target : this.nodes(target)[0];
+        if (!node) return null;
+        const path = pathOf(this.tree, node.id) || [];
+        const element = this.elementOf(node) || this.root;
+        let label = 'Edit';
+        try { label = `Edit ${toAudioSpeech(node)}`; } catch { /* the plain name will do */ }
+        const back = () => { if (returnFocus && this.root.focus) this.root.focus(); };
+        return openEditor(element, this.editing.toText(node), {
+            label,
+            parse: (text) => treeOf(text, this.options),
+            commit: (part, typed) => {
+                this.set(replaceAt(this.tree, path, part), { animate: true });
+                const inPlace = nodeAt(this.tree, path);
+                if (returnFocus && inPlace) this.focusPart(inPlace === this.tree ? null : inPlace);
+                back();
+                if (this.editing.onEdit) this.editing.onEdit({ tree: this.tree, text: this.editing.toText(this.tree), path, part: typed });
+            },
+            cancel: back,
+        });
+    }
+
     // ---- the keyboard: what a click does, without a pointer -----------------------
 
     /** Make the expression one tab stop, with the keys explained to a screen reader. */
@@ -151,7 +207,9 @@ export class View {
         this.root.setAttribute('tabindex', '0');
         // a focusable element needs a name: with { mathml: true } the drawing has none of its own (the MathML has it)
         if (!this.root.getAttribute('aria-label')) { this.root.setAttribute('role', 'math'); this.root.setAttribute('aria-label', this.spoken()); }
-        this.root.setAttribute('aria-description', 'Arrow keys move between parts, Enter selects one.');
+        this.root.setAttribute('aria-description', this.editing
+            ? 'Arrow keys move between parts, F2 edits one.'
+            : 'Arrow keys move between parts, Enter selects one.');
     }
 
     /** Listen for the keys once, on the element (it outlives every set()). */
@@ -173,6 +231,11 @@ export class View {
             case 'ArrowRight': next = at ? this.neighbour(at, 1) : this.partsOf(this.tree)[0]; break;
             case 'ArrowLeft': next = at ? this.neighbour(at, -1) : undefined; break;
             case 'Home': case 'Escape': next = null; break;
+            case 'F2':
+                if (!this.editing) return;
+                event.preventDefault();
+                this.edit(at || this.tree, { returnFocus: true });
+                return;
             case 'Enter': case ' ': {
                 event.preventDefault();
                 const node = at || this.tree;
