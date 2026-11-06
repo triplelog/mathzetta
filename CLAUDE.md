@@ -28,4 +28,4 @@ npm run build        # packages/mathzetta/build/ and packages/inlinemath/dist/ (
 - Each package keeps its own version. A release is `npm publish` in the package's folder.
 - Keep every existing test; update expectations only after reviewing the diff.
 - After changing mathzetta's parser, `evaluate` or `html`, the projects built on it outside this
-  repository have tests too (the calcstuff collection's `tools/test-all.sh`).
+  repository have tests too (the collection's `tools/test-all.sh`, in the folder above).
