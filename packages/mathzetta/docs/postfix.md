@@ -91,12 +91,20 @@ Variadic — a count token comes first:
 | `\sumidx` `\prodidx` | ∑ / ∏ with an index: body, from, to | `i 2 ^ i 1 = n 3 \sumidx` |
 | `()` `[]` `{}` | tuple, list, set | `1 2 3 3 {}` |
 | `(]` `[)` | half-open intervals | `0 1 2 (]` = (0, 1] |
+| `det` | the determinant of a matrix | `A det` |
+| `pmatrix` `bmatrix` `vmatrix` | a matrix in ( ), [ ] or \| \| (the determinant); each operand is a row, a `[]` list (an operand that isn't one is a row of one entry) | `1 2 2 [] 3 4 2 [] 2 bmatrix` |
 | `\:name` | a function the parser didn't know | `x y 2 \:f` = f(x, y) |
 
 `int` arguments, by count: `(f)`, `(f, x)` or `(f, a)`, `(f, x, a)` or
 `(f, a, b)`, `(f, x, a, b)` — the second argument is the variable when it
 is a single letter. `lim`: `(f)`, `(f, x→a)`, `(f, x, a)`, `(f, x, a, side)`
 where side `r`/`l` means from the right/left (`x→0^+` becomes `x, 0, r`).
+A matrix written as a list of equally long lists, `[[1, 2], [3, 4]]`, stays `[]` of `[]`
+(`1 2 2 [] 3 4 2 [] 2 []`); `calculate` and `evaluate` treat it as a matrix all the same
+(`*` is the matrix product, `^ n` a power, `^ T` the transpose), and drawings show it as one.
+`det` is the determinant (`A det`; `\det A` and `det(A)` read as it). `inv(A)`, `transpose(A)`,
+`trace(A)`, `rank(A)`, `rref(A)`, `identity(n)`, `dot(u, v)`, `cross(u, v)` and `linsolve(A, b)` are
+`\:name` functions the calculator knows; `A^T` (also `A^{\top}`) is the transpose there.
 `der(f, x, n)` is `der` applied n times; Leibniz notation `dy/dx` is
 `y x der`.
 

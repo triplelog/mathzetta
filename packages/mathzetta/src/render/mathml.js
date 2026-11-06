@@ -8,7 +8,7 @@
  * around a node are not tagged.
  */
 
-import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, derivativeOrder, bracketedSides, piecewise, bracketOp } from '../common.js';
+import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, derivativeOrder, bracketedSides, piecewise, bracketOp, MATRICES, matrixRows } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { isCustomFunction, precedenceOf } from '../operators.js';
 
@@ -61,7 +61,7 @@ const NAMED = {
     sin: 'sin', cos: 'cos', tan: 'tan', csc: 'csc', sec: 'sec', cot: 'cot',
     sinh: 'sinh', cosh: 'cosh', tanh: 'tanh', arcsin: 'arcsin', arccos: 'arccos', arctan: 'arctan',
     arcsinh: 'arcsinh', arccosh: 'arccosh', arctanh: 'arctanh', atan2: 'atan2',
-    ln: 'ln', max: 'max', min: 'min', gcd: 'gcd', mean: 'mean', round: 'round', fixed: 'fixed', random: 'random',
+    ln: 'ln', max: 'max', min: 'min', gcd: 'gcd', det: 'det', mean: 'mean', round: 'round', fixed: 'fixed', random: 'random',
 };
 
 const GROUPS = { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ']'], '[)': ['[', ')'] };
@@ -77,6 +77,13 @@ function operation(node) {
     if (isCustomFunction(op)) {
         const decorate = args.length === 1 && DECORATIONS[customName(op)];
         return decorate ? el('mrow', node, decorate(render(a))) : call(customName(op));
+    }
+    if (MATRICES[op]) {
+        const rows = node.args.map((r, i) => {
+            const cells = matrixRows(node)[i].map((c) => `<mtd>${render(c)}</mtd>`).join('');
+            return r.type === 'op' && r.op === '[]' ? el('mtr', r, cells) : `<mtr>${cells}</mtr>`;
+        });
+        return el('mrow', node, mo(MATRICES[op][0]) + `<mtable>${rows.join('')}</mtable>` + mo(MATRICES[op][1]));
     }
     if (GROUPS[op]) return el('mrow', node, mo(GROUPS[op][0]) + commas(args.map(render)) + mo(GROUPS[op][1]));
 

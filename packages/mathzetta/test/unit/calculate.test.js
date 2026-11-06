@@ -205,3 +205,47 @@ suite('calculate: options and lists', () => {
         eq(calculate('3 < x < 7', { x: 5 }).value, true);
     });
 });
+
+suite('calculate: matrices', () => {
+    const A = 'bmatrix([1, 2], [3, 4])';
+    test('the matrix product, powers, the inverse and the transpose, exactly', () => {
+        eq(T(`${A} * [[0, 1], [1, 0]]`), 'bmatrix([2, 1], [4, 3])');
+        eq(T('[[1, 2], [3, 4]] * [[5, 6], [7, 8]]'), '[[19, 22], [43, 50]]', 'a list of lists is a matrix');
+        eq(T(`${A}^2`), 'bmatrix([7, 10], [15, 22])');
+        eq(T(`${A}^(-1)`), 'bmatrix([-2, 1], [3/2, -1/2])');
+        eq(T(`${A}^T`), 'bmatrix([1, 3], [2, 4])');
+        eq(T(`${A}^T`, { T: 2 }), 'bmatrix([7, 10], [15, 22])', 'unless T has a value');
+        eq(T(`${A} / ${A}`), 'bmatrix([1, 0], [0, 1])');
+        eq(T('2 * pmatrix([1, 2], [3, 4]) + pmatrix([1, 1], [1, 1])'), 'pmatrix([3, 5], [7, 9])', 'entry by entry with a number, and +');
+    });
+    test('with vectors', () => {
+        eq(T(`${A} * [5, 6]`), '[17, 39]');
+        eq(T(`[1, 2] * ${A}`), '[7, 10]');
+        eq(T('[1, 2] * [3, 4]'), '[3, 8]', 'two lists: still entry by entry');
+        eq(T('dot([1, 2, 3], [4, 5, 6])'), '32');
+        eq(T('cross([1, 0, 0], [0, 1, 0])'), '[0, 0, 1]');
+        eq(T(`linsolve(${A}, [5, 6])`), '[-4, 9/2]');
+    });
+    test('determinants and the rest', () => {
+        eq(T('vmatrix([1, 2], [3, 4])'), '-2');
+        eq(T('\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}'), '-2');
+        eq(T('det([[1/2, 1/3], [1/4, 1/5]])'), '1/60');
+        eq(T(`det(${A})`), '-2');
+        eq(T(`trace(${A})`), '5');
+        eq(T('rank([[1, 2], [2, 4]])'), '1');
+        eq(T('rref([[1, 2, 3], [4, 5, 6]])'), '[[1, 0, -1], [0, 1, 2]]');
+        eq(T('identity(2)'), 'bmatrix([1, 0], [0, 1])');
+        eq(T('\\det A', { A: [[2, 0], [0, 3]] }), '6', 'det is a function like sin');
+        eq(T('inv(x)', { inv: (v) => v + 1, x: 1 }), '2', "a scope's own inv comes first");
+    });
+    test('no answer', () => {
+        throws(() => T('inv([[1, 2], [2, 4]])'), MathError);
+        throws(() => T(`${A} * [[1, 2, 3]]`), MathError);
+        throws(() => T('pmatrix([1, 2], [3])'), MathError);
+        throws(() => T(`${A}^(1/2)`), UnknownError);
+    });
+    test('{{…}} draws its answer as a matrix again', () => {
+        eq(calculateBlock(`${A}^2`), '(bmatrix([7, 10], [15, 22]))');
+        eq(parse(calculateBlock(`${A}^2`)).at(-1), 'bmatrix');
+    });
+});

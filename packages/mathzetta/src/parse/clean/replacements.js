@@ -158,6 +158,10 @@ export const SYMBOL_REPLACEMENTS = [
     ["\\to", "→"],
     ["\\max", "max"],
     ["\\min", "min"],
+    ["\\det", "det"],
+    // the transpose: A^{\top}, A^\intercal, A^{\mathsf{T}} are A^T
+    ["^{\\top}", "^{T}", true], ["^\\top", "^T", true], ["^{\\intercal}", "^{T}", true], ["^\\intercal", "^T", true],
+    ["^{\\mathsf{T}}", "^{T}", true], ["^{\\mathrm{T}}", "^{T}", true],
     ["product(", "prod("],
     ["log[", "log_["],
     ["\\log[", "log_["],

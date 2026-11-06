@@ -243,6 +243,10 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
   (Greek too), optionally with a subscript (`A_1`); a variable may use the ones before it
   (`$_B := 2A$`), and saving it again replaces it from there on. A plain `$r = 3$` still only
   remembers the number: r keeps being drawn as r.
+- **Matrices:** `\begin{pmatrix}…`, `bmatrix`, `vmatrix` (and `[[1, 2], [3, 4]]`) are drawn as
+  a grid in brackets as tall as it, and worked out exactly: `{{A^2}}`, `{{A^{-1}}}`, `{{A^T}}`,
+  `{{det(A)}}`, `{{A [5, 6]}}`, `{{linsolve(A, b)}}`. A saved variable can hold one:
+  `$_M := [[2, 1], [1, 3]]$` then `$M^2 = {{M^2}}$`.
 - **With the CAS:** `{ blocks: casBlocks() }` works out `{{der(x^2, x)}}` (also `diff`,
   `derivative`, `d/dx …`), `{{integral(x^2, x)}}`, `{{solve(…, x)}}`, `{{factor(…)}}` …, and a
   saved variable stands for its expression there: after `$_f := x^3 + 2x$`, `{{der(f, x)}}` is

@@ -81,3 +81,7 @@ x \to 0	x approaches 0	x approaches 0
 if x < 0.5 then 1 - r else r	if x is less than 0.5, then 1 minus r, otherwise r	if x is less than 0.5, then 1 minus r, otherwise r
 # a case nobody wrote (IF with no third argument, if … then with no else) is not read out (Nov 2026)
 IF(r > 0.5, 1)	if r is greater than 0.5, then 1	if r is greater than 0.5, then 1
+# matrices, and a list of equally long lists read as one (Nov 2026)
+\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}	the 2 by 2 matrix, row 1: 1, 2, row 2: 3, 4	the 2 by 2 matrix, row 1: 1, 2, row 2: 3, 4
+\begin{vmatrix} a & b \\ c & d \end{vmatrix}	the determinant of the 2 by 2 matrix, row 1: a, b, row 2: c, d	the determinant of the 2 by 2 matrix, row 1: a, b, row 2: c, d
+[[1, 2], [3, 4]]	the 2 by 2 matrix, row 1: 1, 2, row 2: 3, 4	the 2 by 2 matrix, row 1: 1, 2, row 2: 3, 4

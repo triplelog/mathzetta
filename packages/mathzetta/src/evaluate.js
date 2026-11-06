@@ -9,6 +9,50 @@
 
 import { treeOf } from './input.js';
 import { expandChain } from './common.js';
+import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
+
+// ---- matrices (lists of equally long lists): the matrix product, powers, determinants -----------
+
+const M = matrixArithmetic({
+    add: (a, b) => a + b, sub: (a, b) => a - b, mul: (a, b) => a * b, div: (a, b) => a / b,
+    isZero: (x) => Math.abs(x) < 1e-12, zero: () => 0, one: () => 1, size: Math.abs,
+    fail: (message) => { throw new Error(message); },
+});
+const isMatrix = (v) => isMatrixValue(v) && (v.length > 1 || v[0].length > 1);
+const isVector = (v) => isVectorValue(v) && !isMatrix(v);
+/** Entry by entry, for lists and a number with a list. */
+const each = (f) => {
+    const g = (a, b) => {
+        if (Array.isArray(a) && Array.isArray(b)) {
+            if (a.length !== b.length) throw new Error('Lists of different lengths');
+            return a.map((x, i) => g(x, b[i]));
+        }
+        if (Array.isArray(a)) return a.map((x) => g(x, b));
+        if (Array.isArray(b)) return b.map((y) => g(a, y));
+        return f(a, b);
+    };
+    return g;
+};
+const times = (a, b) => {
+    if (isMatrix(a) && isMatrix(b)) return M.times(a, b);
+    if (isMatrix(a) && isVector(b)) return M.timesVector(a, b);
+    if (isVector(a) && isMatrix(b)) return M.vectorTimes(a, b);
+    return each((x, y) => x * y)(a, b);
+};
+const power = (a, b) => {
+    if (!isMatrix(a)) return Array.isArray(a) ? each((x, y) => x ** y)(a, b) : a ** b;
+    if (!Number.isInteger(b)) throw new Error('A matrix to a power that is not a whole number');
+    return M.power(a, BigInt(b));
+};
+/** det(A); det([[1, 2], [3, 4]]) arrives as one argument per row. */
+const matrixArg = (f) => (xs) => f(xs.length > 1 && xs.every(isVector) ? xs : xs[0]);
+const MATRIX_FUNCTIONS = {
+    det: matrixArg(M.det), inv: matrixArg(M.inverse), inverse: matrixArg(M.inverse), transpose: matrixArg(M.transpose),
+    trace: matrixArg(M.trace), tr: matrixArg(M.trace), rank: matrixArg(M.rank), rref: matrixArg(M.rref),
+    identity: ([n]) => M.identity(n), dot: ([u, v]) => M.dot(u, v), cross: ([u, v]) => M.cross(u, v),
+    linsolve: ([A, b]) => M.solve(A, b),
+};
+const rowsOf = (node, scope) => node.args.map((r) => (r.type === 'op' && r.op === '[]' ? r.args.map((c) => value(c, scope)) : [value(r, scope)]));
 
 const CONSTANTS = {
     pi: Math.PI, 'π': Math.PI, e: Math.E, tau: 2 * Math.PI, 'τ': 2 * Math.PI,
@@ -41,7 +85,7 @@ const gcd2 = (a, b) => (b ? gcd2(b, a % b) : Math.abs(a));
 
 const ONE = {
     neg: (a) => -a, pm: (a) => [a, -a], '!': factorial, '\\not': (a) => !a,
-    sqrt: Math.sqrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil,
+    sqrt: Math.sqrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil, det: (A) => M.det(A),
     ln: Math.log, loglog: (a) => Math.log(Math.log(a)), logloglog: (a) => Math.log(Math.log(Math.log(a))),   // ln ln, as every renderer and calculate()
     expm1: Math.expm1,
     sin: Math.sin, cos: Math.cos, tan: Math.tan,
@@ -52,8 +96,11 @@ const ONE = {
 };
 
 const TWO = {
-    '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b, '/': (a, b) => a / b,
-    '^': (a, b) => a ** b, mod: (a, b) => a % b,
+    '+': (a, b) => (Array.isArray(a) || Array.isArray(b) ? each((x, y) => x + y)(a, b) : a + b),
+    '-': (a, b) => (Array.isArray(a) || Array.isArray(b) ? each((x, y) => x - y)(a, b) : a - b),
+    '*': times,
+    '/': (a, b) => (isMatrix(b) ? times(a, M.inverse(b)) : Array.isArray(a) || Array.isArray(b) ? each((x, y) => x / y)(a, b) : a / b),
+    '^': power, mod: (a, b) => a % b,
     log: (base, x) => Math.log(x) / Math.log(base),
     root: (n, x) => x ** (1 / n),
     atan2: Math.atan2,
@@ -138,7 +185,14 @@ function value(node, scope) {
         return value(statement, scope) % n;
     }
 
+    if (op === 'pmatrix' || op === 'bmatrix') return rowsOf(node, scope);
+    if (op === 'vmatrix') return M.det(rowsOf(node, scope));
+    if (op === '^' && args[1].type === 'symbol' && args[1].value === 'T' && !Object.prototype.hasOwnProperty.call(scope, 'T')) {
+        const m = value(args[0], scope);
+        if (isMatrix(m)) return M.transpose(m);
+    }
     const vals = args.map((a) => value(a, scope));
+    if (op.startsWith('\\:') && Object.prototype.hasOwnProperty.call(MATRIX_FUNCTIONS, op.slice(2))) return MATRIX_FUNCTIONS[op.slice(2)](vals);
     if (ONE[op] && vals.length === 1) return ONE[op](vals[0]);
     if (TWO[op] && vals.length === 2) return TWO[op](vals[0], vals[1]);
     if (MANY[op]) return MANY[op](vals);
@@ -175,4 +229,4 @@ function membership(node, scope) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [CONSTANTS, ONE, TWO, MANY, NUMBER_SETS]) Object.setPrototypeOf(table, null);
+for (const table of [CONSTANTS, ONE, TWO, MANY, NUMBER_SETS, MATRIX_FUNCTIONS]) Object.setPrototypeOf(table, null);

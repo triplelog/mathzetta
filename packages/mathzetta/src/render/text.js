@@ -4,7 +4,7 @@
  */
 
 import { needsParens, isCustomFunction } from '../operators.js';
-import { GREEK, bracketOp, unaryNeedsBrackets, isMinusOneTimes, isVariable, firstLeaf, customName, derivativeOrder, guardLength } from '../common.js';
+import { GREEK, bracketOp, unaryNeedsBrackets, isMinusOneTimes, isVariable, firstLeaf, customName, derivativeOrder, guardLength, MATRICES, matrixRows } from '../common.js';
 import { firstVariable } from '../tree.js';
 
 export function toPlainText(node) {
@@ -44,6 +44,7 @@ function operation(node, render) {
         return `${base.startsWith('-') ? `(${base})` : base}^${side(b, 'right')}`;
     }
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
+    if (MATRICES[op]) return `${op}(${matrixRows(node).map((r) => `[${r.map(render).join(', ')}]`).join(', ')})`;
     if (GROUPS[op]) return GROUPS[op][0] + list() + GROUPS[op][1];
     if (isCustomFunction(op)) return `${customName(op)}(${list()})`;
 

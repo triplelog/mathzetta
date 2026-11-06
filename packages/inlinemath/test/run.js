@@ -391,6 +391,19 @@ test('markdown: CAS blocks see saved variables as their expressions, under any o
     assert.deepEqual(md('$_p := x^2 - 4$ ${{solve(p = 0, x)}}$'), ['x equals negative 2 or x equals 2']);
 });
 
+test('matrices: a grid in brackets, rows addressable, worked out', () => {
+    const html = toHTML('\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}');
+    assert.match(html, /class="mv-matrix" style="grid-template-columns:repeat\(2,auto\)/);
+    assert.equal((html.match(/mv-matrix-cell/g) || []).length, 4);
+    assert.match(html, /mv-n mv-op mv-op-list mv-matrix-row" data-node="\d+"/, 'a row is a node');
+    assert.match(toHTML('\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'), /mv-vert/, 'bars');
+    assert.match(toHTML('[[1, 2], [3, 4]]'), /mv-matrix/, 'a list of lists is drawn as one');
+    assert.doesNotMatch(toHTML('[[1, 2], [3]]'), /mv-matrix"/, 'rows of different lengths stay a list');
+    assert.match(toHTML('{{bmatrix([1, 2], [3, 4])^2}}'), /aria-label="the 2 by 2 matrix, row 1: 7, 10, row 2: 15, 22"/);
+    assert.deepEqual(spoken(markdownToHTML('$_M := [[2, 1], [1, 3]]$ $M^2 = {{M^2}}$ ${{det(M)}}$')),
+        ['the 2 by 2 matrix, row 1: 2, 1, row 2: 1, 3, end matrix, squared equals the 2 by 2 matrix, row 1: 5, 5, row 2: 5, 10', '5']);
+});
+
 // ---- untrusted text, links, the CAS blocks (from a review before publishing) ---------------
 
 {

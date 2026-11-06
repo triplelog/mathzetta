@@ -6,7 +6,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength } from '../common.js';
+import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -78,7 +78,7 @@ const GROUPS = { '()': ['(', ')'], '{}': ['(', ')'], '[]': ['ARRAY[', ']'], '(]'
 // are only allowed as the right side of ∈ / ∉.
 const SQLITE_UNSUPPORTED = new Set([
     '!', 'gcd', 'perm', 'comb', 'der', 'int', 'lim', '\\sumidx', '\\prodidx',
-    '±', 'pm', '∪', '∩', '_', '→',
+    '±', 'pm', '∪', '∩', '_', '→', 'pmatrix', 'bmatrix', 'vmatrix', 'det',
 ]);
 
 const SQLITE_FUNCTIONS = { max: 'MAX', min: 'MIN' };
@@ -102,6 +102,8 @@ function operation(node, render, options) {
     if (op === '+' && isText(node)) return `${render(a)} || ${render(b)}`;   // joining text
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
+    if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
+    if (MATRICES[op]) return `ARRAY[${matrixRows(node).map((r) => `ARRAY[${r.map(render).join(', ')}]`).join(', ')}]`;
     if (GROUPS[op]) return GROUPS[op][0] + list() + GROUPS[op][1];
     if (isCustomFunction(op)) {
         // f(x) names no SQL function of ours, and a name in SQL could be anything the database has

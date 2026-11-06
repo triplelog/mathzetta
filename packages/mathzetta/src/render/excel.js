@@ -20,7 +20,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength } from '../common.js';
+import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -61,7 +61,7 @@ function leaf(node, opts) {
 }
 
 const FUNCTIONS = {
-    sqrt: 'SQRT', abs: 'ABS', floor: 'INT', ln: 'LN',
+    sqrt: 'SQRT', abs: 'ABS', floor: 'INT', ln: 'LN', det: 'MDETERM',
     sin: 'SIN', cos: 'COS', tan: 'TAN',
     sinh: 'SINH', cosh: 'COSH', tanh: 'TANH', arcsin: 'ASIN', arccos: 'ACOS', arctan: 'ATAN',
     arcsinh: 'ASINH', arccosh: 'ACOSH', arctanh: 'ATANH',
@@ -123,6 +123,13 @@ function operation(node, render, opts) {
         const name = customName(op);
         if (!(typeof opts.functions === 'function' ? opts.functions(name) : (opts.functions ?? []).some((f) => f.toLowerCase() === name.toLowerCase())) || !/^[A-Za-z_][\w.]*$/.test(name)) fail(`the function ${name}(…)`);
         return `${name}(${list()})`;
+    }
+    if (MATRICES[op]) {
+        // an array constant holds numbers only: {1,2;3,4}
+        const rows = matrixRows(node);
+        if (!rows.every((r) => r.every((c) => c.type === 'number' || (c.type === 'op' && c.op === 'neg' && c.args[0].type === 'number')))) fail('a matrix of anything but numbers');
+        const array = `{${rows.map((r) => r.map(render).join(',')).join(';')}}`;
+        return op === 'vmatrix' ? `MDETERM(${array})` : array;
     }
     if (operator(op)?.group) {
         if (args.length === 1) return `(${render(a)})`;

@@ -98,6 +98,9 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 /* ---- piecewise ------------------------------------------------------------- */
 .mv-cases { display: inline-grid; grid-template-columns: auto auto; column-gap: 1em; row-gap: 0.25em; align-items: baseline; text-align: left; margin: 0 0.1em; }
 .mv-case-value, .mv-case-cond { display: block; }
+.mv-matrix { display: inline-grid; column-gap: 0.8em; row-gap: 0.3em; align-items: baseline; justify-items: center; margin: 0 0.15em; }
+.mv-matrix-row { display: contents; }
+.mv-matrix-cell { display: block; }
 
 /* ---- decorations: \boxed \cancel \overline \vec … --------------------------- */
 .mv-boxed { display: inline-block; border: 0.06em solid currentColor; padding: 0.16em 0.2em; }

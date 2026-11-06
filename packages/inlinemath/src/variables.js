@@ -99,7 +99,8 @@ const SLIDER = new RegExp(`^(${NUMBER})\\s*\\.\\.\\s*(${NUMBER})(?:\\s+step\\s+(
  */
 export function inputOf(text) {
     const m = /^\s*\[\[([\s\S]*)\]\]\s*$/.exec(text);
-    if (!m) return null;
+    // [[2, 1], [1, 3]] is a matrix (rows of a list), not an input
+    if (!m || /\]\s*,\s*\[/.test(m[1])) return null;
     const inner = m[1].trim();
     const range = SLIDER.exec(inner);
     if (range) {

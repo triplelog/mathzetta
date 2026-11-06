@@ -36,7 +36,7 @@ export {
 // How a tree reads when written out — shared by every outputter, and by Inline Math.
 export {
     GREEK, bracketOp, needsBrackets, unaryNeedsBrackets, isImplicitProduct, bracketedSides, isMinusOneTimes,
-    startsWithSign, isVariable, firstLeaf, smallWhole, customName, derivativeOrder,
+    startsWithSign, isVariable, firstLeaf, smallWhole, customName, derivativeOrder, MATRICES, matrixRows,
 } from './common.js';
 
 /** Is this array well-formed standard postfix? */

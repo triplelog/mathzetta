@@ -28,6 +28,7 @@
 
 import { asTree, firstVariable } from './tree.js';
 import { expandChain } from './common.js';
+import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 import { evaluate as floatEvaluate } from './evaluate.js';
 import { parseTree, setBlockHandler } from './parse/index.js';
 
@@ -181,7 +182,11 @@ function fromJS(v) {
         if (/^-?(\d+\.?\d*|\.\d+)(\.\.)?$/.test(v.trim())) return X(decimalToQ(v));
         return calc(parseTree(v), {});   // '1/3', 'sqrt(2)'
     }
-    if (Array.isArray(v)) return group(v.map(fromJS), v.group || '()');
+    if (Array.isArray(v)) {
+        // a JS array of equally long arrays is a matrix: [[1, 2], [3, 4]]
+        if (!v.group && isMatrixValue(v)) return group(v.map((r) => group(r.map(fromJS), '[]')), '[]');
+        return group(v.map(fromJS), v.group || '()');
+    }
     if (isX(v) || typeof v === 'function') return v;
     throw new UnknownError(`can't use ${typeof v} as a value`);
 }
@@ -599,11 +604,78 @@ const ONE = {
     pm: (a) => group([a, neg(a)], 'pm'),
     '\\not': (a) => !truthy(a),
 };
+ONE.det = (a) => MATRIX_FUNCTIONS.det(a);
 for (const f of ['sin', 'cos', 'tan', 'csc', 'sec', 'cot']) ONE[f] = each1((a) => trig(f, a));
 for (const f of ['arcsin', 'arccos', 'arctan']) ONE[f] = each1((a) => inverseTrig(f, a));
 
+// ---- matrices: a list of equally long lists ([[1, 2], [3, 4]]) or a pmatrix / bmatrix ----------
+
+const MATRIX_KINDS = new Set(['pmatrix', 'bmatrix']);
+/** A matrix value: rows (each a [] list) of entries, marked pmatrix, bmatrix, or a list of lists. */
+const isMatrix = (v) => isMatrixValue(v) && (MATRIX_KINDS.has(v.group) || (v.group === '[]' && v.every((r) => r.group === '[]') && (v.length > 1 || v[0].length > 1)));
+const isVector = (v) => isVectorValue(v) && !isMatrix(v) && v.group !== 'pm';
+const M = matrixArithmetic({
+    add, sub, mul, div,
+    isZero: (x) => (isX(x) ? x.c.n === 0n : Math.abs(num(x)) < 1e-12),
+    zero: () => rat(0), one: () => rat(1),
+    size: (x) => Math.abs(num(x)),
+    fail: (message) => { throw new MathError(message); },
+    make: (rows, like) => group(rows.map((r) => group(r, '[]')), like && like.group ? like.group : 'bmatrix'),
+});
+const asVector = (xs, like) => group(xs, like && like.group ? like.group : '[]');
+/** det(A), and det([[1, 2], [3, 4]]), whose brackets are read as the call's: its rows arrive one per argument. */
+const matrixOnly = (name, f) => (...vs) => {
+    const v = vs.length > 1 && vs.every(isVector) ? group(vs.map((r) => group(r, '[]')), '[]') : vs[0];
+    if (vs.length > 1 && v === vs[0]) throw new UnknownError(`${name} of more than one thing`);
+    if (!isMatrix(v)) throw new UnknownError(`${name} of something that isn't a matrix`);
+    return f(v);
+};
+
+/** A × B: the matrix product for matrices (and a matrix with a vector), entry by entry otherwise. */
+function times(a, b) {
+    if (isMatrix(a) && isMatrix(b)) return M.times(a, b);
+    if (isMatrix(a) && isVector(b)) return asVector(M.timesVector(a, b), b);
+    if (isVector(a) && isMatrix(b)) return asVector(M.vectorTimes(a, b), a);
+    return mul(a, b);
+}
+
+/** A / B is A · B⁻¹ when B is a matrix. */
+const over = (a, b) => (isMatrix(b) ? times(a, M.inverse(b)) : div(a, b));
+
+/** A^n: a matrix power (n < 0 uses the inverse). */
+function power(a, b) {
+    if (!isMatrix(a)) return pow(a, b);
+    const n = wholeOf(b);
+    if (n === null) throw new UnknownError('a matrix to a power that is not a whole number');
+    return M.power(a, n);
+}
+
+/** Matrix functions, written det(A), inv(A) …; a scope's own function of the same name comes first. */
+const MATRIX_FUNCTIONS = {
+    det: matrixOnly('det', M.det),
+    inv: matrixOnly('inv', M.inverse), inverse: matrixOnly('inverse', M.inverse),
+    transpose: matrixOnly('transpose', M.transpose),
+    trace: matrixOnly('trace', M.trace), tr: matrixOnly('tr', M.trace),
+    rank: matrixOnly('rank', (A) => rat(M.rank(A))),
+    rref: matrixOnly('rref', M.rref),
+    identity: (n) => { const k = wholeOf(n); if (k === null || k < 1n || k > 100n) throw new UnknownError('identity(n) needs a whole number n'); return M.identity(Number(k)); },
+    dot: (u, v) => { if (!isVector(u) || !isVector(v)) throw new UnknownError('dot of something that isn\'t a vector'); return M.dot(u, v); },
+    cross: (u, v) => { if (!isVector(u) || !isVector(v)) throw new UnknownError('cross of something that isn\'t a vector'); return asVector(M.cross(u, v), u); },
+    linsolve: (A, b) => {
+        if (!isMatrix(A) || !(isMatrix(b) || isVector(b))) throw new UnknownError('linsolve(A, b) needs a matrix and a vector');
+        return isMatrix(b) ? M.solve(A, b) : asVector(M.solve(A, b), b);
+    },
+};
+
+/** pmatrix(…) and bmatrix(…): each argument a row ([] list, or one entry). */
+function matrixOf(node, v) {
+    const rows = node.args.map((r) => group(r.type === 'op' && r.op === '[]' ? r.args.map(v) : [v(r)], '[]'));
+    if (rows.some((r) => r.length !== rows[0].length)) throw new MathError('rows of different lengths');
+    return group(rows, node.op === 'vmatrix' ? 'bmatrix' : node.op);
+}
+
 const TWO = {
-    '+': add, '-': sub, '*': mul, '/': div, '^': pow,
+    '+': add, '-': sub, '*': times, '/': over, '^': power,
     '±': (a, b) => group([add(a, b), sub(a, b)], 'pm'),
     mod: each2(modV),
     log: each2(log),
@@ -656,9 +728,18 @@ function calc(node, env) {
     if (op === 'lim') return limit(args, env);
     if (op === '\\sumidx' || op === '\\prodidx') return series(op === '\\sumidx', args, env);
     if (['()', '[]', '{}'].includes(op)) return group(args.map(v), op);
+    if (op === 'pmatrix' || op === 'bmatrix') return matrixOf(node, v);
+    if (op === 'vmatrix') return M.det(matrixOf(node, v));
+    // A^T: the transpose, unless T has a value
+    if (op === '^' && args[1].type === 'symbol' && args[1].value === 'T' && !Object.prototype.hasOwnProperty.call(env, 'T')) {
+        const m = v(args[0]);
+        if (isMatrix(m)) return M.transpose(m);
+    }
     if (DELEGATED.includes(op)) return delegate(node, env);
     if (op.startsWith('\\:')) {
-        const f = env[op.slice(2)];
+        const name = op.slice(2);
+        if (typeof env[name] !== 'function' && Object.prototype.hasOwnProperty.call(MATRIX_FUNCTIONS, name)) return MATRIX_FUNCTIONS[name](...args.map(v));
+        const f = env[name];
         if (typeof f !== 'function') throw new UnknownError(`no function ${op.slice(2)}`);
         return fromJS(f(...args.map((a) => toJS(v(a)))));
     }
@@ -1014,6 +1095,7 @@ function format(v, o) {
     if (v && v.kind === 's') return JSON.stringify(v.text);
     if (Array.isArray(v)) {
         if (v.group === 'pm' && v.length === 2 && equal(v[1], neg(v[0]))) return `±${wrapped(v[0], o)}`;
+        if (MATRIX_KINDS.has(v.group) && isMatrixValue(v)) return `${v.group}(${v.map((r) => `[${r.map((x) => format(x, o)).join(', ')}]`).join(', ')})`;
         const [open, close] = { '()': '()', '[]': '[]', '{}': '{}' }[v.group] || '{}';
         return open + v.map((x) => format(x, o)).join(', ') + close;
     }
@@ -1159,3 +1241,5 @@ setBlockHandler(calculateBlock);
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
 for (const table of [LIMITS, SIN_TABLE, CONSTANTS, ONE, TWO, MANY]) Object.setPrototypeOf(table, null);
+
+Object.setPrototypeOf(MATRIX_FUNCTIONS, null);

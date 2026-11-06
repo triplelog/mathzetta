@@ -228,3 +228,22 @@ export function guardLength(text) {
     if (text.length > MAX_OUTPUT) throw new Error('The output would be too long');
     return text;
 }
+
+/** The matrix operators and the brackets each is written with. */
+export const MATRICES = { pmatrix: ['(', ')'], bmatrix: ['[', ']'], vmatrix: ['|', '|'] };
+
+/**
+ * A matrix's rows, each an array of entry nodes — for a pmatrix, bmatrix or vmatrix node (an
+ * argument that isn't a [] list is a row of one entry), or for a list of equally long lists
+ * written as one, [[1, 2], [3, 4]] (two rows or more, or one row of two or more). Else null.
+ */
+export function matrixRows(node) {
+    if (!node || node.type !== 'op') return null;
+    if (Object.prototype.hasOwnProperty.call(MATRICES, node.op)) {
+        return node.args.map((r) => (r.type === 'op' && r.op === '[]' ? r.args : [r]));
+    }
+    if (node.op !== '[]' || !node.args.length || !node.args.every((r) => r.type === 'op' && r.op === '[]')) return null;
+    const n = node.args[0].args.length;
+    if (!n || !node.args.every((r) => r.args.length === n) || (node.args.length < 2 && n < 2)) return null;
+    return node.args.map((r) => r.args);
+}

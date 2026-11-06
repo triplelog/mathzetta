@@ -114,6 +114,10 @@ export function firstLeaf(node: Node): string;
 export function smallWhole(node: Node, limit: number): number;
 export function customName(op: string): string;
 export function derivativeOrder(node: Node): { n: number; body: Node; by: Node; variable: boolean };
+/** The matrix operators (pmatrix, bmatrix, vmatrix) and the brackets each is written with. */
+export const MATRICES: { pmatrix: [string, string]; bmatrix: [string, string]; vmatrix: [string, string] };
+/** A matrix's rows (arrays of entry nodes): a pmatrix/bmatrix/vmatrix node, or a list of equally long lists; else null. */
+export function matrixRows(node: Node): Node[][] | null;
 
 // ---- outputters ------------------------------------------------------------------
 

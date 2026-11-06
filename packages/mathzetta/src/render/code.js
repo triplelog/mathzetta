@@ -10,7 +10,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength } from '../common.js';
+import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { JS_HELPERS } from '../js-helpers.js';
 
@@ -34,6 +34,8 @@ const JS = {
     round: (v, d) => (d === '0' ? `Math.round(${v})` : `Math.round(${v} * Math.pow(10, ${d})) / Math.pow(10, ${d})`),
     fixed: (v, d) => `Number(${v}).toFixed(${d})`,   // a string with exactly d decimals
     derivative: (f, x) => `derivative(${f}, ${x})`,
+    matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
+    det: (m) => `det(${m})`,
     integral: (parts) => `integrate(${parts.join(', ')})`,
     limit: (parts) => `limit(${parts.join(', ')})`,
     indexed: (kind, idx, lower, condition, body) => kind === 'sum'
@@ -61,6 +63,8 @@ const PY = {
     round: (v, d) => `round(${v}, ${d})`,
     fixed: (v, d, literal) => (literal === null ? `format(${v}, '.' + str(${d}) + 'f')` : `format(${v}, '.${literal}f')`),   // a string with exactly d decimals
     derivative: (f, x) => `sympy.diff(${f}, ${x})`,
+    matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
+    det: (m) => `numpy.linalg.det(${m})`,
     integral: (parts, f, v, bounds) => (bounds
         ? `scipy.integrate.quad(lambda ${v}: ${f}, ${bounds.join(', ')})[0]`
         : `sympy.integrate(${f}, sympy.Symbol(${JSON.stringify(v)}))`),
@@ -92,6 +96,8 @@ const NP = {
     math: (fn) => `np.${NP_NAMES[fn] ?? fn}`,
     list: { ...PY.list, '{}': ['[', ']'] },   // np.isin reads a set as one object
     abs: 'np.abs', random: 'np.random.random()',
+    matrix: (rows) => `np.array(${PY.matrix(rows)})`,
+    det: (m) => `np.linalg.det(${m})`,
     both: (a, b) => `np.logical_and(${a}, ${b})`, either: (a, b) => `np.logical_or(${a}, ${b})`, not: (x) => `np.logical_not(${x})`,
     close: (a, b) => `np.isclose(${a}, ${b})`,
     ternary: (c, t, f) => `np.where(${c}, ${t}, ${f})`,
@@ -174,6 +180,8 @@ const SY = {
     true: S('true'), false: S('false'), null: 'None',
     math: (fn) => S({ log: 'log', asin: 'asin', acos: 'acos', atan: 'atan', asinh: 'asinh', acosh: 'acosh', atanh: 'atanh', atan2: 'atan2', expm1: 'expm1', ceil: 'ceiling' }[fn] ?? fn),
     abs: S('Abs'), random: 'random.random()',
+    matrix: (rows) => `sympy.Matrix(${PY.matrix(rows)})`,
+    det: (m) => `${m}.det()`,
     both: (a, b) => `sympy.And(${a}, ${b})`, either: (a, b) => `sympy.Or(${a}, ${b})`, not: (x) => `sympy.Not(${x})`,
     close: (a, b) => `sympy.Abs((${a}) - (${b})) < sympy.Rational(1, 10**9)`,
     exactNumber: (v) => {
@@ -331,7 +339,7 @@ const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '?:', 'mea
 
 /** What SymPy always writes as a call (sympy.factorial(n), sympy.Eq(a, b)): never bracketed again. */
 const SY_CALLS = new Set(['!', 'perm', 'comb', 'mod', 'pmod', '=', '===', '≡', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor',
-    '?:', '∈', '∉', '∪', '∩', 'der', 'int', 'lim', '\\sumidx', '\\prodidx', 'floor', 'ceil', 'ln', 'log', 'loglog', 'logloglog', 'root', 'max', 'min', 'gcd', 'csc', 'sec', 'cot', '{}']);
+    '?:', '∈', '∉', '∪', '∩', 'der', 'int', 'lim', '\\sumidx', '\\prodidx', 'floor', 'ceil', 'ln', 'log', 'loglog', 'logloglog', 'root', 'max', 'min', 'gcd', 'csc', 'sec', 'cot', '{}', 'pmatrix', 'bmatrix', 'vmatrix']);
 
 function codeBracketOp(node, lang = JS) {
     if (lang === SY && SY_CALLS.has(node.op)) return null;
@@ -378,6 +386,11 @@ function operation(node, render, lang) {
     if (special != null) return special;
     if (MATH_FUNCTIONS[op]) return `${lang.math(MATH_FUNCTIONS[op])}(${list()})`;
     if (RECIPROCALS[op]) return `1 / ${lang.math(RECIPROCALS[op])}(${render(a)})`;
+    if (op === 'det') return lang.det(render(a));
+    if (MATRICES[op]) {
+        const m = lang.matrix(matrixRows(node).map((r) => r.map(render)));
+        return op === 'vmatrix' ? lang.det(m) : m;
+    }
     if (lang.list[op]) return lang.list[op][0] + list() + lang.list[op][1];
     if (lang.eq[op]) return binary(lang.eq[op]);
     if (isCustomFunction(op)) return `${identifier(customName(op), lang)}(${list()})`;

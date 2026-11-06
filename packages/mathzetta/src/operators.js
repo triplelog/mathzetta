@@ -37,6 +37,7 @@ const table = {
 
     // ---- named functions of one argument ------------------------------------
     'sqrt': fn(1), 'abs': fn(1), 'floor': fn(1), 'ceil': fn(1),
+    'det': fn(1),       // the determinant of a matrix: det A, \\det A, |A| for a matrix written out (vmatrix)
     'ln': fn(1), 'loglog': fn(1), 'logloglog': fn(1), 'expm1': fn(1),
     'sin': fn(1), 'cos': fn(1), 'tan': fn(1), 'csc': fn(1), 'sec': fn(1), 'cot': fn(1),
     'sinh': fn(1), 'cosh': fn(1), 'tanh': fn(1),
@@ -62,6 +63,11 @@ const table = {
     'lim': fn(VARIADIC),       // lim(f, x→a) and longer forms
     '\\sumidx': fn(VARIADIC),  // ∑ with index:   body, from, to
     '\\prodidx': fn(VARIADIC), // ∏ with index:   body, from, to
+
+    // ---- matrices: each argument is a row, a [] list of its entries (or one entry) ----
+    'pmatrix': fn(VARIADIC),   // ( )   1 2 2 [] 3 4 2 [] 2 pmatrix
+    'bmatrix': fn(VARIADIC),   // [ ]
+    'vmatrix': fn(VARIADIC),   // | |   the determinant
 
     // ---- groups: tuples, lists, sets, intervals ----------------------------
     '()': group(), '[]': group(), '{}': group(), '(]': group(), '[)': group(),

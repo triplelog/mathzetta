@@ -20,6 +20,7 @@ export const PARSE_PRECEDENCE = {
     'sum': FUNCTION, 'prod': FUNCTION, '\\sumidx': FUNCTION, '\\prodidx': FUNCTION,
     'perm': FUNCTION, 'comb': FUNCTION, '\\perm': FUNCTION, '\\comb': FUNCTION, '\\binom': FUNCTION,
     'max': FUNCTION, 'min': FUNCTION, 'gcd': FUNCTION, 'mean': FUNCTION,
+    'pmatrix': FUNCTION, 'bmatrix': FUNCTION, 'vmatrix': FUNCTION, 'det': FUNCTION,
     'sin': FUNCTION, 'cos': FUNCTION, 'tan': FUNCTION, 'csc': FUNCTION, 'sec': FUNCTION, 'cot': FUNCTION,
     'sinh': FUNCTION, 'cosh': FUNCTION, 'tanh': FUNCTION,
     'arcsin': FUNCTION, 'arccos': FUNCTION, 'arctan': FUNCTION,

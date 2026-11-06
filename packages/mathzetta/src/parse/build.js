@@ -122,6 +122,9 @@ function normalize(name, args) {
             }
             break;
         }
+        case 'det':     // det([[1, 2], [3, 4]]): the call's brackets took the list's, so its rows arrive one by one
+            if (args.length > 1 && args.every((a) => a.type === 'op' && a.op === '[]')) return op('det', [op('[]', args)]);
+            break;
         case 'fixed':   // fixed(x) is two decimals, like a spreadsheet's FIXED
             if (args.length === 1) return op('fixed', [args[0], num(2)]);
             break;

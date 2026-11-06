@@ -6,5 +6,5 @@ export {
     fromPostfix, toPostfix, validatePostfix, asTree, treeOf, walk, firstVariable, num, sym, op, leaf,
     operator, isOperator, operatorNames, precedenceOf, getOperatorPrecedence, needsParens, isCustomFunction, isNumeric, getSupportedOperations,
     GREEK, bracketOp, needsBrackets, unaryNeedsBrackets, isImplicitProduct, bracketedSides, isMinusOneTimes,
-    startsWithSign, isVariable, firstLeaf, smallWhole, customName, derivativeOrder,
+    startsWithSign, isVariable, firstLeaf, smallWhole, customName, derivativeOrder, MATRICES, matrixRows,
 } from './types.js';

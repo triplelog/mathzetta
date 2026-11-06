@@ -29,7 +29,7 @@
  */
 
 import { needsParens, isCustomFunction, CUSTOM_PREFIX } from '../operators.js';
-import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength } from '../common.js';
+import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -85,7 +85,7 @@ const identifier = (name) => name
 
 /** Functions GLSL has under another name, or the same one. */
 const BUILTIN = {
-    sqrt: 'sqrt', abs: 'abs', floor: 'floor', ceil: 'ceil', ln: 'log',
+    sqrt: 'sqrt', abs: 'abs', floor: 'floor', ceil: 'ceil', ln: 'log', det: 'determinant',
     sin: 'sin', cos: 'cos', tan: 'tan', arcsin: 'asin', arccos: 'acos', arctan: 'atan', atan2: 'atan',
 };
 
@@ -235,6 +235,24 @@ function operation(node, render, es3, filter = false) {
                 : `mod(${render(a)}, ${render(b)})`;
         case '∈': case '∉':
             return membership(node, render);
+        case 'pmatrix': case 'bmatrix': case 'vmatrix': {
+            const rows = matrixRows(node).map((r) => r.map(render));
+            const n = rows.length;
+            const square = rows.every((r) => r.length === n);
+            if (op === 'vmatrix') {   // written out: GLSL ES 1.0 has no determinant()
+                if (!square || n > 3) throw new Error('No GLSL for a determinant bigger than 3 by 3');
+                if (n === 1) return rows[0][0];
+                const m = rows.map((r) => r.map((c) => `(${c})`));
+                if (n === 2) return `(${m[0][0]} * ${m[1][1]} - ${m[0][1]} * ${m[1][0]})`;
+                const [[p, q, r0], [s, t, u], [v, w, x]] = m;
+                return `(${p} * (${t} * ${x} - ${u} * ${w}) - ${q} * (${s} * ${x} - ${u} * ${v}) + ${r0} * (${s} * ${w} - ${t} * ${v}))`;
+            }
+            // GLSL's matrices are column by column
+            if (square && n >= 2 && n <= 4) return `mat${n}(${rows[0].map((_, c) => rows.map((r) => r[c]).join(', ')).join(', ')})`;
+            const flat = rows.flat();
+            if ((n === 1 || rows.every((r) => r.length === 1)) && flat.length >= 2 && flat.length <= 4) return `vec${flat.length}(${flat.join(', ')})`;
+            throw new Error(`No GLSL for a ${n} by ${rows[0].length} matrix`);
+        }
         case '()': case '[]': case '{}': case '(]': case '[)':
             return args.length >= 2 && args.length <= 4 ? `vec${args.length}(${list()})` : `float[](${list()})`;
         case '∪':

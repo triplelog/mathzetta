@@ -2,7 +2,7 @@
  * Tree → LaTeX (KaTeX-compatible).
  */
 
-import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, bracketOp, derivativeOrder, bracketedSides, piecewise } from '../common.js';
+import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, bracketOp, derivativeOrder, bracketedSides, piecewise, MATRICES, matrixRows } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { isCustomFunction, precedenceOf } from '../operators.js';
 
@@ -71,7 +71,7 @@ const NAMED = {
     sinh: '\\sinh', cosh: '\\cosh', tanh: '\\tanh',
     arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan',
     arcsinh: '\\sinh^{-1}', arccosh: '\\cosh^{-1}', arctanh: '\\tanh^{-1}',
-    ln: '\\ln', max: '\\max', min: '\\min', gcd: '\\gcd',
+    ln: '\\ln', max: '\\max', min: '\\min', gcd: '\\gcd', det: '\\det',
     round: '\\text{round}', fixed: '\\text{fixed}', atan2: '\\text{atan2}',
     random: '\\text{random}',
 };
@@ -87,6 +87,7 @@ function operation(node, render) {
 
     if (COMPARISONS[op]) return `${side(a, 'left')} ${COMPARISONS[op]} ${side(b, 'right')}`;
     if (NAMED[op]) return `${NAMED[op]}${paren(list())}`;
+    if (MATRICES[op]) return `\\begin{${op}}${matrixRows(node).map((r) => r.map(render).join(' & ')).join(' \\\\ ')}\\end{${op}}`;
     if (GROUPS[op]) return GROUPS[op][0] + list() + GROUPS[op][1];
     if (isCustomFunction(op)) {
         const fn = customName(op);

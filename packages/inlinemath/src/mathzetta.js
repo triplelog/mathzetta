@@ -13,5 +13,6 @@ export {
     operator, precedenceOf, isCustomFunction, VARIADIC,
     GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable,
     firstLeaf, customName, derivativeOrder, bracketedSides, bracketOp,
+    MATRICES, matrixRows,
 } from 'mathzetta';
 export { toSpeech, toSpeechSegments, toAudioSpeech } from 'mathzetta/speech';

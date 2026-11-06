@@ -122,6 +122,8 @@ export function defineDefaultOperators() {
   for (const name of ['max', 'min', 'gcd', 'mean', 'sum', 'prod']) defineOperator({ symbol: name, arity: VARIADIC, label: name });
   // Groups: tuples, lists, sets, intervals.
   for (const name of ['()', '[]', '{}', '(]', '[)']) defineOperator({ symbol: name, arity: VARIADIC, label: 'group' });
+  // Matrices: each operand a row ([] list); pmatrix ( ), bmatrix [ ], vmatrix | | (the determinant). Carried, not rewritten.
+  for (const name of ['pmatrix', 'bmatrix', 'vmatrix']) defineOperator({ symbol: name, arity: VARIADIC, label: 'matrix' });
   // Comparisons, sets and logic are carried, not evaluated.
   for (const name of ['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '∈', '∉', '∪', '∩', '≈', '≡', '→', 'pmod',
     '&', '|', '\\xor', '\\nand', '\\nor']) {

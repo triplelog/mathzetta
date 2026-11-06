@@ -45,6 +45,15 @@ const KNOWN = [
         'ℚ has no test in code (a double is always a fraction): it is written as a set known by name'],
     [['∞', 'Infinity + NaN', '(-\\infty, 0) \\cup (0,\\infty)'], ['sql'], "PostgreSQL's ∞ is the string 'Infinity'"],
     [['[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]'], ['sql'], 'PostgreSQL has no matrix product'],
+    [['\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}', '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}', 'bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['sql', 'glsl'],
+        'a matrix as a PostgreSQL array or a GLSL mat2 is written but not read back'],
+    [['[[1, 2], [3, 4]]'], ['sql'], 'a PostgreSQL array of arrays is written but not read back'],
+    [['\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}', '\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}'], ['excel'],
+        "a spreadsheet's array constant {1,2;3,4} (and MDETERM) is written but not read back"],
+    [['bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['javascript', 'python', 'numpy', 'sympy'],
+        'a column of one-entry rows, [[x], [y]], reads back as the list [x, y]: the product is the same numbers, one level of brackets less'],
+    [['\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}', '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'], ['sympy'],
+        "SymPy's determinant is a method, Matrix(…).det(), which the reader doesn't take apart"],
 ];
 
 const known = new Map();

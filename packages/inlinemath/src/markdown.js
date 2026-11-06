@@ -222,7 +222,8 @@ function drawAll(markdown, options, store, owner) {
             const left = pending.filter((def) => {
                 try {
                     const r = calculate(textOf(def), scope);
-                    if (typeof r.value === 'number' || typeof r.value === 'bigint') {
+                    // a number, or a matrix (or list): {{M^2}} works it out
+                    if (typeof r.value === 'number' || typeof r.value === 'bigint' || Array.isArray(r.value)) {
                         scope[def.name] = r.exact ? r.text : r.value;
                         return false;
                     }

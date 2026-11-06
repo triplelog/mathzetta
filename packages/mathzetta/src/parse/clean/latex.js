@@ -11,7 +11,7 @@
  *   \int_a^b f dx         int(f,x,a,b)
  *   ⌊x⌋  ⌈x⌉              floor(x)  ceil(x)
  *   \binom56              \binom{5}{6}
- *   \begin{matrix}..      [[a, b], [c, d]]
+ *   \begin{pmatrix}..     pmatrix([a, b], [c, d])   (bmatrix, vmatrix too; other kinds [[a, b], [c, d]])
  *   log(x, b)             log_{b}(x)
  *   a ? b : c             a ?(b)?: c
  *   if a then b else c    ((a) ? (b) : (c))      (no else: the value `unchanged`)
@@ -298,7 +298,9 @@ function rootIndexToArgument(input) {
     return input;
 }
 
-/** After `\begin{`: a matrix environment → nested lists, or false. */
+const MATRIX_KINDS = new Set(['pmatrix', 'bmatrix', 'vmatrix']);
+
+/** After `\begin{`: a matrix environment → pmatrix([a, b], [c, d]) (also b, v) or nested lists, or false. */
 function matrixToLists(input) {
     const close = input.indexOf('}');
     const open = input.indexOf('{');
@@ -314,7 +316,10 @@ function matrixToLists(input) {
         .map((row) => row.trim())
         .filter((row) => row.length)
         .map((row) => '[' + row.replace(/&/g, ', ') + ']');
-    return '[' + rows.join(', ') + ']' + input.slice(end + 6 + kind.length);
+    const rest = input.slice(end + 6 + kind.length);
+    // ( ), [ ] and | | keep their brackets as a matrix operator; the others are lists of rows
+    if (MATRIX_KINDS.has(kind)) return kind + '(' + rows.join(', ') + ')' + rest;
+    return '[' + rows.join(', ') + ']' + rest;
 }
 
 /** Read `_x` or `_{...}` (and likewise `^`) at input[at]; returns [text, next index]. */

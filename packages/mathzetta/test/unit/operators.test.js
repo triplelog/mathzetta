@@ -6,6 +6,8 @@ import { toLaTeX, toMathML, toJavaScript, toPython, toSQL, toText, toSpeech, toG
 suite('operator table', () => {
     // A node for every operator, with as many arguments as it takes.
     const sample = (name) => {
+        // a matrix's arguments are its rows: [[a, b], [c, d]]
+        if (['pmatrix', 'bmatrix', 'vmatrix'].includes(name)) return op(name, [op('[]', [sym('a'), sym('b')]), op('[]', [sym('c'), sym('d')])]);
         const { arity } = operator(name);
         const count = arity === VARIADIC ? 3 : arity;
         return op(name, ['a', 'b', 'c'].slice(0, count).map(sym));
@@ -15,6 +17,7 @@ suite('operator table', () => {
     for (const name of operatorNames()) {
         for (const [format, render] of Object.entries(formats)) {
             test(`${name} renders with ${format}`, () => {
+                if ((name === 'vmatrix' || name === 'det') && format === 'toSQL') return throws(() => render(sample(name)), /^No SQL for a determinant/);
                 const out = render(sample(name));
                 if (typeof out !== 'string' || !out.length) throw new Error('empty output');
             });
@@ -24,7 +27,7 @@ suite('operator table', () => {
     // SQLite has no function for these; the sqlite dialect throws rather than
     // writing SQL that fails later. Everything else must render.
     const SQLITE_UNSUPPORTED = new Set(['!', 'gcd', 'perm', 'comb', 'der', 'int', 'lim',
-        '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '_', '→']);
+        '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '_', '→', 'pmatrix', 'bmatrix', 'vmatrix', 'det']);
     for (const name of operatorNames()) {
         test(`${name} renders with toSQL sqlite`, () => {
             const node = sample(name);
@@ -42,7 +45,8 @@ suite('operator table', () => {
     }
 
     // Spreadsheets have no symbolic maths, ±, sets to combine, or an index into a list: toExcel says so.
-    const EXCEL_UNSUPPORTED = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '→']);
+    const EXCEL_UNSUPPORTED = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '→',
+        'pmatrix', 'bmatrix', 'vmatrix']);   // matrices: of numbers only (the sample's entries are letters)
     for (const name of operatorNames()) {
         test(`${name} renders with toExcel`, () => {
             const node = sample(name);

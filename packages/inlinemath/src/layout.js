@@ -21,7 +21,7 @@
 import {
     GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable,
     firstLeaf, customName, derivativeOrder, bracketedSides, bracketOp, firstVariable,
-    isCustomFunction, precedenceOf, toAudioSpeech,
+    isCustomFunction, precedenceOf, toAudioSpeech, MATRICES, matrixRows,
 } from './mathzetta.js';
 import { svg } from './glyphs.js';
 
@@ -42,6 +42,7 @@ const OP_CLASS = {
     '&': 'and', '|': 'or', '\\not': 'not', '\\xor': 'xor', '\\nand': 'nand', '\\nor': 'nor', '?:': 'cases',
     '()': 'tuple', '[]': 'list', '{}': 'set', '(]': 'interval', '[)': 'interval',
     '\\sumidx': 'sum', '\\prodidx': 'prod', 'mod': 'mod', 'pmod': 'pmod',
+    pmatrix: 'matrix', bmatrix: 'matrix', vmatrix: 'matrix',
 };
 
 const RELATIONS = {
@@ -54,7 +55,7 @@ const BINARY = { '±': '±', '∪': '∪', '∩': '∩', 'mod': 'mod' };
 const TRIG = ['sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'sinh', 'cosh', 'tanh'];
 const INVERSE = { arcsin: 'sin', arccos: 'cos', arctan: 'tan', arcsinh: 'sinh', arccosh: 'cosh', arctanh: 'tanh' };
 /** Functions written with a name and, when the argument is simple, no brackets: sin x, ln x. */
-const NAMED = [...TRIG, ...Object.keys(INVERSE), 'ln'];
+const NAMED = [...TRIG, ...Object.keys(INVERSE), 'ln', 'det'];
 /** Functions always written with brackets: max(a, b). */
 const CALLS = { atan2: 'atan2', max: 'max', min: 'min', gcd: 'gcd', mean: 'mean', round: 'round', fixed: 'fixed', expm1: 'expm1', random: 'random' };
 
@@ -216,6 +217,8 @@ class Layout {
         if (NAMED.includes(op) || op === 'log') return wrap(this.named(node, ctx));
         if (CALLS[op]) return wrap(row(this.word(CALLS[op]), this.fence(this.list(args, ctx))));
         if (isCustomFunction(op)) return wrap(this.custom(node, ctx));
+        const rows = matrixRows(node);   // pmatrix, bmatrix, vmatrix, and [[1, 2], [3, 4]]
+        if (rows) return wrap(this.matrix(node, rows, ctx));
         if (GROUPS[op]) return wrap(this.fence(this.list(args, ctx), ...GROUPS[op]));
         if (RELATIONS[op] && args.length === 2) return wrap(row(side(a, 'left'), this.rel(RELATIONS[op]), side(b, 'right')));
         if (BINARY[op] && args.length === 2) return wrap(row(side(a, 'left'), this.bin(BINARY[op]), side(b, 'right')));
@@ -575,6 +578,28 @@ class Layout {
         return row(op, body);
     }
 
+    /**
+     * A matrix: a grid of entries, centred on the maths axis, in brackets as tall as it is. Each
+     * row that is a list in the tree is an element of its own (display: contents), so a row can
+     * be pointed at like any part.
+     */
+    matrix(node, rows, ctx) {
+        const ROWGAP = 0.3;
+        const cells = rows.map((r) => r.map((c) => this.render(c, ctx)));
+        const heights = cells.map((r) => ({ h: Math.max(LH, ...r.map((b) => b.h)), d: Math.max(LD, ...r.map((b) => b.d)) }));
+        const total = heights.reduce((s, x) => s + x.h + x.d, 0) + ROWGAP * (rows.length - 1);
+        const lift = AXIS + total / 2 - heights[0].h;   // the first row's baseline
+        const html = cells.map((r, i) => {
+            const inner = r.map((b) => this.el('matrix-cell', b.html)).join('');
+            const tree = node.args[i];
+            return tree && tree.type === 'op' && tree.op === '[]' ? this.wrap(tree, ['op', 'op-list', 'matrix-row'], box(inner)).html : inner;
+        }).join('');
+        const columns = rows[0].length;
+        const grid = box(this.el('matrix', html, `grid-template-columns:repeat(${columns},auto);vertical-align:${em(lift)}`), AXIS + total / 2, total / 2 - AXIS);
+        const [open, close] = MATRICES[node.op] ?? ['[', ']'];
+        return this.fence(grid, open, close);
+    }
+
     /** c ? a : b  →  a brace with "a  if c", "b  otherwise". Nested ternaries add rows. */
     cases(node, ctx) {
         const rows = [];
@@ -602,7 +627,7 @@ function isSimpleArgument(node, inScript = false) {
     if (node.type === 'number') return !node.value.startsWith('-') || inScript;
     if (node.type === 'symbol') return true;
     if (node.type !== 'op') return false;
-    if (node.op === 'abs') return !inScript;
+    if (node.op === 'abs' || matrixRows(node)) return !inScript;   // |x| and a matrix bring their own brackets
     if (inScript && (node.op === 'neg' || node.op === '^')) return isSimpleArgument(node.args[0], true) && (node.op === 'neg' || isSimpleArgument(node.args[1], true));
     if (node.op === '*' && !isMinusOneTimes(node)) {
         return node.args.every((c) => (c.type === 'number' && !c.value.startsWith('-')) || isShortSymbol(c) || (c.op === '*' && isSimpleArgument(c, inScript)));

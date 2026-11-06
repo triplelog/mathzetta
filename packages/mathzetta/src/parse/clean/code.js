@@ -8,6 +8,7 @@
  *   np.where(c, a, b), a if c else b   ((c) ? (a) : (b))
  *   np.logical_and(a, b), a ^^ b       ((a) & (b)), a \xor b
  *   np.isin(x, [1, 2]), [1, 2].includes(x), contains(S, x), x IN (1, 2)    x ∈ {1, 2}
+ *   np.array([[1, 2], [3, 4]]), sympy.Matrix(…), np.linalg.det(A)          [[1, 2], [3, 4]], det(A)
  *   math.isclose(a, b)                 ((a) ≈ (b))
  *   Number.isInteger(x), float(x).is_integer(), Number.isFinite(x)          x ∈ ℤ, x ∈ ℝ
  *   math.factorial(n), mz_factorial(n), FACTORIAL(n)                        (n)!
@@ -249,6 +250,9 @@ const NP_BARE = {
 
 function prefixes(text) {
     text = text.replace(/(?<![\w.])(?:np|numpy)\.random\.random\(\s*\)|(?<![\w.])random\.random\(\s*\)/g, 'Math.random()');
+    // matrices: np.array([[1, 2], [3, 4]]) is the list of lists; np.linalg.det(A) is det(A)
+    text = text.replace(/(?<![\w.])(?:np|numpy)\.linalg\.(det|inv)\b/g, '$1');
+    text = text.replace(/(?<![\w.])(?:np|numpy)\.array\s*\(/g, '(');
     text = text.replace(/(?<![\w.])(?:np|numpy)\.(\w+)/g, (whole, name) => {
         if (NP_AS_MATH[name]) return `Math.${NP_AS_MATH[name]}`;
         if (NP_BARE[name]) return NP_BARE[name];
@@ -276,6 +280,7 @@ const SYMPY_CALLS = {
     Piecewise: 'sympy_piecewise', FiniteSet: 'sympy_set', Interval: 'sympy_interval', Contains: 'sympy_contains',
     Union: 'union', Intersection: 'intersection', diff: 'derivative', integrate: 'sympy_integrate', limit: 'sympy_limit',
     summation: 'sympy_summation', product: 'sympy_product', expm1: 'expm1',
+    Matrix: '',   // sympy.Matrix([[1, 2], [3, 4]]): the list of lists
 };
 const SYMPY_INTERVALS = { open: '()', Lopen: '(]', Ropen: '[)' };
 

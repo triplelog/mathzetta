@@ -45,7 +45,7 @@
  * every rule except these.
  */
 
-import { isMinusOneTimes, derivativeOrder, customName, GREEK, isUnchanged } from '../common.js';
+import { isMinusOneTimes, derivativeOrder, customName, GREEK, isUnchanged, matrixRows } from '../common.js';
 import { operator, isCustomFunction, precedenceOf } from '../operators.js';
 import { firstVariable } from '../tree.js';
 
@@ -69,6 +69,7 @@ export const WORDS = {
     limitAs: 'the limit as', fromTheRight: 'from the right', fromTheLeft: 'from the left',
     sumFrom: 'the sum from', sumOver: 'the sum over', sumOf: 'the sum of',
     productFrom: 'the product from', productOver: 'the product over', productOf: 'the product of',
+    matrix: (rows, columns) => `the ${rows} by ${columns} matrix`, row: (n) => `row ${n}`, determinantOf: 'the determinant of',
     theSet: 'the set', theList: 'the list', openInterval: 'the open interval from', closedInterval: 'the closed interval from',
     halfOpenInterval: 'the half-open interval from', comma: ',', if: 'if', then: 'then', otherwise: 'otherwise',
     infinity: 'infinity', pi: 'pi', e: 'e', delta: 'delta', randomNumber: 'a random number',
@@ -79,7 +80,7 @@ export const WORDS = {
     // where a group ends, said by toAudioSpeech() only (and dropped at the end of the expression)
     endQuantity: 'end quantity', endFraction: 'end fraction', endRoot: 'end root', endExponent: 'end exponent',
     endSub: 'end sub', endAbsoluteValue: 'end absolute value', endFloor: 'end floor', endCeiling: 'end ceiling',
-    endLimit: 'end limit', endSum: 'end sum', endProduct: 'end product', endDerivative: 'end derivative',
+    endLimit: 'end limit', endSum: 'end sum', endMatrix: 'end matrix', endProduct: 'end product', endDerivative: 'end derivative',
     // "one half", "two thirds": numerators 1–9 and denominators 2–10 (ordinals[d] names 1/d)
     half: 'half', halves: 'halves', ordinals: ['', '', 'half', 'third', 'quarter', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'],
     numerators: ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
@@ -94,7 +95,7 @@ export const NAMES = {
     arcsinh: 'inverse hyperbolic sine', arccosh: 'inverse hyperbolic cosine', arctanh: 'inverse hyperbolic tangent',
     ln: 'the natural log', log: 'log', loglog: 'the log of the log', logloglog: 'the log of the log of the log',
     expm1: 'e to the power, minus 1, of', max: 'the maximum', min: 'the minimum', gcd: 'the greatest common divisor',
-    mean: 'the mean', atan2: 'the arctangent', round: 'round', fixed: 'fixed', random: 'random',
+    mean: 'the mean', det: 'the determinant', atan2: 'the arctangent', round: 'round', fixed: 'fixed', random: 'random',
 };
 
 /** Greek letters by name: α → "alpha". */
@@ -361,7 +362,12 @@ class Speaker {
             case '()':
                 if (args.length === 2) return [me(w.openInterval), ...this.speak(a), me(w.to), ...this.speak(b)];
                 return list();
+            case 'pmatrix': case 'bmatrix':
+                return this.matrix(node);
+            case 'vmatrix':
+                return [me(w.determinantOf), ...this.matrix(node)];
             case '[]':
+                if (matrixRows(node)) return this.matrix(node);   // [[1, 2], [3, 4]]
                 if (args.length === 2) return [me(w.closedInterval), ...this.speak(a), me(w.to), ...this.speak(b)];
                 return [me(w.theList), ...list()];
             case '(]': case '[)':
@@ -380,6 +386,19 @@ class Speaker {
                 return this.bigOperator(node, w.productFrom, w.productOver, w.productOf, 'endProduct');
         }
         throw new Error(`No speech for '${op}'`);
+    }
+
+    /** "the 2 by 2 matrix, row 1: 1, 2, row 2: 3, 4" (and ", end matrix" for a listener). */
+    matrix(node) {
+        const w = this.w;
+        const rows = matrixRows(node);
+        const out = [this.seg(node, w.matrix(rows.length, rows[0].length))];
+        rows.forEach((cells, i) => {
+            const row = node.args[i];
+            out.push(this.seg(node, w.comma), this.seg(row.type === 'op' && row.op === '[]' ? row : node, `${w.row(i + 1)}:`));
+            cells.forEach((c, k) => out.push(...(k ? [this.seg(node, w.comma)] : []), ...this.speak(c)));
+        });
+        return [...out, ...this.closer(node, 'endMatrix')];
     }
 
     /** The arguments of a call: "x", "2 x", "the quantity x plus 1,", or "a, b, c". */
