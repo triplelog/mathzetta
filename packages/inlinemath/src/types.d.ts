@@ -132,7 +132,39 @@ export interface MarkdownOptions {
     render?: (markdown: string) => string;
     /** Which of '$$', '$', '\\[', '\\(' mark maths (default all). */
     delimiters?: string[];
+    /**
+     * The saved variables ($A := 2+2$) the maths may use. markdownToHTML: none by default;
+     * renderMarkdownInto: the page's `variables` by default, false for none.
+     */
+    variables?: Variables | false | null;
 }
+/** What a saved variable is: its expression, or the input that sets it. */
+export interface VariableDefinition {
+    name: string;
+    text: string;
+    input: null | { kind: 'textbox'; default: string } | { kind: 'dropdown'; options: string[]; default: string } | { kind: 'slider'; min: number; max: number; step: number; default: string };
+    key: string;
+}
+/** A page's saved variables: every part drawn with renderMarkdownInto sees the others'. */
+export class Variables {
+    /** A variable's expression now (what its input holds, for an input), or undefined. */
+    get(name: string): string | undefined;
+    /** Set a variable: what its input holds, or (with no input) a definition for the whole page. */
+    set(name: string, text: string | number): this;
+    /** Forget a variable set with set(), or everything. */
+    clear(name?: string): this;
+    /** The saved names. */
+    names(): string[];
+    /** Called whenever a variable changes; returns a function that stops it. */
+    subscribe(fn: (owner: unknown, name?: string) => void): () => void;
+    definitions(except?: unknown): Map<string, VariableDefinition>;
+    textOf(def: VariableDefinition): string;
+    own(owner: unknown, defs: Map<string, VariableDefinition> | null): void;
+}
+/** A store of its own, for parts of a page that shouldn't share variables. */
+export function createVariables(): Variables;
+/** The page's store, renderMarkdownInto's default. */
+export const variables: Variables;
 export function markdownToHTML(markdown: string, options?: MarkdownOptions): string;
 export function renderMarkdownInto<E extends Element>(element: E, markdown: string, options?: MarkdownOptions): E;
 export function extractMath(markdown: string, options?: { delimiters?: string[] }): { text: string; math: Array<{ source: string; display: boolean; raw: string }> };

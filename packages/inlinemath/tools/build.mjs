@@ -52,7 +52,7 @@ const globalEntry = (kind) => ({
     resolveId: (id) => (id === VIRTUAL ? id : null),
     load: (id) => (id === VIRTUAL
         ? [kind.startsWith('lite') ? `export * from ${JSON.stringify(join(ROOT, `src/${kind}.js`))};` : `export * from ${JSON.stringify(join(ROOT, 'src/index.js'))};`,
-            kind.startsWith('lite') ? '' : `export { markdownToHTML, extractMath, renderMarkdown, renderMarkdownInto } from ${JSON.stringify(join(ROOT, 'src/markdown.js'))};`,
+            kind.startsWith('lite') ? '' : `export { markdownToHTML, extractMath, renderMarkdown, renderMarkdownInto, createVariables, variables } from ${JSON.stringify(join(ROOT, 'src/markdown.js'))};`,
             kind === 'cas' ? `export { mathCAS, casBlocks, stepsHTML, tokensOf } from ${JSON.stringify(join(ROOT, 'src/cas.js'))};` : '',
             `import css from ${JSON.stringify(join(ROOT, 'inlinemath.css'))};`,
             `export const CSS = css;`,

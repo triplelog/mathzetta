@@ -7,8 +7,15 @@
  * Maths: $…$ inline, $$…$$ (or a ```math fence) on its own, \(…\) and \[…\] too.
  * Each is read by MathZetta (LaTeX, plain text or code all work) and drawn by
  * Inline Math; {{…}} inside is worked out first (MathZetta's calculator, or the CAS:
- * { blocks: casBlocks() } from '@mathzetta/inlinemath/cas'). A definition such as $r = 3$ or
- * $g := 9.81$ is remembered for the {{…}} after it ({ define: false } turns that off).
+ * { blocks: casBlocks() } from '@mathzetta/inlinemath/cas'). A definition such as $r = 3$ is
+ * remembered, as a number, for the {{…}} after it ({ define: false } turns that off).
+ *
+ * Saved variables: $A := 2+2$ saves A (and draws A ≔ 2 + 2); $_A := 2+2$ saves it without drawing.
+ * After it, A in any maths is drawn as its expression and {{A}} is its value: $A = {{A}}$ draws
+ * 2 + 2 = 4. $A := [[2+2]]$ is a textbox that sets A, [[2+2 | x^2]] a dropdown, [[1..10]] a slider
+ * ([[0..1 step 0.1 = 0.5]]). renderMarkdownInto keeps every part of a page in one store
+ * (`variables`), so a variable saved in one part is used in the others, and changing an input
+ * redraws everything that uses it.
  *
  * A $ is maths only when it looks like it (Pandoc's rule): the opening $ is not
  * followed by a space, the closing $ is not after a space or before a digit, so
@@ -21,8 +28,11 @@
  * the maths is taken out first and put back into its output.
  */
 
-import { toHTML } from './html.js';
+import { toHTML, treeOf } from './html.js';
 import { calculate } from './calculator.js';
+import { nameOf, bare, substitute, inputOf, variables as pageVariables } from './variables.js';
+
+export { createVariables, variables, Variables } from './variables.js';
 
 // ---- finding the maths --------------------------------------------------------------------
 
@@ -132,30 +142,171 @@ function closingDollar(s, from) {
 
 const escape = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** A definition: r = 3, g := 9.81 (a single name on the left). */
-const DEFINITION = /^\s*([A-Za-zͰ-Ͽ](?:_\{?\w+\}?)?)\s*(?::=|=)\s*([^=<>≤≥]+)$/;
+/** A definition: r = 3, g = 9.81 (a single name on the left) — remembered as a number for {{…}}. */
+const DEFINITION = /^\s*([A-Za-z\u0370-\u03ff](?:_\{?\w+\}?)?)\s*=\s*([^=<>≤≥]+)$/;
 
-function drawMath(item, options, scope) {
-  const { source, display } = item;
-  try {
-    const html = toHTML(source, { ...options.math, display, blocks: options.blocks, scope });
-    if (options.define !== false) define(source, scope);
-    return display ? `<span class="mv-md-display">${html}</span>` : `<span class="mv-md-math">${html}</span>`;
-  } catch (error) {
-    return `<span class="mv-md-error" title="${escape(error.message)}"><code>${escape(item.raw)}</code></span>`;
-  }
+/**
+ * Maths that saves a variable: `A := 2+2` (drawn), `_A := 2+2` or `_A = 2+2` (not drawn),
+ * `A := [[…]]` (an input). Else null; `{ error }` for a `$_…$` that saves nothing.
+ */
+function savingOf(source) {
+    let s = source.trim();
+    const hidden = s.startsWith('_');
+    if (hidden) s = s.slice(1).trimStart();
+    let at = s.indexOf(':=');
+    let width = 2;
+    if (at < 0 && hidden) {
+        at = s.search(/(?<![<>!≤≥=])=(?!=)/);
+        width = 1;
+    }
+    const nothing = hidden ? { error: 'a hidden $_…$ saves a variable: $_A := 2+2$' } : null;
+    if (at <= 0) return nothing;
+    const lhs = s.slice(0, at).trim();
+    const rhs = s.slice(at + width).trim();
+    let name = null;
+    try {
+        name = /\{\{/.test(lhs) ? null : nameOf(treeOf(lhs));
+    } catch {
+        // not a name
+    }
+    if (name === null || !rhs) return nothing;
+    return { hidden, lhs, name, rhs, input: inputOf(rhs) };
 }
 
-/** $r = 3$: remember r (exactly, as the calculator's text) for later {{…}}. */
-function define(source, scope) {
-  const m = DEFINITION.exec(source);
-  if (!m || /\{\{/.test(m[2])) return;
-  try {
-    const r = calculate(m[2], scope);
-    if (typeof r.value === 'number' || typeof r.value === 'bigint') scope[m[1].replace(/[{}]/g, '')] = r.exact ? r.text : r.value;
-  } catch {
-    // not a number (x = y + 1): nothing to remember
-  }
+/** `A = …` drawn as `A ≔ …`: the first relation is the definition's. */
+function asDefinition(html) {
+    return html
+        .replace('<span class="mv-rel">=</span>', '<span class="mv-rel mv-rel-def">≔</span>')
+        .replace(/(aria-label="[^"]*?) equals /, '$1 is defined as ')
+        .replace('<mo>=</mo>', '<mo>≔</mo>');
+}
+
+/** The input a definition's [[…]] asks for, holding `text`. */
+function controlHTML(def, text) {
+    const { input, name } = def;
+    const attrs = `class="mv-md-input mv-md-${input.kind}" data-mv-var="${escape(name)}" aria-label="${escape(name)}"`;
+    if (input.kind === 'dropdown') {
+        const options = input.options.map((o) => `<option value="${escape(o)}"${o === text ? ' selected' : ''}>${escape(o)}</option>`);
+        return `<select ${attrs}>${options.join('')}</select>`;
+    }
+    if (input.kind === 'slider') {
+        return `<input type="range" ${attrs} min="${input.min}" max="${input.max}" step="${input.step}" value="${escape(text)}">`
+            + `<output class="mv-md-output" data-mv-out="${escape(name)}">${escape(text)}</output>`;
+    }
+    return `<input type="text" ${attrs} value="${escape(text)}" size="${Math.max(4, text.length + 1)}" spellcheck="false" autocomplete="off">`;
+}
+
+/**
+ * Every piece of maths drawn, in reading order: a variable is known to the maths after it, and
+ * the variables already in `store` (the other parts of the page) to all of it.
+ */
+function drawAll(markdown, options, store, owner) {
+    const { text, math } = extractMath(markdown, options);
+    const defs = store ? store.definitions(owner) : new Map();
+    const textOf = (def) => (store ? store.textOf(def) : def.text);
+    const numbers = { ...(options.scope ?? {}) };   // options.scope and $r = 3$
+    const scope = {};                                // what {{…}} sees: those and the saved variables' values
+    const mine = new Map();
+    const inputs = new Set();
+    // the saved variables' values, for {{…}}: worked out until nothing more can be (B := 2A before A := 3)
+    const refresh = () => {
+        for (const k of Object.keys(scope)) delete scope[k];
+        Object.assign(scope, numbers);
+        for (const name of defs.keys()) delete scope[name];   // x^2 has no value: {{A}} draws A, drawn as x^2
+        let pending = [...defs.values()];
+        while (pending.length) {
+            const left = pending.filter((def) => {
+                try {
+                    const r = calculate(textOf(def), scope);
+                    if (typeof r.value === 'number' || typeof r.value === 'bigint') {
+                        scope[def.name] = r.exact ? r.text : r.value;
+                        return false;
+                    }
+                } catch {
+                    // not (yet) a number
+                }
+                return true;
+            });
+            if (left.length === pending.length) break;
+            pending = left;
+        }
+    };
+    refresh();
+    const lookupFor = (drawOpts) => {
+        const trees = new Map();
+        return (name) => {
+            const def = defs.get(name);
+            if (!def) return null;
+            if (!trees.has(name)) {
+                let tree = null;
+                try {
+                    tree = treeOf(textOf(def), drawOpts);
+                } catch {
+                    // an input holding something that doesn't read: A is drawn as A
+                }
+                trees.set(name, tree);
+            }
+            return trees.get(name);
+        };
+    };
+
+    const drawItem = (item, i) => {
+        const { source, display } = item;
+        const cls = display ? 'mv-md-display' : 'mv-md-math';
+        const wrap = (html, extra = '') => `<span class="${cls}${extra}" data-mv-md="${i}">${html}</span>`;
+        try {
+            const drawOpts = { ...options.math, display, blocks: options.blocks, scope };
+            const save = savingOf(source);
+            if (save && save.error) throw new Error(save.error);
+            if (save) {
+                const { name, input, hidden } = save;
+                const def = input
+                    ? { name, text: input.default, input, key: `input:${JSON.stringify(input)}` }
+                    : { name, text: save.rhs, input: null, key: `expr:${save.rhs}` };
+                let html = '';
+                if (input) {
+                    const control = controlHTML(def, textOf(def));
+                    html = hidden ? control : `${toHTML(save.lhs, drawOpts)}<span class="mv-md-assign" aria-hidden="true">≔</span>${control}`;
+                    inputs.add(i);
+                } else {
+                    const rhs = substitute(treeOf(save.rhs, drawOpts), lookupFor(drawOpts)).tree;
+                    if (!hidden) html = asDefinition(toHTML({ type: 'op', op: '=', args: [bare(treeOf(save.lhs)), bare(rhs)] }, drawOpts));
+                }
+                defs.delete(name);
+                defs.set(name, def);
+                mine.set(name, def);
+                refresh();
+                if (hidden && !input) return '';
+                return wrap(html, input ? ' mv-md-input-def' : '');
+            }
+            const { tree, changed } = substitute(treeOf(source, drawOpts), lookupFor(drawOpts));
+            const html = toHTML(tree, drawOpts);
+            if (!changed && options.define !== false && define(source, numbers, defs)) refresh();
+            return wrap(html);
+        } catch (error) {
+            return `<span class="mv-md-error" data-mv-md="${i}" title="${escape(error.message)}"><code>${escape(item.raw)}</code></span>`;
+        }
+    };
+    const drawn = math.map(drawItem);
+    return { text, math, drawn, defs: mine, inputs };
+}
+
+/** $r = 3$: remember r (exactly, as the calculator's text) for later {{…}} — unless r is a saved variable. */
+function define(source, numbers, saved) {
+    const m = DEFINITION.exec(source);
+    if (!m || /\{\{/.test(m[2])) return false;
+    const name = m[1].replace(/[{}]/g, '');
+    if (saved.has(name)) return false;
+    try {
+        const r = calculate(m[2], numbers);
+        if (typeof r.value === 'number' || typeof r.value === 'bigint') {
+            numbers[name] = r.exact ? r.text : r.value;
+            return true;
+        }
+    } catch {
+        // not a number (x = y + 1): nothing to remember
+    }
+    return false;
 }
 
 // ---- the Markdown renderer ----------------------------------------------------------------
@@ -329,6 +480,18 @@ export function renderMarkdown(markdown, options = {}, sourceOf = (t) => t) {
 
 // ---- together ---------------------------------------------------------------------------
 
+/** The Markdown around the drawn maths. */
+function assemble({ text, math, drawn }, options) {
+    const sourceOf = (t) => t.replace(PLACEHOLDER, (_, n) => math[Number(n)].raw);
+    const html = options.render ? options.render(text) : renderMarkdown(text, options, sourceOf);
+    return html
+        // display maths alone in a paragraph is a block of its own
+        .replace(new RegExp(`<p>\\s*${OPEN}(\\d+)${CLOSE}\\s*</p>`, 'g'), (whole, n) => (math[Number(n)].display && drawn[Number(n)] ? `<div class="mv-md-block">${drawn[Number(n)]}</div>` : whole))
+        .replace(PLACEHOLDER, (_, n) => drawn[Number(n)])
+        // a paragraph that only saved variables ($_A := 2+2$) leaves nothing behind
+        .replace(/<p>\s*<\/p>\n?/g, '');
+}
+
 /**
  * Markdown with maths → HTML.
  * @param {string} markdown
@@ -337,25 +500,96 @@ export function renderMarkdown(markdown, options = {}, sourceOf = (t) => t) {
  * @param {Function} [options.blocks] the {{…}} handler (default the calculator; casBlocks() for the CAS)
  * @param {object} [options.scope] values for {{…}}: { r: 3 }
  * @param {boolean} [options.define] remember $r = 3$ for later {{…}} (default true)
+ * @param {object} [options.variables] a store (createVariables()) whose variables the maths may use
  * @param {boolean} [options.html] let raw HTML through (default false: it is shown as text)
  * @param {(markdown: string) => string} [options.render] another Markdown renderer
  * @param {string[]} [options.delimiters] which of '$$', '$', '\\[', '\\(' mark maths (default all)
  */
 export function markdownToHTML(markdown, options = {}) {
-  const { text, math } = extractMath(markdown, options);
-  const scope = { ...(options.scope ?? {}) };
-  // drawn in reading order, so a definition is known to the maths after it
-  const drawn = math.map((item) => drawMath(item, options, scope));
-  const sourceOf = (t) => t.replace(PLACEHOLDER, (_, n) => math[Number(n)].raw);
-  const html = options.render ? options.render(text) : renderMarkdown(text, options, sourceOf);
-  return html
-    // display maths alone in a paragraph is a block of its own
-    .replace(new RegExp(`<p>\\s*${OPEN}(\\d+)${CLOSE}\\s*</p>`, 'g'), (whole, n) => (math[Number(n)].display ? `<div class="mv-md-block">${drawn[Number(n)]}</div>` : whole))
-    .replace(PLACEHOLDER, (_, n) => drawn[Number(n)]);
+    return assemble(drawAll(markdown, options, options.variables || null), options);
 }
 
-/** Draw Markdown with maths into an element. */
+const bindings = new WeakMap();
+const live = new Set();   // every bound element's binding, to notice the ones taken off the page
+
+/** Parts taken off the page take their variables with them. */
+function sweep() {
+    for (const b of live) if (b.connected() && !b.element.isConnected) b.stop(true);
+}
+
+/**
+ * Draw Markdown with maths into an element, live: its variables join the page's store
+ * (options.variables, default `variables`; false for none), its inputs set them, and its maths is
+ * drawn again whenever a variable it can see changes. Drawing into the element again replaces it all.
+ */
 export function renderMarkdownInto(element, markdown, options = {}) {
-  element.innerHTML = markdownToHTML(markdown, options);
-  return element;
+    const store = options.variables === undefined ? pageVariables : options.variables || null;
+    sweep();
+    const old = bindings.get(element);
+    if (old) old.stop(old.store !== store);
+    let result = drawAll(markdown, options, store, element);
+    element.innerHTML = assemble(result, options);
+    if (!store) {
+        bindings.delete(element);
+        return element;
+    }
+    store.own(element, result.defs);
+
+    let connected = element.isConnected;
+    const redraw = () => {
+        const next = drawAll(markdown, options, store, element);
+        next.drawn.forEach((html, i) => {
+            if (html === result.drawn[i] || next.inputs.has(i)) return;
+            const at = element.querySelector(`[data-mv-md="${i}"]`);
+            if (at) at.outerHTML = html;
+        });
+        // inputs for the same variable agree; a slider shows its value
+        for (const el of element.querySelectorAll('[data-mv-var], [data-mv-out]')) {
+            const def = next.defs.get(el.dataset.mvVar ?? el.dataset.mvOut);
+            if (!def) continue;
+            const text = store.textOf(def);
+            if (el.dataset.mvOut !== undefined) el.textContent = text;
+            else if (el.value !== text && el !== el.ownerDocument?.activeElement) el.value = text;
+        }
+        result = next;
+    };
+    const onInput = (event) => {
+        const el = event.target;
+        const name = el && el.dataset && el.dataset.mvVar;
+        if (name === undefined || !element.contains(el)) return;
+        if (el.type === 'text') {
+            try {
+                treeOf(el.value, { blocks: options.blocks, scope: {} });
+                el.removeAttribute('aria-invalid');
+            } catch {
+                el.setAttribute('aria-invalid', 'true');   // keeps what it held last
+                return;
+            }
+        }
+        store.set(name, el.value);
+    };
+    element.addEventListener('input', onInput);
+    element.addEventListener('change', onInput);
+    const unsubscribe = store.subscribe((from) => {
+        if (from === element) return;
+        if (!element.isConnected) {
+            if (connected) stop(true);   // taken off the page: its variables go with it
+            return;
+        }
+        connected = true;
+        sweep();
+        redraw();
+    });
+    function stop(drop) {
+        unsubscribe();
+        element.removeEventListener('input', onInput);
+        element.removeEventListener('change', onInput);
+        live.delete(binding);
+        bindings.delete(element);
+        if (drop) store.own(element, null);
+    }
+    const binding = { element, store, stop, connected: () => connected };
+    live.add(binding);
+    bindings.set(element, binding);
+    return element;
 }

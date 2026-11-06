@@ -227,8 +227,22 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
   `\(…\)` / `\[…\]`. MathZetta reads it, so LaTeX, plain text (`$sqrt(x)/2$`) and
   code all work.
 - **Working out:** `{{…}}` inside maths is worked out (the calculator, or the CAS with
-  `blocks`). A definition like `$r = 3$` or `$g := 9.81$` is remembered, exactly, for
-  the `{{…}}` after it (`define: false` turns that off; `scope: { r: 3 }` gives values).
+  `blocks`). A definition like `$r = 3$` is remembered, exactly, for the `{{…}}` after it
+  (`define: false` turns that off; `scope: { r: 3 }` gives values).
+- **Saved variables:** `$A := 2+2$` saves A (drawn A ≔ 2 + 2), and `$_A := 2+2$` saves it
+  without drawing anything. After that, A in any maths is drawn as its expression and `{{A}}`
+  is its value, so `$A = {{A}}$` draws 2 + 2 = 4 and `$3A$` draws 3(2 + 2). A name is a letter
+  (Greek too), optionally with a subscript (`A_1`); a variable may use the ones before it
+  (`$_B := 2A$`), and saving it again replaces it from there on. A plain `$r = 3$` still only
+  remembers the number: r keeps being drawn as r.
+- **Inputs:** `$A := [[2+2]]$` is a textbox that sets A, `$f := [[x^2 | sin(x) | 2x]]$` a
+  dropdown, `$n := [[1..10]]$` a slider (`[[0..1 step 0.05 = 0.5]]`: a step and a starting
+  value); with `$_…$` only the input is shown. `renderMarkdownInto(el, text)` makes them live:
+  every part of the page drawn with it shares the page's store (`variables`), so a variable
+  saved in one part is used in the others, and changing an input redraws everything that uses
+  it. `variables.set('A', 'x^2')` sets one from code, `variables.get('A')` reads it;
+  `{ variables: createVariables() }` gives a part a store of its own, `{ variables: false }` none.
+  `markdownToHTML` is static: inputs drawn at their starting values.
 - **Dollars:** a `$` is maths only when it looks like it (Pandoc's rule): "$5 and $10"
   stays text, and `\$` is a dollar sign. Code spans and fences are left alone.
 - **Bad maths:** maths that doesn't read is shown as written, marked, with the reason as

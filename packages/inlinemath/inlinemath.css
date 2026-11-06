@@ -140,3 +140,11 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-md-display { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
 .mv-md-block { margin: 0.8em 0; }
 .mv-md-error code { background: rgba(200, 60, 0, 0.08); color: #a33; border-bottom: 1px dotted #a33; }
+/* saved variables: $A := 2+2$ draws A ≔ 2 + 2; $A := [[…]]$ an input that sets A */
+.mv-md-input-def { display: inline-flex; align-items: center; gap: 0.3em; }
+.mv-md-assign { margin: 0 0.1em; }
+.mv-md-input { font: inherit; font-size: 0.9em; }
+input.mv-md-textbox { font-family: inherit; padding: 0.05em 0.3em; field-sizing: content; min-width: 3ch; }
+input.mv-md-textbox[aria-invalid="true"] { outline: 2px solid #c33; outline-offset: 1px; }
+input.mv-md-slider { vertical-align: middle; }
+.mv-md-output { font-variant-numeric: tabular-nums; min-width: 2ch; }

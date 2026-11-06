@@ -248,7 +248,7 @@ test('the core imports only what every page maps (mathzetta, mathzetta/speech, m
 // ---- Markdown with maths (inlinemath/markdown) -------------------------------------------
 
 const { markdownToHTML, extractMath } = await import('../src/markdown.js');
-const spoken = (html) => [...html.matchAll(/class="mv-md-(?:math|display)"><span[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
+const spoken = (html) => [...html.matchAll(/class="mv-md-(?:math|display)"(?: data-mv-md="\d+")?><span[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
 
 test('markdown: which dollars are maths', () => {
     const pieces = (t) => extractMath(t).math.map((m) => `${m.display ? 'D' : 'I'}:${m.source}`);
@@ -267,7 +267,7 @@ test('markdown: which dollars are maths', () => {
 test('markdown: maths drawn inline and on its own, worked out, remembered', () => {
     const html = markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.\n\n$$\\int_0^1 x^2 dx = {{\\int_0^1 x^2 dx}}$$');
     assert.deepEqual(spoken(html), ['pi r squared', 'r equals 3', '9 pi', 'the integral from 0 to 1 of x squared, d x equals one third']);
-    assert.ok(html.includes('<div class="mv-md-block"><span class="mv-md-display">'), 'display maths is a block');
+    assert.ok(html.includes('<div class="mv-md-block"><span class="mv-md-display" data-mv-md="3">'), 'display maths is a block');
     assert.deepEqual(spoken(markdownToHTML('$r = 1/3$, ${{3r}}$')), ['r equals one third', '1'], 'definitions are exact');
     assert.deepEqual(spoken(markdownToHTML('$r = 3$ ${{r}}$', { define: false })), ['r equals 3', 'r'], 'define: false');
     assert.deepEqual(spoken(markdownToHTML('${{a + 1}}$', { scope: { a: 2 } })), ['3']);
@@ -276,7 +276,7 @@ test('markdown: maths drawn inline and on its own, worked out, remembered', () =
 
 test('markdown: maths that does not read is shown as written, with the reason', () => {
     const html = markdownToHTML('bad $\\frac{1$ here');
-    assert.match(html, /<span class="mv-md-error" title="[^"]+"><code>\$\\frac\{1\$<\/code><\/span>/);
+    assert.match(html, /<span class="mv-md-error" data-mv-md="0" title="[^"]+"><code>\$\\frac\{1\$<\/code><\/span>/);
 });
 
 test('markdown: the Markdown itself', () => {
@@ -300,7 +300,67 @@ test('markdown: safe by default', () => {
 test('markdown: another renderer, with the maths put back into its output', () => {
     const render = (md) => `<article>${md.replace(/\*(.+?)\*/g, '<i>$1</i>')}</article>`;
     const html = markdownToHTML('*so* $x^2$', { render });
-    assert.ok(html.startsWith('<article><i>so</i> <span class="mv-md-math">'));
+    assert.ok(html.startsWith('<article><i>so</i> <span class="mv-md-math" data-mv-md="0">'));
+});
+
+test('markdown: saved variables — $A := 2+2$, then A is drawn as 2 + 2 and {{A}} is 4', () => {
+    const all = (html) => [...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]);
+    assert.deepEqual(spoken(markdownToHTML('$A := 2+2$ then $A = {{A}}$')), ['A is defined as 2 plus 2', '2 plus 2 equals 4']);
+    assert.ok(markdownToHTML('$A := 2+2$').includes('<span class="mv-rel mv-rel-def">≔</span>'), 'drawn with ≔');
+    // $_…$ saves without drawing; a paragraph of nothing else leaves nothing behind
+    const hidden = markdownToHTML('$_A := 2+2$\n\nthen $A={{A}}$, $3A$, $x^2 + A_1$');
+    assert.ok(hidden.startsWith('<p>then '), hidden);
+    assert.deepEqual(spoken(hidden), ['2 plus 2 equals 4', '3 times the quantity 2 plus 2', 'x squared plus A sub 1']);
+    assert.deepEqual(spoken(markdownToHTML('$_A = x^2$ $A + 1$ ${{A}}$')), ['x squared plus 1', 'x squared'], 'no value: {{A}} is its expression');
+    // in reading order, a variable may use another, and saving again replaces it
+    assert.deepEqual(spoken(markdownToHTML('$_B := 2A$ $_A := 3$ $B$; $_A := 5$ $B = {{B}}$')), ['2 times 3', '2 times 5 equals 10']);
+    assert.deepEqual(spoken(markdownToHTML('$A$ $_A := 1$')), ['A'], 'not before it is saved');
+    assert.deepEqual(spoken(markdownToHTML('$_A := A + 1$ $A$')), ['A plus 1'], 'a name in its own definition stays');
+    assert.deepEqual(spoken(markdownToHTML('$A_1 := 5$ $A_1 + A$')), ['A sub 1 is defined as 5', '5 plus A']);
+    // = still only remembers a number for {{…}}: r is drawn as r
+    assert.deepEqual(spoken(markdownToHTML('$r = 3$ $\\pi r^2 = {{pi r^2}}$')), ['r equals 3', 'pi r squared equals 9 pi']);
+    assert.deepEqual(spoken(markdownToHTML('$g := 10$ ${{2g}}$')), ['g is defined as 10', '20']);
+    assert.match(markdownToHTML('$_x$'), /mv-md-error[^>]*title="a hidden/, 'a $_…$ that saves nothing is an error');
+    assert.deepEqual(all(markdownToHTML('$$_A := 2$$\n\n$A$')), ['2'], 'display maths too');
+});
+
+test('markdown: inputs set variables — [[…]] is a textbox, [[a | b]] a dropdown, [[1..10]] a slider', () => {
+    const text = markdownToHTML('$A := [[2+2]]$ $A = {{A}}$');
+    assert.match(text, /≔<\/span><input type="text" class="mv-md-input mv-md-textbox" data-mv-var="A" aria-label="A" value="2\+2"/);
+    assert.deepEqual(spoken(text), ['2 plus 2 equals 4']);
+    const select = markdownToHTML('$f := [[x^2 | sin(x)]]$ $f$');
+    assert.match(select, /<select class="mv-md-input mv-md-dropdown" data-mv-var="f" aria-label="f"><option value="x\^2" selected>x\^2<\/option><option value="sin\(x\)">sin\(x\)<\/option><\/select>/);
+    assert.deepEqual(spoken(select), ['x squared']);
+    const slider = markdownToHTML('$_n := [[1..10 = 4]]$ $n^2 = {{n^2}}$');
+    assert.ok(slider.startsWith('<p><span class="mv-md-math mv-md-input-def" data-mv-md="0"><input type="range"'), 'hidden: the input alone');
+    assert.match(slider, /min="1" max="10" step="1" value="4"><output class="mv-md-output" data-mv-out="n">4<\/output>/);
+    assert.deepEqual(spoken(slider), ['4 squared equals 16']);
+    assert.match(markdownToHTML('$_t := [[0..1 step 0.25]]$'), /min="0" max="1" step="0.25" value="0"/);
+    assert.match(markdownToHTML('$_t := [[0..2]]$'), /step="1"/);
+    assert.match(markdownToHTML('$_t := [[0..0.5]]$'), /step="0.005"/);
+    assert.ok(markdownToHTML('$_A := [["><script>]]$').includes('value="&quot;&gt;&lt;script&gt;"'), 'escaped');
+});
+
+test('markdown: a store of variables shared between parts, and set from code', async () => {
+    const { createVariables } = await import('../src/markdown.js');
+    const v = createVariables();
+    v.set('k', '7');
+    assert.deepEqual(spoken(markdownToHTML('${{2k}}$ $k$', { variables: v })), ['14', '7']);
+    assert.equal(v.get('k'), '7');
+    const page = createVariables();
+    page.own('first', new Map([['A', { name: 'A', text: '2+2', input: { kind: 'textbox', default: '2+2' }, key: 'input:A' }]]));
+    let told = 0;
+    page.subscribe(() => told++);
+    page.set('A', 'x^2');
+    assert.equal(page.get('A'), 'x^2', 'an input set');
+    assert.deepEqual(spoken(markdownToHTML('$A + 1$', { variables: page })), ['x squared plus 1']);
+    page.set('A', 'x^2');
+    assert.equal(told, 1, 'no news when nothing changed');
+    page.own('first', new Map([['A', { name: 'A', text: '3', input: { kind: 'textbox', default: '3' }, key: 'input:B' }]]));
+    assert.equal(page.get('A'), '3', 'a different input forgets what the old one held');
+    page.own('first', null);
+    assert.equal(page.get('A'), undefined);
+    assert.deepEqual(page.names(), []);
 });
 
 // ---- untrusted text, links, the CAS blocks (from a review before publishing) ---------------
