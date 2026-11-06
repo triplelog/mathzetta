@@ -77,10 +77,12 @@ const ALIASES = { integral: 'integrate', differentiate: 'diff', approximate: 'ap
 
 /**
  * A `{{…}}` handler: pass it as toHTML(input, { blocks: casBlocks() }).
- * @param {object} [options] { cas } a CAS of your own (mathCAS({ rules })), { steps } kept on the handler's `last`
+ * @param {object} [options] { cas } a CAS of your own (mathCAS({ rules })); { steps } how much working each call
+ *   keeps (the CAS's steps option: true, 'brief', false), read from the handler's `last` after a block
  */
 export function casBlocks(options = {}) {
   const cas = options.cas ?? mathCAS();
+  const how = options.steps === undefined ? {} : { steps: options.steps };
   const handler = (text, scope) => {
     let tokens;
     try {
@@ -103,16 +105,16 @@ export function casBlocks(options = {}) {
     let r;
     try {
       switch (symbolic ? name : head === 'der' ? 'derivative' : 'antiderivative') {
-        case 'simplify': r = cas.simplify(args[0]); break;
-        case 'expand': r = cas.expand(args[0]); break;
-        case 'factor': r = cas.factor(args[0]); break;
-        case 'cancel': r = cas.cancel(args[0]); break;
-        case 'diff': r = cas.diff(args[0], word(args[1]), { order: args[2] ? Number(args[2].s) : 1 }); break;
-        case 'integrate': r = cas.integrate(args[0], word(args[1]), args[3] ? { from: args[2].s, to: args[3].s } : {}); break;
-        case 'solve': r = cas.solve(args[0], word(args[1])); break;
-        case 'approx': r = cas.approximate(args[0], { digits: args[1] ? Number(args[1].s) : 15 }); break;
-        case 'derivative': r = cas.diff(node.args[0], node.args[1].s); break;
-        default: r = cas.integrate(node); break;
+        case 'simplify': r = cas.simplify(args[0], how); break;
+        case 'expand': r = cas.expand(args[0], how); break;
+        case 'factor': r = cas.factor(args[0], how); break;
+        case 'cancel': r = cas.cancel(args[0], how); break;
+        case 'diff': r = cas.diff(args[0], word(args[1]), { ...how, order: args[2] ? Number(args[2].s) : 1 }); break;
+        case 'integrate': r = cas.integrate(args[0], word(args[1]), { ...how, ...(args[3] ? { from: args[2].s, to: args[3].s } : {}) }); break;
+        case 'solve': r = cas.solve(args[0], word(args[1]), how); break;
+        case 'approx': r = cas.approximate(args[0], { ...how, digits: args[1] ? Number(args[1].s) : 15 }); break;
+        case 'derivative': r = cas.diff(node.args[0], node.args[1].s, how); break;
+        default: r = cas.integrate(node, undefined, how); break;
       }
     } catch (error) {
       // no answer: leave it as written, as calculateBlock does

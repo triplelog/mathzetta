@@ -192,7 +192,8 @@ export interface CASStep { id: string; name: string; from: string; to: string; p
 export type CAS = Record<string, any>;
 export function mathCAS(options?: { rules?: unknown[]; names?: string[]; complex?: boolean; [option: string]: unknown }): CAS;
 /** A `{{…}}` handler: toHTML(input, { blocks: casBlocks() }). `last` holds the latest CAS result. */
-export function casBlocks(options?: { cas?: CAS }): BlockHandler & { last?: unknown };
+/** steps: how much working each call keeps (true: every step, 'brief': the ones that carry the idea, false: none). */
+export function casBlocks(options?: { cas?: CAS; steps?: boolean | 'brief' | Record<string, unknown> }): BlockHandler & { last?: { steps?: CASStep[]; text?: string; [k: string]: unknown } };
 /** Steps as an ordered list, each rewrite highlighted, with its explanation. */
 export function stepsHTML(steps: CASStep[], options?: DrawOptions): string;
 /** A CAS node → MathZetta postfix tokens. */
