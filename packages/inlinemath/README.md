@@ -181,7 +181,7 @@ page needs nothing else:
 </script>
 ```
 
-`@0.1` follows the latest 0.1.x; `@0.1.0` pins a release.
+`@0.2` follows the latest 0.2.x; `@0.2.0` pins a release.
 
 **The stylesheet is required** — the drawing is HTML laid out by `inlinemath.css` (6.9 KB, 2.1 KB
 gzipped): without it fractions, radicals and brackets don't line up. The classic builds
@@ -306,7 +306,6 @@ playground: any input, any operation, detail level, and a live rule editor).
 
 **Notation MathZetta doesn't read yet** (Inline Math can only draw what parses):
 - **Evaluation bars:** `[F(x)]_0^1` reads as a power of a subscript, and `\left. F \right|_0^1` is rejected.
-- **Matrices:** `\begin{pmatrix}` becomes nested lists.
 - **Partial derivatives:** `\partial f / \partial x` becomes products.
 - **Derivative orders:** `f^{(4)}` becomes a power.
 - **Lists of answers:** `x = 2, x = -3` is rejected.
@@ -316,11 +315,10 @@ playground: any input, any operation, detail level, and a live rule editor).
 1. **Exit animation.** Parts that disappear in a step should fade out where they were (ghost copies). Today they vanish, and new signs and bars just appear.
 2. **Step-diff helper.** Given `step.before`, `step.after` and `step.path`, return what changed, then highlight → animate → un-highlight in one call. That would be the video's main move.
 3. **Narration sync.** Something like `view.follow(segments, timings)`: drive highlights from a text-to-speech engine's word timings (`words: [{start, end, i, j}]`).
-4. **Click-to-edit.** Swap a clicked node for an input box showing its text (`toText` / LaTeX), re-parse, and splice it back in. This was a good inline-math idea.
-5. **Copy as LaTeX or text** from a selection.
-6. **Line breaking and alignment.** Multi-line derivations with the `=` signs lined up (an `align` helper), and breaking long sums.
-7. **A DOM refine pass, optional.** Measure once after fonts load, to nudge fraction bars and script heights where the em estimates are off with unusual fonts.
-8. **Spacing table.** Move the per-operator spacing (bin, rel, thin) into one table so a house style is one edit.
+4. **Copy as LaTeX or text** from a selection.
+5. **Line breaking and alignment.** Multi-line derivations with the `=` signs lined up (an `align` helper), and breaking long sums.
+6. **A DOM refine pass, optional.** Measure once after fonts load, to nudge fraction bars and script heights where the em estimates are off with unusual fonts.
+7. **Spacing table.** Move the per-operator spacing (bin, rel, thin) into one table so a house style is one edit.
 
 ## Known rough edges
 

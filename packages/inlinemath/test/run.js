@@ -270,6 +270,8 @@ test('markdown: maths drawn inline and on its own, worked out, remembered', () =
     assert.ok(html.includes('<div class="mv-md-block"><span class="mv-md-display" data-mv-md="3">'), 'display maths is a block');
     assert.deepEqual(spoken(markdownToHTML('$r = 1/3$, ${{3r}}$')), ['r equals one third', '1'], 'definitions are exact');
     assert.deepEqual(spoken(markdownToHTML('$r = 3$ ${{r}}$', { define: false })), ['r equals 3', 'r'], 'define: false');
+    const det = spoken(markdownToHTML('$A = \\begin{pmatrix} 2 & 1 \\\\ 1 & 3 \\end{pmatrix}$ ${{det(A)}}$'));
+    assert.equal(det.at(-1), '5', 'a matrix definition is remembered');
     assert.deepEqual(spoken(markdownToHTML('${{a + 1}}$', { scope: { a: 2 } })), ['3']);
     assert.deepEqual(spoken(markdownToHTML('${{solve(x^2 = 4, x)}}$', { blocks: casBlocks() })), ['x equals negative 2 or x equals 2']);
 });

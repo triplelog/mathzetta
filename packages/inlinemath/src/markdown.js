@@ -316,7 +316,7 @@ function drawAll(markdown, options, store, owner) {
     return { text, math, drawn, defs: mine, inputs, trees };
 }
 
-/** $r = 3$: remember r (exactly, as the calculator's text) for later {{…}} — unless r is a saved variable. */
+/** $r = 3$ (or $A = \\begin{pmatrix}…$): remember r (exactly, as the calculator's text) for later {{…}} — unless r is a saved variable. */
 function define(source, numbers, saved) {
     const m = DEFINITION.exec(source);
     if (!m || /\{\{/.test(m[2])) return false;
@@ -324,7 +324,8 @@ function define(source, numbers, saved) {
     if (saved.has(name)) return false;
     try {
         const r = calculate(m[2], numbers);
-        if (typeof r.value === 'number' || typeof r.value === 'bigint') {
+        // a number, or a matrix (or list), as for saved variables
+        if (typeof r.value === 'number' || typeof r.value === 'bigint' || Array.isArray(r.value)) {
             numbers[name] = r.exact ? r.text : r.value;
             return true;
         }

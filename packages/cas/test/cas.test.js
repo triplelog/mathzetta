@@ -40,6 +40,13 @@ table('cas: the normal form (exact arithmetic, like terms)', (x) => text(cas.sim
   ['log_8(4)', '2/3'],
 ]);
 
+// matrices and det are carried, not rewritten: they read, and like terms still combine
+table('cas: matrices and det', (x) => text(cas.simplify(x, { steps: false })), [
+  ['det(A) + det(A)', '2det(A)'],
+  ['\\det(A) + 1', 'det(A) + 1'],
+  ['det([[1,2],[3,4]])', 'det([[1, 2], [3, 4]])'],
+]);
+
 table('cas: simplify with rules', (x) => text(cas.simplify(x, { steps: false })), [
   ['sin(pi/6)', '1/2'],
   ['sin(7pi/6)', '-1/2'],
