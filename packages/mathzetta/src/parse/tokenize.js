@@ -59,6 +59,7 @@ export function tokenize(input, mode = 'plain') {
         if (char === PROTECTED) {
             flush(char);
             const end = input.indexOf(PROTECTED, i + 1);
+            if (end < 0) throw new Error(`An unmatched ${PROTECTED}`);   // only ever written in pairs; never loop back
             const name = input.slice(i, end + 1);
             tokens.push(OPENERS.includes(input[end + 1]) ? CUSTOM_PREFIX + name : name);
             i = end;

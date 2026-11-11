@@ -5,8 +5,9 @@
  * an error for anything SQLite has no function for.
  */
 
+import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows } from '../common.js';
+import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -14,9 +15,8 @@ import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain
  * @param {'postgres'|'sqlite'} [options.dialect] default 'postgres'
  * @param {boolean} [options.quoteIdentifiers] write variables as "column" names
  * @param {string} [options.stringQuote] quote character for string literals
- *   (by default strings keep the quotes they were typed with, backticks becoming
- *   single quotes; in the sqlite dialect they default to single quotes, since
- *   SQLite reads "x" as a column). The text is always re-escaped by doubling.
+ *   (by default single quotes, in both dialects: SQL reads "x" as a column).
+ *   The text is always re-escaped by doubling.
  * @param {Iterable<string>} [options.columns] names that are always columns,
  *   even when they look like a constant (a column called `e` or `pi`)
  */
@@ -27,14 +27,22 @@ export function toSqlCode(node, options = {}) {
     const opts = {
         ...options,
         sqlite,
-        stringQuote: options.stringQuote ?? (sqlite ? "'" : undefined),
+        stringQuote: options.stringQuote ?? "'",   // "Bob" in PostgreSQL is the column Bob
         columns: new Set(options.columns ?? []),
     };
     const render = (n) => guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts));
     return render(node);
 }
 
-const CONSTANTS = { pi: 'PI()', 'π': 'PI()', e: 'EXP(1)', '∞': "'Infinity'", true: 'TRUE', false: 'FALSE', null: 'NULL' };
+const CONSTANTS = {
+    pi: 'PI()', 'π': 'PI()', e: 'EXP(1)', tau: '(2 * PI())', 'τ': '(2 * PI())', '∞': "'Infinity'", '-∞': "'-Infinity'",
+    true: 'TRUE', false: 'FALSE', null: 'NULL',
+};
+/** Words SQL reads as values or syntax, never as a column: a variable called user is written "user". */
+const RESERVED = new Set(['user', 'current_user', 'session_user', 'current_role', 'current_date', 'current_time',
+    'current_timestamp', 'current_catalog', 'current_schema', 'localtime', 'localtimestamp', 'default', 'all', 'any', 'some',
+    'and', 'or', 'not', 'is', 'in', 'like', 'between', 'case', 'when', 'then', 'else', 'end', 'select', 'from', 'where',
+    'null', 'true', 'false', 'cast', 'as', 'distinct', 'array', 'exists', 'rowid', 'oid']);
 // SQLite has no infinity literal, but a real too big for a double reads as one.
 const SQLITE_CONSTANTS = { ...CONSTANTS, '∞': '9e999', '-∞': '-9e999', tau: '(2 * PI())', 'τ': '(2 * PI())' };
 
@@ -50,11 +58,13 @@ function leaf(node, options) {
         return q + text.split(q).join(q + q) + q;
     }
     if (options.columns.has(v)) return `"${v.replace(/"/g, '""')}"`;
+    const percent = percentDecimal(v);
+    if (percent) return percent;   // 50% is 0.5
     const constants = options.sqlite ? SQLITE_CONSTANTS : CONSTANTS;
     if (Object.prototype.hasOwnProperty.call(constants, v)) return constants[v];
     if (v === '°') return '(PI()/180)';
     // a name that isn't a plain identifier (a space, a quote, a keyword's company) is always quoted
-    return options.quoteIdentifiers || !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    return options.quoteIdentifiers || !/^[\p{L}_][\p{L}\p{N}_]*$/u.test(v) || RESERVED.has(v.toLowerCase()) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
 const FUNCTIONS = {
@@ -62,7 +72,7 @@ const FUNCTIONS = {
     sin: 'SIN', cos: 'COS', tan: 'TAN', csc: 'CSC', sec: 'SEC', cot: 'COT',
     sinh: 'SINH', cosh: 'COSH', tanh: 'TANH', arcsin: 'ASIN', arccos: 'ACOS', arctan: 'ATAN',
     arcsinh: 'ASINH', arccosh: 'ACOSH', arctanh: 'ATANH', atan2: 'ATAN2',
-    round: 'ROUND', perm: 'PERM', comb: 'COMB', max: 'GREATEST', min: 'LEAST', gcd: 'GCD',
+    perm: 'PERM', comb: 'COMB', max: 'GREATEST', min: 'LEAST', gcd: 'GCD',
     random: 'RANDOM', der: 'DERIVATIVE', int: 'INTEGRATE', lim: 'LIMIT',
     '\\sumidx': 'SUMMATION', '\\prodidx': 'PRODUCT', '!': 'FACTORIAL',
 };
@@ -84,22 +94,30 @@ const SQLITE_UNSUPPORTED = new Set([
 const SQLITE_FUNCTIONS = { max: 'MAX', min: 'MIN' };
 const SQLITE_RECIPROCALS = { csc: 'SIN', sec: 'COS', cot: 'TAN' };
 
+const COMPARING = new Set(['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≡']);
+
 function operation(node, render, options) {
+    node = withIndex(node, firstVariable);   // ∑_0^3 i^2 is written SUMMATION(…, i = 0, 3), which reads back
     const chained = expandChain(node);   // 3 < x < 7 is (3 < x) and (x < 7)
     if (chained) return render(chained);
     const { op, args } = node;
     const [a, b] = args;
-    const sideOf = (parentOp, child, s) => (needsParens(parentOp, sqlBracketOp(child), s) ? `(${render(child)})` : render(child));
+    // PostgreSQL gives every comparison the same precedence (and no associativity): c = (a < b) keeps its brackets
+    const sideOf = (parentOp, child, s) => (needsParens(parentOp, sqlBracketOp(child), s) || (COMPARING.has(parentOp) && COMPARING.has(sqlBracketOp(child)))
+        ? `(${render(child)})` : render(child));
     const side = (child, s) => sideOf(op, child, s);
     const list = () => args.map(render).join(', ');
 
     if (options.sqlite) {
-        const out = sqliteOperation(node, render, side, list);
+        const out = sqliteOperation(node, render, side, list, sideOf);
         if (out !== undefined) return out;
     }
 
-    if (op === '*' && isMinusOneTimes(node)) return '-' + render(b);
+    if (op === '*' && isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render, options);   // -x, bracketed as -x is
     if (op === '+' && isText(node)) return `${render(a)} || ${render(b)}`;   // joining text
+    // a whole number divided is integer division in PostgreSQL (1 / 2 is 0): its numerator is written real.
+    // (Integer columns still divide as integers; strToSQL's SQLite dialect casts them, PostgreSQL's does not.)
+    if (op === '/' && a.type === 'number' && /^-?\d+$/.test(a.value)) return `${render(a)}.0 / ${side(b, 'right')}`;
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
@@ -118,18 +136,34 @@ function operation(node, render, options) {
     switch (op) {
         case '^':
             return `POWER(${render(a)}, ${render(b)})`;
-        case 'root':
+        case 'root': {
+            // an odd root of a negative number is real: cbrt(-8) is -2, where POWER(-8, 1.0/3) fails
+            const n = a.type === 'number' && /^\d+$/.test(a.value) ? Number(a.value) : 0;
+            if (n > 1 && n % 2 === 1) {
+                const x = render(b);
+                if (n === 3 && !options.sqlite) return `CBRT(${x})`;
+                const v = /^[\w."]+$/.test(x) ? x : `(${x})`;
+                return `(CASE WHEN ${v} < 0 THEN -POWER(-${v}, 1.0 / ${n}) ELSE POWER(${v}, 1.0 / ${n}) END)`;
+            }
             return `POWER(${render(b)}, 1.0 / (${render(a)}))`;
-        case 'mod':
-            return `MOD(${render(a)}, ${render(b)})`;
+        }
+        case 'round':   // PostgreSQL has ROUND(x, d) for NUMERIC only, which takes halves away from zero
+            return `ROUND(CAST(${render(a)} AS NUMERIC), ${render(b)})`;
+        case 'mod': {   // SQL's MOD takes the sign of a; mod in maths takes the divisor's: -7 mod 3 is 2
+            const [x, n] = [render(a), render(b)];
+            if (/^\d+(\.\d+)?$/.test(x) && /^\d+(\.\d+)?$/.test(n)) return `MOD(${x}, ${n})`;   // 7 mod 3: no sign to take
+            return `MOD(MOD(${x}, ${n}) + ${n}, ${n})`;
+        }
         case 'log':
             return a.type === 'symbol' && a.value === 'e' ? `LN(${render(b)})` : `LOG(${render(a)}, ${render(b)})`;
         case 'loglog':
             return `LN(LN(${render(a)}))`;
         case 'logloglog':
             return `LN(LN(LN(${render(a)})))`;
-        case 'neg':
-            return '-' + (unaryNeedsBrackets(op, a) ? `(${render(a)})` : render(a));
+        case 'neg': {   // never --x: that starts a comment in SQL
+            const inner = unaryNeedsBrackets(op, a) ? `(${render(a)})` : render(a);
+            return '-' + (inner.startsWith('-') ? `(${inner})` : inner);
+        }
         case 'pm':
             return `ARRAY[${render(a)}, -(${render(a)})]`;
         case '≈':
@@ -164,8 +198,8 @@ function operation(node, render, options) {
             return args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ');
         case 'prod':
             return args.map((x, i) => sideOf('*', x, i ? 'right' : 'left')).join(' * ');
-        case 'mean':
-            return `((${args.map(render).join(' + ')}) / ${args.length})`;
+        case 'mean':   // written out as a sum, so bracket like +
+            return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length})`;
         case '∈': case '∉':
             return membership(node, render);
         case '±':
@@ -181,7 +215,7 @@ function operation(node, render, options) {
 /**
  * The SQLite spellings that differ from PostgreSQL; undefined means "same".
  */
-function sqliteOperation(node, render, side, list) {
+function sqliteOperation(node, render, side, list, sideOf) {
     const { op, args } = node;
     const [a, b] = args;
     if (SQLITE_UNSUPPORTED.has(op)) throw new Error(`No SQLite SQL for '${op}'`);
@@ -197,8 +231,10 @@ function sqliteOperation(node, render, side, list) {
             return `${realLeft(a, render, side)} / ${side(b, 'right')}`;
         case 'expm1':
             return `(EXP(${render(a)}) - 1)`;
+        case 'round':   // SQLite's ROUND takes any number, and halves away from zero
+            return `ROUND(${list()})`;
         case 'mean':
-            return `((${args.map(render).join(' + ')}) / ${args.length}.0)`;
+            return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length}.0)`;
         case 'fixed':   // text with exactly that many decimals
             return b.type === 'number' && /^\d+$/.test(b.value) ? `printf('%.${b.value}f', ${render(a)})` : `printf('%.' || (${render(b)}) || 'f', ${render(a)})`;
         case '∈': case '∉':
@@ -232,6 +268,7 @@ function sqliteNumberSet(node, render) {
     const v = render(x);
     const numeric = `typeof(${v}) IN ('integer', 'real')`;
     const tests = {
+        __proto__: null,   // x ∈ toString is no set
         'ℝ': `(${numeric} AND ABS(${v}) < 9e999)`,
         'ℤ': `(${numeric} AND ${v} = TRUNC(${v}))`,
         'ℕ': `(${numeric} AND ${v} = TRUNC(${v}) AND ${v} > 0)`,
@@ -246,6 +283,7 @@ const SELF_BRACKETED = new Set(['&', '|', '\\xor', 'mean']);
 function sqlBracketOp(node) {
     if (node.type !== 'op' || SELF_BRACKETED.has(node.op) || FUNCTIONS[node.op]) return null;
     if (['csc', 'sec', 'cot', 'expm1'].includes(node.op)) return null;   // bracketed or a call either way
+    if (node.op === '\\not') return '&';   // NOT binds looser than + and =: (NOT a) + 1
     return bracketOp(node);
 }
 

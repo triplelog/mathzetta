@@ -15,7 +15,7 @@ import { parseTable } from '../test/checks.js';
 
 const CASES = new URL('../test/cases/', import.meta.url);
 const files = readdirSync(CASES).filter((f) => f.endsWith('.tsv')).sort();
-const COLUMNS = ['clean', 'postfix', 'latex', 'mathml', 'javascript', 'python', 'sql', 'excel', 'text', 'evaluated', 'speech', 'glsl'];
+const COLUMNS = ['clean', 'postfix', 'latex', 'mathml', 'javascript', 'python', 'sql', 'excel', 'text', 'evaluated', 'speech', 'audio', 'glsl'];
 
 const perColumn = Object.fromEntries(COLUMNS.map((c) => [c, {}]));
 const usedOps = new Map();          // operator -> number of rows whose postfix uses it

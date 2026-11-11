@@ -28,8 +28,9 @@
  *     like the maths takes the sign of the divisor.
  */
 
+import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, CUSTOM_PREFIX } from '../operators.js';
-import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows } from '../common.js';
+import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -66,6 +67,8 @@ function float(text) {
 function leaf(node) {
     const v = node.value;
     if (node.type === 'number') return float(v);
+    const percent = node.type === 'symbol' && percentDecimal(v);
+    if (percent) return float(percent);   // 50% is 0.5
     if (node.type === 'string') return v;
     if (CONSTANTS[v] !== undefined) return CONSTANTS[v];
     if (v === '\\+' || v === '\\-') return v[1];
@@ -109,11 +112,15 @@ function glslBracketOp(node) {
     return bracketOp(node);
 }
 
-/** x^2 is a call; x^-1 is a division; the rest are calls too. */
+/** x^2 is a call; x^-1 is a division; x^1 is its base as it is; the rest are calls too. */
 function powerBracketOp(node) {
     const n = integerExponent(node.args[1]);
+    if (n === 1) return glslBracketOp(node.args[0]);
     return n !== null && n < 0 && n >= -4 ? '/' : null;
 }
+
+/** 10^digits as a GLSL float literal: 100.0, 0.01, 1.0e25 (never 1e+25.0). */
+const powerOfTen = (digits) => (Math.abs(digits) > 6 ? `1.0e${digits}` : float(String(10 ** digits)));
 
 /** The exponent as a small integer, or null. */
 function integerExponent(exp) {
@@ -122,6 +129,7 @@ function integerExponent(exp) {
 }
 
 function operation(node, render, es3, filter = false) {
+    node = withIndex(node, firstVariable);   // ∑_0^3 i^2 is written SUMMATION(…, i = 0, 3), which reads back
     const chained = expandChain(node);   // 3 < x < 7 is (3 < x) and (x < 7)
     if (chained) return render(chained);
     const { op, args } = node;
@@ -132,9 +140,12 @@ function operation(node, render, es3, filter = false) {
     const unary = (child) => {
         const childOp = glslBracketOp(child);
         const prec = childOp ? needsParens('neg', childOp, 'right') : false;
-        return prec || (child.type === 'op' && ['neg', 'pm'].includes(child.op)) ? `(${render(child)})` : render(child);
+        const text = render(child);   // never --x, a decrement
+        return prec || text.startsWith('-') || (child.type === 'op' && ['neg', 'pm'].includes(child.op)) ? `(${text})` : text;
     };
 
+    // det([[1, 2], [3, 4]]): a list of rows is no GLSL matrix; written out as |1 2; 3 4| is
+    if (op === 'det' && a && matrixRows(a)) return operation({ ...node, op: 'vmatrix', args: a.args }, render, es3, filter);
     if (BUILTIN[op]) return `${BUILTIN[op]}(${list()})`;
     if (ES3_ONLY[op] && op !== 'round') return `${es3 ? ES3_ONLY[op] : 'mz_' + ES3_ONLY[op]}(${list()})`;
     if (RECIPROCALS[op]) return `1.0 / ${RECIPROCALS[op]}(${render(a)})`;
@@ -143,7 +154,7 @@ function operation(node, render, es3, filter = false) {
 
     switch (op) {
         case '+': case '-': case '*': case '/':
-            if (op === '*' && isMinusOneTimes(node)) return '-' + unary(b);
+            if (op === '*' && isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render, es3, filter);
             if (op === '*' && b.type === 'symbol' && b.value === '°') return `radians(${render(a)})`;
             return binary(op);
         case 'mod':
@@ -192,9 +203,9 @@ function operation(node, render, es3, filter = false) {
             return `(exp(${render(a)}) - 1.0)`;
         case 'round': case 'fixed': {   // floats carry no digit count: fixed is round here
             const digits = integerExponent(b);
-            const value = digits === 0 || digits === null ? render(a) : `${render(a)} * ${float(String(10 ** digits))}`;
-            const rounded = es3 ? `round(${value})` : `mz_round(${value})`;
-            return digits === 0 || digits === null ? rounded : `${rounded} / ${float(String(10 ** digits))}`;
+            const value = digits === 0 || digits === null ? render(a) : `${side(a, 'left', '*')} * ${powerOfTen(digits)}`;   // (a + b) * 100.0
+            const rounded = `mz_round(${value})`;   // round() leaves halves to the implementation
+            return digits === 0 || digits === null ? rounded : `${rounded} / ${powerOfTen(digits)}`;
         }
         case 'random':
             return 'mz_random()';
@@ -203,7 +214,7 @@ function operation(node, render, es3, filter = false) {
         case 'gcd':
             return args.map(render).reduce((acc, x) => `mz_gcd(${acc}, ${x})`);
         case 'mean':
-            return `((${args.map(render).join(' + ')}) / ${args.length}.0)`;
+            return `((${args.map((x, i) => side(x, i ? 'right' : 'left', '+')).join(' + ')}) / ${args.length}.0)`;
         case 'sum':
             return args.map((x, i) => side(x, i ? 'right' : 'left', '+')).join(' + ');
         case 'prod':
@@ -226,12 +237,12 @@ function operation(node, render, es3, filter = false) {
             return `(${render(a)} ? ${branch(b, args[2])} : ${branch(args[2], b)})`;
         }
         case '≈':
-            return `(abs(${render(a)} - ${render(b)}) < 1e-5)`;
+            return `(abs(${render(a)} - ${side(b, 'right', '-')}) < 1e-5)`;   // a ≈ b - c: a - (b - c)
         case '≡':
             return binary('==');
         case 'pmod':
             return a.type === 'op' && ['≡', '='].includes(a.op)
-                ? `(mod(${render(a.args[0])} - ${render(a.args[1])}, ${render(b)}) == 0.0)`
+                ? `(mod(${render(a.args[0])} - ${side(a.args[1], 'right', '-')}, ${render(b)}) == 0.0)`
                 : `mod(${render(a)}, ${render(b)})`;
         case '∈': case '∉':
             return membership(node, render);
@@ -351,7 +362,7 @@ export const GLSL_HELPERS = [
         `${t} mz_sq(${t} x) { return x * x; }`,
         `${t} mz_cube(${t} x) { return x * x * x; }`,
         `${t} mz_cbrt(${t} x) { return sign(x) * pow(abs(x), ${t}(1.0 / 3.0)); }`,
-        `${t} mz_round(${t} x) { return floor(x + 0.5); }`,
+        `${t} mz_round(${t} x) { return sign(x) * floor(abs(x) + 0.5); }`,   // halves away from zero; GLSL's round() may go either way
         `${t} mz_sinh(${t} x) { return (exp(x) - exp(-x)) / 2.0; }`,
         `${t} mz_cosh(${t} x) { return (exp(x) + exp(-x)) / 2.0; }`,
         `${t} mz_tanh(${t} x) { ${t} a = exp(2.0 * x); return (a - 1.0) / (a + 1.0); }`,

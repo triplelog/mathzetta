@@ -10,7 +10,8 @@ const DIGIT_LETTERS = 'ABCDEFGHIJ';
 
 export const placeholder = (n) => PREFIX + [...String(n)].map((d) => DIGIT_LETTERS[d]).join('');
 /** Is this word a string's placeholder? (It must stay one token, never be read as letters.) */
-export const isPlaceholder = (word) => new RegExp(`^${PREFIX}[${DIGIT_LETTERS}]+$`).test(word);
+const PLACEHOLDER = new RegExp(`^${PREFIX}[${DIGIT_LETTERS}]+$`);
+export const isPlaceholder = (word) => PLACEHOLDER.test(word);
 
 /**
  * An apostrophe right after a letter, digit, closing bracket or another
@@ -79,13 +80,20 @@ export function extractStrings(input) {
     return { text, strings };
 }
 
-/** Put the original strings back into each token. */
+// a string's placeholder (strtktkBA), or a protected name's (§0§, parse/index.js)
+const ANY_PLACEHOLDER = new RegExp(`${PREFIX}[${DIGIT_LETTERS}]+|§\\d+§`, 'g');
+
+/** Put the original strings back into each token: one pass over each token, whatever the count. */
 export function restoreStrings(tokens, strings) {
     if (!strings || strings.size === 0) return tokens;
-    // Longest first: strtktkB is a prefix of strtktkBA.
-    const entries = [...strings].sort((a, b) => b[0].length - a[0].length);
-    return tokens.map((token) => {
-        for (const [id, original] of entries) token = token.split(id).join(original);
-        return token;
-    });
+    return tokens.map((token) => (typeof token !== 'string' ? token : token.replace(ANY_PLACEHOLDER, (found) => {
+        const exact = strings.get(found);
+        if (exact !== undefined) return exact;
+        // else the longest id that is one: "a"B is strtktkA then a letter B, not strtktkAB
+        for (let end = found.length - 1; end > PREFIX.length; end--) {
+            const original = strings.get(found.slice(0, end));
+            if (original !== undefined) return original + found.slice(end);
+        }
+        return found;
+    })));
 }

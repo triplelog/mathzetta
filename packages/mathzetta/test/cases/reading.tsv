@@ -170,7 +170,7 @@ sec(x) mod 4	sec(x) mod 4	["x","sec","4","mod"]	\sec\left(x\right) \bmod 4	<math
 true||6|	true||6|	["true","6","abs","|"]	\mathrm{true} \lor \left|6\right|	<math><mrow id="mz-3"><mi id="mz-0">true</mi><mo>∨</mo><mrow id="mz-2"><mo>|</mo><mn id="mz-1">6</mn><mo>|</mo></mrow></mrow></math>
 |4|||5|	|4|||5|	["4","abs","5","abs","|"]	\left|4\right| \lor \left|5\right|	<math><mrow id="mz-4"><mrow id="mz-1"><mo>|</mo><mn id="mz-0">4</mn><mo>|</mo></mrow><mo>∨</mo><mrow id="mz-3"><mo>|</mo><mn id="mz-2">5</mn><mo>|</mo></mrow></mrow></math>
 z \in ((x in y) in x)	z∈((x∈y)∈x)	["z","x","y","∈","x","∈","∈"]	z \in \left(x \in y \in x\right)	<math><mrow><mi>z</mi><mo>∈</mo><mrow><mo>(</mo><mrow><mrow><mi>x</mi><mo>∈</mo><mi>y</mi></mrow><mo>∈</mo><mi>x</mi></mrow><mo>)</mo></mrow></mrow></math>
-\sqrt[x in (0,5] ? 3 : 2]{x}	sqrt{x∈(0,5]?(3)?:2,x}	["x","0","5","2","(]","∈","3","2","?:","x","root"]	\sqrt[\begin{cases}3 & \text{if } x \in (0, 5] \\ 2 & \text{otherwise} \end{cases}]{x}	<math><mroot><mi>x</mi><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>3</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mi>x</mi><mo>∈</mo><mrow><mo>(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></mrow></mtd></mtr><mtr><mtd><mn>2</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mroot></math>
+\sqrt[x in (0,5] ? 3 : 2]{x}	sqrt{x∈(0,5]?(3)?:2,x}	["x","0","5","2","(]","∈","3","2","?:","x","root"]	\sqrt[{\begin{cases}3 & \text{if } x \in (0, 5] \\ 2 & \text{otherwise} \end{cases}}]{x}	<math><mroot><mi>x</mi><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>3</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mi>x</mi><mo>∈</mo><mrow><mo>(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></mrow></mtd></mtr><mtr><mtd><mn>2</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mroot></math>
 \left(x \downarrow y ∈ \left(x, \sinh\left(x\right)\right) \right) \downarrow x \bmod y 	(x \nor y∈(x,sinh(x))) \nor x mod y	["x","y","x","x","sinh","2","()","∈","\\nor","x","y","mod","\\nor"]
 \infty \cdot \left|\cos^{-1}\left(x \cdot y\right) \lor \tanh\left(x\right)\right| 	∞*|arccos(x* y)∨tanh(x)|	["∞","x","y","*","arccos","x","tanh","|","abs","*"]
 der(3x^12,x)=der(3x^12)=ddx(3x^12)=36x^11\neqddy(3x^12)	der(3x^{12},x)=der(3x^{12})=der(3x^{12},x)=36x^{11}≠der(3x^{12},y)	["3","x","12","^","*","x","der","3","x","12","^","*","x","der","=","3","x","12","^","*","x","der","=","36","x","11","^","*","=","3","x","12","^","*","y","der","≠"]	\frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = 36x^{11} \neq \frac{\mathrm{d}}{\mathrm{d}y}\left[3x^{12}\right]	<math><mrow><mrow><mrow><mrow><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mn>36</mn><mo>⁢</mo><msup><mi>x</mi><mn>11</mn></msup></mrow></mrow><mo>≠</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>y</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow></math>
@@ -219,7 +219,7 @@ xy+1	xy+1	["x","y","*","1","+"]	xy + 1	<math><mrow><mrow><mi>x</mi><mo>⁢</mo><
 7!==9	7≠=9	["7","9","≠="]	7 \neq 9	<math><mrow><mn>7</mn><mo>≠</mo><mn>9</mn></mrow></math>	7 !== 9	true
 7! == 9	7!_=9	["7","!","9","="]	7! = 9	<math><mrow><mrow><mn>7</mn><mo>!</mo></mrow><mo>=</mo><mn>9</mn></mrow></math>	7 * 6 * 5 * 4 * 3 * 2 * 1 == 9	false
 3<>4	3≠4	["3","4","≠"]	3 \neq 4	<math><mrow><mn>3</mn><mo>≠</mo><mn>4</mn></mrow></math>	3 != 4	true
-mean(1,2,3)%2	mean(1,2,3)%2	["1","2","3","3","mean","2","mod"]	\frac{1 + 2 + 3}{3} \bmod 2	<math><mrow><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow><mo>mod</mo><mn>2</mn></mrow></math>	((1 + 2 + 3) / 3) % 2	0
+mean(1,2,3)%2	mean(1,2,3)%2	["1","2","3","3","mean","2","mod"]	\frac{1 + 2 + 3}{3} \bmod 2	<math><mrow><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow><mo>mod</mo><mn>2</mn></mrow></math>	((((1 + 2 + 3) / 3) % 2) + 2) % 2	0
 \int_0^7 x\mathrm{d}x	int(x,x,0,7)	["x","x","0","7","4","int"]	\int_{0}^{7}{x}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><mi>x</mi><mi>d</mi><mi>x</mi></mrow></math>	integrate(x, x, 0, 7)
 \int_0^7 xdx	int(x,x,0,7)	["x","x","0","7","4","int"]	\int_{0}^{7}{x}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><mi>x</mi><mi>d</mi><mi>x</mi></mrow></math>	integrate(x, x, 0, 7)
 \int_{0}^{7} x^2\mathrm{d}x	int(x^{2},x,0,7)	["x","2","^","x","0","7","4","int"]	\int_{0}^{7}{x^2}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mn>7</mn></mrow></msubsup><msup><mi>x</mi><mn>2</mn></msup><mi>d</mi><mi>x</mi></mrow></math>	integrate(Math.pow(x, 2), x, 0, 7)
@@ -358,7 +358,7 @@ x^23^2	x^{23}^{2}	["x","23","2","^","^"]	x^{23^2}	<math><msup><mi>x</mi><msup><m
 \prod_{i=0}^{10} x^{2}	\prodidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(x, 2);}; return prod;})()
 \prod_{i=0}^10 x^{2}	\prodidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(x, 2);}; return prod;})()
 51 mod 3*4	51 mod 3*4	["51","3","mod","4","*"]	\left(51 \bmod 3\right) \cdot 4	<math><mrow><mrow><mo>(</mo><mrow><mn>51</mn><mo>mod</mo><mn>3</mn></mrow><mo>)</mo></mrow><mo>⋅</mo><mn>4</mn></mrow></math>	(51 % 3) * 4	0
--2 mod -x	-2 mod -x	["-2","x","neg","mod"]	-2 \bmod -x	<math><mrow><mn>-2</mn><mo>mod</mo><mrow><mo>−</mo><mi>x</mi></mrow></mrow></math>	-2 % -x
+-2 mod -x	-2 mod -x	["-2","x","neg","mod"]	-2 \bmod -x	<math><mrow><mn>-2</mn><mo>mod</mo><mrow><mo>−</mo><mi>x</mi></mrow></mrow></math>	((-2 % -x) + -x) % -x
 
 # Code spellings (spreadsheet, SQL, numpy/math, SymPy, GLSL) that no other row used — added 2026-11-03
 =AND(a, b)	((a)&(b))	["a","b","&"]	a \land b
@@ -400,7 +400,7 @@ ROUND(x, 2)	round(x,2)	["x","2","round"]	\text{round}\left(x, 2\right)
 SIN(x)	sin(x)	["x","sin"]	\sin\left(x\right)
 SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
 COMB(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
-TRUNC(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+TRUNC(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
 GREATEST(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
 LEAST(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
 MOD(a, b)	((a) mod (b))	["a","b","mod"]	a \bmod b
@@ -415,9 +415,9 @@ np.logical_not(a)	(!(a))	["a","\\not"]	\neg a
 np.where(x > 0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
 np.isin(x, [1, 2])	((x)∈{1,2})	["x","1","2","2","{}","∈"]	x \in \{1, 2\}
 np.isclose(a, b)	((a)≈(b))	["a","b","≈"]	a \approx b
-np.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
-math.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
-Math.trunc(x)	((x)-((x) mod 1))	["x","x","1","mod","-"]	x - \left(x \bmod 1\right)
+np.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+Math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
 math.factorial(5)	((5)!)	["5","!"]	5!
 scipy.special.perm(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
 scipy.special.comb(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}

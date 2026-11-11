@@ -10,7 +10,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows } from '../common.js';
+import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { JS_HELPERS } from '../js-helpers.js';
 
@@ -22,6 +22,8 @@ const JS = {
     abs: 'Math.abs', max: 'Math.max', min: 'Math.min', random: 'Math.random()',
     pow: (b, e) => `Math.pow(${b}, ${e})`,
     both: (a, b) => `(${a} && ${b})`, either: (a, b) => `(${a} || ${b})`, not: (x) => `!${x}`,
+    xor: (a, b) => `(!(${a}) !== !(${b}))`,
+    oddRoot: (x, n) => (n === 3 ? `Math.cbrt(${x})` : `(${x} < 0 ? -Math.pow(-${x}, 1 / ${n}) : Math.pow(${x}, 1 / ${n}))`),
     close: (a, b) => `Math.abs((${a}) - (${b})) < 1e-9`,
     eq: { '=': '==', '===': '===', '≠': '!=', '≠=': '!==' },
     ternary: (c, t, f) => `(${c} ? ${t} : ${f})`,
@@ -31,7 +33,14 @@ const JS = {
     perm: (n, k) => `${JS_HELPERS.perm}(${n}, ${k})`,
     comb: (n, k) => `${JS_HELPERS.comb}(${n}, ${k})`,
     gcd: (xs) => `${JS_HELPERS.gcd}([${xs}])`,
-    round: (v, d) => (d === '0' ? `Math.round(${v})` : `Math.round(${v} * Math.pow(10, ${d})) / Math.pow(10, ${d})`),
+    // halves away from zero, as evaluate() and calculate(): Math.round(-2.5) would be -2
+    round: (v, d) => {
+        const x = simple(v) ? v : `(${v})`;
+        if (isUnsigned(v)) return d === '0' ? `Math.round(${v})` : `Math.round(${v} * Math.pow(10, ${d})) / Math.pow(10, ${d})`;   // 3.7: no half below zero
+        if (d === '0') return `(${x} < 0 ? -Math.round(-${x}) : Math.round(${x}))`;
+        const p = `Math.pow(10, ${d})`;
+        return `(${x} < 0 ? -Math.round(-${x} * ${p}) : Math.round(${x} * ${p})) / ${p}`;
+    },
     fixed: (v, d) => `Number(${v}).toFixed(${d})`,   // a string with exactly d decimals
     derivative: (f, x) => `derivative(${f}, ${x})`,
     matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
@@ -51,7 +60,9 @@ const PY = {
     abs: 'abs', max: 'max', min: 'min', random: 'random.random()',
     pow: null,   // Python has `**`, see '^' below
     both: (a, b) => `(${a} and ${b})`, either: (a, b) => `(${a} or ${b})`, not: (x) => `not ${x}`,
-    close: (a, b) => `math.isclose(${a}, ${b})`,
+    xor: (a, b) => `((not (${a})) != (not (${b})))`,
+    oddRoot: (x, n) => (n === 3 ? `math.cbrt(${x})` : `(-(-${x}) ** (1 / ${n}) if ${x} < 0 else ${x} ** (1 / ${n}))`),   // math.cbrt: Python 3.11
+    close: (a, b) => `abs((${a}) - (${b})) < 1e-9`,   // as JavaScript and SQL: math.isclose has no absolute tolerance, so x ≈ 0 never held
     eq: { '=': '==', '===': '==', '≠': '!=', '≠=': '!=' },
     ternary: (c, t, f) => `(${t} if ${c} else ${f})`,
     list: { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ')'], '[)': ['(', ')'] },
@@ -60,8 +71,17 @@ const PY = {
     perm: (n, k) => `math.perm(${n}, ${k})`,
     comb: (n, k) => `math.comb(${n}, ${k})`,
     gcd: (xs) => `math.gcd(${xs})`,
-    round: (v, d) => `round(${v}, ${d})`,
-    fixed: (v, d, literal) => (literal === null ? `format(${v}, '.' + str(${d}) + 'f')` : `format(${v}, '.${literal}f')`),   // a string with exactly d decimals
+    // halves away from zero: Python's round(2.5) is 2 (to even), evaluate()'s 3
+    round: (v, d) => {
+        const x = simple(v) ? v : `(${v})`;
+        if (d === '0') return isUnsigned(v) ? `math.floor(${v} + 0.5)` : `(math.floor(${x} + 0.5) if ${x} >= 0 else -math.floor(-${x} + 0.5))`;
+        const p = `10 ** ${simple(d) ? d : `(${d})`}`;
+        if (isUnsigned(v)) return `math.floor(${v} * ${p} + 0.5) / ${p}`;
+        return `(math.floor(${x} * ${p} + 0.5) if ${x} >= 0 else -math.floor(-${x} * ${p} + 0.5)) / ${p}`;
+    },
+    // a string with exactly d decimals; rounded first, as format() alone takes 2.5 to '2' and 0.125 to '0.12'
+    // (in double quotes: checkGeneratedPython takes only "…" strings)
+    fixed: (v, d, literal) => (literal === null ? `format(${PY.round(v, d)}, "." + str(${d}) + "f")` : `format(${PY.round(v, literal)}, ".${literal}f")`),
     derivative: (f, x) => `sympy.diff(${f}, ${x})`,
     matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
     det: (m) => `numpy.linalg.det(${m})`,
@@ -105,8 +125,15 @@ const NP = {
     factorial: (x) => `scipy.special.factorial(${x})`,
     perm: (n, k) => `scipy.special.perm(${n}, ${k})`,
     comb: (n, k) => `scipy.special.comb(${n}, ${k})`,
-    round: (v, d) => `np.round(${v}, ${d})`,
-    fixed: (v, d, literal) => (literal === null ? `np.char.mod('%.' + str(${d}) + 'f', ${v})` : `np.char.mod('%.${literal}f', ${v})`),   // strings, element-wise
+    // halves away from zero: np.round rounds them to even
+    round: (v, d) => {
+        const x = simple(v) ? v : `(${v})`;
+        if (d === '0') return `np.where(${x} >= 0, np.floor(${x} + 0.5), -np.floor(-${x} + 0.5))`;
+        const p = `10.0 ** ${simple(d) ? d : `(${d})`}`;
+        return `np.where(${x} >= 0, np.floor(${x} * ${p} + 0.5), -np.floor(-${x} * ${p} + 0.5)) / ${p}`;
+    },
+    oddRoot: (x, n) => (n === 3 ? `np.cbrt(${x})` : `np.where(${x} < 0, -np.power(-${x}, 1 / ${n}), np.power(${x}, 1 / ${n}))`),
+    fixed: (v, d, literal) => (literal === null ? `np.char.mod("%." + str(${d}) + "f", ${NP.round(v, d)})` : `np.char.mod("%.${literal}f", ${NP.round(v, literal)})`),   // strings, element-wise
     /**
      * Operators written differently from Python's: (args rendered, node, render) → code, or null for Python's.
      * With one argument, max, min, sum, mean and prod are over an array (a column): max(HR) is
@@ -228,11 +255,20 @@ const SY = {
         loglog: (parts) => `sympy.log(sympy.log(${parts[0]}))`,
         logloglog: (parts) => `sympy.log(sympy.log(sympy.log(${parts[0]})))`,
         expm1: (parts) => `(sympy.exp(${parts[0]}) - 1)`,
-        root: (parts) => `sympy.root(${parts[1]}, ${parts[0]})`,
-        // round half up, written so it works on symbols too (Python's round does not)
-        round: (parts, node) => (node.args[1].type === 'number' && node.args[1].value === '0'
-            ? `sympy.floor(${parts[0]} + sympy.Rational(1, 2))`
-            : `sympy.floor((${parts[0]}) * 10**(${parts[1]}) + sympy.Rational(1, 2)) / 10**(${parts[1]})`),
+        // the real root of a negative number for an odd index: sympy.root(-8, 3) is the complex 1 + √3·i. Of a
+        // symbol, SymPy's own root stays (its real_root is piecewise, and differentiates as such)
+        root: (parts, node) => (node.args[0].type === 'number' && /^\d*[13579]$/.test(node.args[0].value)
+            && (node.args[1].type === 'number' || (node.args[1].op === 'neg' && node.args[1].args[0].type === 'number'))
+            ? `sympy.real_root(${parts[1]}, ${parts[0]})` : `sympy.root(${parts[1]}, ${parts[0]})`),
+        // halves away from zero, written so it works on symbols too (Python's round does not)
+        round: (parts, node) => {
+            const zero = node.args[1].type === 'number' && node.args[1].value === '0';
+            const scaled = zero ? `(${parts[0]})` : `(${parts[0]}) * 10**(${parts[1]})`;
+            const up = `sympy.floor(${scaled} + sympy.Rational(1, 2))`;
+            const down = `-sympy.floor(-${scaled} + sympy.Rational(1, 2))`;
+            const rounded = `sympy.Piecewise((${up}, ${parts[0]} >= 0), (${down}, True))`;
+            return zero ? rounded : `${rounded} / 10**(${parts[1]})`;
+        },
         '&': (parts, node, render) => flatten('&', node, render, 'sympy.And'),
         '|': (parts, node, render) => flatten('|', node, render, 'sympy.Or'),
         '\\not': (parts) => `sympy.Not(${parts[0]})`,
@@ -262,9 +298,10 @@ const SY = {
             // lim(f, x → a), lim(f, x, a[, side]), or lim(f, a) with the variable read from f
             const [f, second] = node.args;
             const arrow = second?.type === 'op' && second.op === '→';
+            if (node.args.length < 2) throw new Error('A limit needs a point: lim(f, x → a)');
             const [variable, to] = arrow ? second.args.map(render)
                 : node.args.length === 2 ? [firstVariable(f) || 'x', parts[1]] : [parts[1], parts[2]];
-            const side = node.args[3]?.type === 'symbol' ? { r: ', "+"', l: ', "-"' }[node.args[3].value] ?? '' : '';
+            const side = node.args[3]?.type === 'symbol' ? LIMIT_SIDES[node.args[3].value] ?? '' : '';
             return `sympy.limit(${parts[0]}, ${variable}, ${to}${side})`;
         },
         '\\sumidx': (parts, node, render) => symbolicIndexed('summation', node, render),
@@ -290,6 +327,8 @@ export function toCode(node, language = 'javascript') {
 
 function leaf(node, lang) {
     const v = node.value;
+    const percent = node.type === 'symbol' && percentDecimal(v);
+    if (percent) return leaf({ type: 'number', value: percent }, lang);   // 50% is 0.5
     if (node.type === 'number') {
         const n = v.endsWith('..') ? v.replace(/\.+$/, '') : v;
         return lang.exactNumber ? lang.exactNumber(n) : n;
@@ -343,6 +382,8 @@ const SY_CALLS = new Set(['!', 'perm', 'comb', 'mod', 'pmod', '=', '===', '≡',
 
 function codeBracketOp(node, lang = JS) {
     if (lang === SY && SY_CALLS.has(node.op)) return null;
+    // Python's `not` binds looser than + and ==: (not a) + 1 keeps its brackets, as an and/or does
+    if (lang === PY && node.op === '\\not') return '&';
     // sum(x) of one item is written as the item (numpy: a function call)
     if ((node.op === 'sum' || node.op === 'prod') && node.args.length === 1) {
         return node.args[0].type === 'op' ? codeBracketOp(node.args[0], lang) : null;
@@ -362,6 +403,27 @@ const MATH_FUNCTIONS = {
 };
 
 const RECIPROCALS = { csc: 'sin', sec: 'cos', cot: 'tan' };
+
+/** A number written without a sign: 3.7 */
+const isUnsigned = (text) => /^\d+(\.\d+)?$/.test(text);
+
+/** A name, a number or a call: needs no brackets as a factor. */
+function simple(text) {
+    if (/^[\w.]+$/.test(text)) return true;
+    const m = /^[\w.$]+\(/.exec(text);
+    if (!m) return false;
+    for (let i = m[0].length - 1, depth = 0; i < text.length; i++) {   // the call's bracket closes at the very end
+        if (text[i] === '(') depth++;
+        else if (text[i] === ')' && --depth === 0) return i === text.length - 1;
+    }
+    return false;
+}
+
+/** lim(f, x, a, r): SymPy's side of a one-sided limit */
+const LIMIT_SIDES = { r: ', "+"', l: ', "-"' };
+
+/** After a minus: -(-5), never --5 (a syntax error in JavaScript, a decrement in GLSL, a comment in SQL). */
+export const noSign = (text) => (text.startsWith('-') ? `(${text})` : text);
 
 function operation(node, render, lang) {
     const chained = lang.python && lang.name !== 'sympy' ? null : expandChain(node);   // Python chains comparisons itself
@@ -386,7 +448,10 @@ function operation(node, render, lang) {
     if (special != null) return special;
     if (MATH_FUNCTIONS[op]) return `${lang.math(MATH_FUNCTIONS[op])}(${list()})`;
     if (RECIPROCALS[op]) return `1 / ${lang.math(RECIPROCALS[op])}(${render(a)})`;
-    if (op === 'det') return lang.det(render(a));
+    if (op === 'det') {   // det([[1, 2], [3, 4]]): the list of rows written as the language's matrix (sympy.Matrix(…).det())
+        const rows = matrixRows(a);
+        return lang.det(rows ? lang.matrix(rows.map((r) => r.map(render))) : render(a));
+    }
     if (MATRICES[op]) {
         const m = lang.matrix(matrixRows(node).map((r) => r.map(render)));
         return op === 'vmatrix' ? lang.det(m) : m;
@@ -397,7 +462,12 @@ function operation(node, render, lang) {
 
     switch (op) {
         case '+': case '-': case '*': case '/': case 'mod':
-            if (op === '*' && isMinusOneTimes(node)) return '-' + render(b);
+            if (op === '*' && isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render, lang);   // -x, bracketed as -x is
+            // mod takes the divisor's sign, as in maths (and Python's %): -7 mod 3 is 2, where JavaScript's % gives -1
+            if (op === 'mod' && !lang.python && !(isUnsigned(render(a)) && isUnsigned(render(b)))) {   // 7 % 3 needs no more
+                const r = sideOf('mod', b, 'right');
+                return `((${sideOf('mod', a, 'left')} % ${r}) + ${r}) % ${r}`;
+            }
             return binary(op === 'mod' ? '%' : op);
         case '<': case '>':
             return binary(op);
@@ -412,9 +482,9 @@ function operation(node, render, lang) {
             return lang.pow ? lang.pow(b0, render(b)) : `${b0} ** ${side(b, 'right')}`;
         }
         case 'neg':
-            return '-' + unary(a);
+            return '-' + noSign(unary(a));
         case 'pm':   // both values
-            return `${lang.list['[]'][0]}${render(a)}, -${unary(a)}${lang.list['[]'][1]}`;
+            return `${lang.list['[]'][0]}${render(a)}, -${noSign(unary(a))}${lang.list['[]'][1]}`;
         case '≈':
             return lang.close(render(a), render(b));
         case '≡':   // without a modulus, congruent just means equal
@@ -446,8 +516,15 @@ function operation(node, render, lang) {
         }
         case 'abs':
             return `${lang.abs}(${render(a)})`;
-        case 'root':
+        case 'root': {
+            // an odd root of a negative number is real: cbrt(-8) is -2, where pow(-8, 1/3) is NaN
+            const n = a.type === 'number' && /^\d+$/.test(a.value) ? Number(a.value) : 0;
+            if (n > 1 && n % 2 === 1 && lang.oddRoot) {
+                const x = render(b);
+                return lang.oddRoot(simple(x) ? x : `(${x})`, n);
+            }
             return `${lang.math('pow')}(${render(b)}, 1 / (${render(a)}))`;
+        }
         case 'log':
             if (a.type === 'symbol' && a.value === 'e') return `${lang.math('log')}(${render(b)})`;
             return `(${lang.math('log')}(${render(b)}) / ${lang.math('log')}(${render(a)}))`;
@@ -461,12 +538,12 @@ function operation(node, render, lang) {
             return lang.fixed(render(a), render(b), b.type === 'number' && /^\d+$/.test(b.value) ? b.value : null);
         case 'random':
             return lang.random;
-        case 'max': case 'min':
-            return `${lang[op]}(${list()})`;
+        case 'max': case 'min':   // Python's max(x) of one number is an error: the number is its own max
+            return lang.python && args.length === 1 ? render(a) : `${lang[op]}(${list()})`;
         case 'gcd':
             return lang.gcd(list());
-        case 'mean':
-            return `((${args.map(render).join(' + ')}) / ${args.length})`;
+        case 'mean':   // written out as a sum, so bracket like +
+            return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length})`;
         case 'sum':   // written out as a + b + c, so bracket like +
             return args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ');
         case 'prod':
@@ -476,6 +553,7 @@ function operation(node, render, lang) {
         case '|':
             return lang.either(render(a), render(b));
         case '\\xor': {
+            if (lang.xor) return lang.xor(render(a), render(b));   // a true or false, not one of the operands
             const l = side(a, 'left');
             const r = side(b, 'right');
             return lang.either(lang.both(l, lang.not(`(${r})`)), lang.both(lang.not(`(${l})`), r));
@@ -596,4 +674,4 @@ function indexed(kind, args, render, lang) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [JS, PY, NP_NAMES, COMPARISONS, NP, SY_SETS, SY_INTERVALS, SY, LANGUAGES, MATH_FUNCTIONS, RECIPROCALS, NUMBER_SETS]) Object.setPrototypeOf(table, null);
+for (const table of [JS, PY, NP_NAMES, COMPARISONS, NP, SY_SETS, SY_INTERVALS, SY, LANGUAGES, MATH_FUNCTIONS, RECIPROCALS, NUMBER_SETS, LIMIT_SIDES]) Object.setPrototypeOf(table, null);

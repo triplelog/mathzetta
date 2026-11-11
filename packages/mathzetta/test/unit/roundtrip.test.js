@@ -33,8 +33,6 @@ const KNOWN = [
     [['A ∩ B', 'a ± b', '[1, 2]'], ['sql'], 'PostgreSQL arrays and set operations (ARRAY[…], INTERSECTION) are written but not read back'],
     [['fixed(2.5, 3)', 'fixed(3.14159, 2)', 'fixed(1/3, 4)', 'fixed(-2.5, 0)', 'fixed(2.5)', 'fixed(x, y)', 'fixed(x, 2)', '=FIXED(x, 1)'], ['python', 'numpy', 'sympy', 'sqlite'],
         "fixed's digit count sits inside a string ('.2f', '%.2f') the reader doesn't open; JavaScript, SQL, Excel and GLSL read back"],
-    [['fixed(-2.5, 0)'], ['sql', 'glsl'],
-        'read back as round(-2.5, 0), which evaluate() (Math.round) takes up to -2; fixed, like calculate(), rounds the half away from zero to -3'],
     [['fixed(x, y)'], ['sql', 'glsl'],
         'read back as round(x, y): with a digit count that is not a whole number, fixed takes its whole part and round does not; GLSL (no text) has to ignore a non-literal count'],
     [['sum(i^2-17,i=0,infinity)!=product(i^2-17,i\\in T)'], ['latex', 'text'], 'an infinite sum and a product over an unknown set T: no value to compare'],
@@ -52,7 +50,7 @@ const KNOWN = [
         "a spreadsheet's array constant {1,2;3,4} (and MDETERM) is written but not read back"],
     [['bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['javascript', 'python', 'numpy', 'sympy'],
         'a column of one-entry rows, [[x], [y]], reads back as the list [x, y]: the product is the same numbers, one level of brackets less'],
-    [['\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}', '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'], ['sympy'],
+    [['\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}', '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}', 'det([[1, 2], [3, 4]])'], ['sympy'],
         "SymPy's determinant is a method, Matrix(…).det(), which the reader doesn't take apart"],
 ];
 
@@ -76,38 +74,53 @@ const same = (a, b) => {
     return (Number.isNaN(a) && Number.isNaN(b)) || a === b || Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a));
 };
 
+// a second pass with negative and whole values: mod, round, trunc and roots differ between languages there
+const SIGNED = [-2, 3, -1.5, 4, -0.5, 2, -3, 1];
+
 suite('round trip: mathzetta reads what it writes', () => {
     const failures = Object.fromEntries(EVERY.map((f) => [f, []]));
-    const unexpectedPasses = [];
+    const counts = Object.fromEntries(EVERY.map((f) => [f, 0]));
+    const unexpectedPasses = new Set();
     let checked = 0;
-    for (const input of inputs) {
-        let tree;
-        try { tree = parseTree(input); } catch { continue; }
-        const scope = {};
-        let n = 0;
-        walk(tree, (node) => {
-            if (node.type === 'symbol' && /^[A-Za-zα-ωΑ-Ω]\w*$/.test(node.value) && !CONSTANTS.has(node.value) && !(node.value in scope)) {
-                scope[node.value] = VALUES[n++ % VALUES.length];
+    for (const values of [VALUES, SIGNED]) {
+        for (const input of inputs) {
+            let tree;
+            try { tree = parseTree(input); } catch { continue; }
+            const scope = {};
+            let n = 0;
+            walk(tree, (node) => {
+                if (node.type === 'symbol' && /^[A-Za-zα-ωΑ-Ω]\w*$/.test(node.value) && !CONSTANTS.has(node.value) && !(node.value in scope)) {
+                    scope[node.value] = values[n++ % values.length];
+                }
+            });
+            let want;
+            try { want = evaluate(tree, scope); } catch { continue; }   // only inputs with a value
+            if (typeof want === 'number' && Number.isNaN(want)) continue;   // NaN read back as NaN would prove nothing
+            for (const [format, write] of Object.entries(FORMATS)) {
+                let code;
+                try { code = write(tree); } catch { continue; }   // e.g. 5! has no SQLite
+                let ok = false;
+                try { ok = same(want, evaluate(parseTree(code), scope)); } catch { /* not ok */ }
+                checked++;
+                counts[format]++;
+                const expected = known.has(`${format}\t${input}`);
+                const where = values === VALUES ? '' : ' (negative and whole values)';
+                if (!ok && !expected) failures[format].push(`${input}  →  ${code}${where}`);
+                if (ok && expected && values === VALUES) unexpectedPasses.add(`${format}: ${input}`);
             }
-        });
-        let want;
-        try { want = evaluate(tree, scope); } catch { continue; }   // only inputs with a value
-        for (const [format, write] of Object.entries(FORMATS)) {
-            let code;
-            try { code = write(tree); } catch { continue; }   // e.g. 5! has no SQLite
-            let ok = false;
-            try { ok = same(want, evaluate(parseTree(code), scope)); } catch { /* not ok */ }
-            checked++;
-            const expected = known.has(`${format}\t${input}`);
-            if (!ok && !expected) failures[format].push(`${input}  →  ${code}`);
-            if (ok && expected) unexpectedPasses.push(`${format}: ${input}`);
         }
     }
     for (const format of EVERY) {
         test(`${format}: read back with the same value`, () => eq(failures[format], []));
     }
-    test('every listed exception still fails (remove the ones that work now)', () => eq(unexpectedPasses, []));
-    test('the sweep covers the cases', () => eq(checked > 6000, true, `${checked} checks`));
+    test('every listed exception still fails (remove the ones that work now)', () => eq([...unexpectedPasses], []));
+    // each format on its own, near what it checks today: a writer that starts throwing (and is skipped) shows here
+    test('the sweep covers the cases, in every format', () => {
+        // on 2026-11-11: 2068 for most, sympy 1978, sql 2063, sqlite 1905, excel 1965 (the rest have no such code)
+        const FLOOR = { sympy: 1950, sql: 2040, sqlite: 1880, excel: 1940 };
+        eq(checked > 20000, true, `${checked} checks`);
+        eq(EVERY.filter((f) => counts[f] < (FLOOR[f] ?? 2040)).map((f) => `${f}: ${counts[f]}`), []);
+    });
 });
 
 suite('code people type', () => {

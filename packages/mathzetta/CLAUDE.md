@@ -17,7 +17,7 @@ them, and nothing here about the closed projects beyond a public link.
 ## Commands
 
 ```bash
-npm test          # node test/run.js — unit tests (test/unit/*.test.js, 9 files by subject) + every TSV in test/cases
+npm test          # node test/run.js — unit tests (test/unit/*.test.js, 11 files by subject) + every TSV in test/cases
 npm run coverage  # tools/test-coverage.js: what the tables cover — checks per output column, operators no row uses,
                   # rows with no expected value, code spellings the reader knows that no input uses
 npm run build     # rollup → build/ (bundles, flavours, split ES modules and CommonJS; gitignored, shipped to npm)
@@ -54,7 +54,14 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   them in place: "Accept output", "Fill from current output" for rows with no expectations, "Mark known…" for test/known-failures.json. The run fails if a known failure starts passing.
   A cell `ERROR` (or `ERROR: text`) expects a refusal; in formulas.tsv, `ERROR` in the columns cell. test/known-failures.json
   is empty since 2026-11-03 (every stale expectation reviewed): keep it for genuinely unsolved checks, with a true reason.
-- Plain English is a cleaning phase, `src/parse/clean/english.js` (after `code`): comparisons (`x is at least 3`), ranges (`x is between 3 and 5`, `exclusive`, `strictly`), properties (`n is even`, `x is a whole number`, `n is divisible by 3`), and the words `toSpeech` uses, so speech reads back (parse.test.js checks it). Operator words (plus, times…) only between operands.
+- **One meaning in every output** (test/unit/agreement.test.js runs evaluate, calculate, the JavaScript and SQLite's SQL;
+  python.test.js runs Python and numpy, with negative numbers and halves): `mod` takes the divisor's sign, `round` takes a
+  half away from zero, `trunc` (read as `x < 0 ? ceil(x) : floor(x)`) goes toward zero, an odd root of a negative number is
+  real, `50%` is 0.5. A language whose own operator differs is written to match (JavaScript's `%`, Python's `round` and
+  `format`, SQL's `MOD`, PostgreSQL's integer `/`); a new output or spelling keeps to them.
+- Plain English is a cleaning phase, `src/parse/clean/english.js` (after `code`). It runs only when the text holds one of
+  its `TRIGGER` words (most input has none; the phase was two thirds of parse time) — a new phrase needs a trigger word,
+  and goes in `PHRASES`, which parse.test.js checks against `TRIGGER`. It reads comparisons (`x is at least 3`), ranges (`x is between 3 and 5`, `exclusive`, `strictly`), properties (`n is even`, `x is a whole number`, `n is divisible by 3`), and the words `toSpeech` uses, so speech reads back (parse.test.js checks it). Operator words (plus, times…) only between operands.
 - A chain of comparisons `3 < x < 7` keeps its written postfix (`3 x < 7 <`); `expandChain()` in common.js turns it into
   `(3 < x) & (x < 7)` for evaluate, calculate and the code outputs that don't chain (JS, SymPy, SQL, Excel, GLSL).
 - `src/python-function.js` — toPythonFunction, checkGeneratedPython (the whitelist), Python templates with `# mathzetta:` slots; `tools/python-template.js` is the `mathzetta-python` command; `examples/python/logistic.py` and `test/fixtures/python/` are run by test/unit/python.test.js when python3 (and numpy) are there. `preparePythonTemplate` is what a form needs (every slot's error, latex, tree, never throws); ../pyslots is the web page built on it, with the matplotlib chart examples over baseball data.
@@ -80,12 +87,15 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   functions the caller lists (`functions`: a list or `(name) => boolean`); `strToSQL` refuses names that
   aren't columns; generated JS passes `checkGeneratedJs` (helpers matched as exact text, `keywords: false` for
   formulas); every top-level lookup table has a null prototype (a file ends with
-  `Object.setPrototypeOf(table, null)` for each) — a new table goes in that list; names from a postfix array
+  `Object.setPrototypeOf(table, null)` for each) — a new table goes in that list, and an object literal looked up
+  inside a function (`{ r: …, l: … }[value]`) gets `__proto__: null` or becomes a Map; names from a postfix array
   or tree are escaped in MathML and LaTeX; `filterShader` takes only GLSL identifiers for uniforms and pictures.
 - **Nothing runs for long or grows without bound** (suite "limits: work, size and depth"): `parse` reads at most
   5000 characters (`maxLength`), trees are at most 1000 levels (`MAX_DEPTH`, src/tree.js), `evaluate` and
   `calculate` have a step budget (5,000,000 nodes per call, nested calls share it), perm/comb stop at ∞, a
   cleaning phase that grows past 100k characters and an output past a million (`guardLength`) are refused, a
-  filter pass has at most 24 neighbourhood calls. A regex that starts with an operand anchors it to the start of
+  filter pass has at most 24 neighbourhood calls, `§` is refused (it marks protected names), at most 100 `\int` are
+  read, `calculate` charges big-number gcds to its step budget and caps decimal places at 10,000, and generated
+  JS factorial/perm/comb stop where a double reaches ∞ (test/unit/untrusted.test.js has these and the checker holes). A regex that starts with an operand anchors it to the start of
   a word (english.js), or a long word makes it quadratic. Generated JS sum loops cap each loop at a million but
   checkGeneratedJs refuses them, so only a caller running toJavaScript itself meets them.

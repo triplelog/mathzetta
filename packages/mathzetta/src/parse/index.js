@@ -28,9 +28,14 @@ const MARKED = /\\(?:text|textrm|textit|mathrm|mathit|operatorname)\{\s*([A-Za-z
 
 function protectNames(text, names = [], values = []) {
     const protectedNames = new Map();
+    const ids = new Map();   // one placeholder per name, however often it is written
     const placeholder = (name) => {
-        const id = `${PROTECTED}${protectedNames.size}${PROTECTED}`;
-        protectedNames.set(id, name);
+        let id = ids.get(name);
+        if (id === undefined) {
+            id = `${PROTECTED}${protectedNames.size}${PROTECTED}`;
+            protectedNames.set(id, name);
+            ids.set(name, id);
+        }
         return id;
     };
     // \text{round}(x, 2), \operatorname{sin} x: a function MathZetta knows stays that function
@@ -103,6 +108,8 @@ export function parseSteps(expression, options = {}) {
         // a bound on the work: some cleaning and tokenizing steps grow faster than the length
         const maxLength = options.maxLength ?? MAX_LENGTH;
         if (expression.length > maxLength) throw new Error(`Longer than ${maxLength} characters (options.maxLength)`);
+        // § marks the names kept whole (§0§): a typed one would be taken for a mark, or never end
+        if (expression.includes(PROTECTED)) throw new Error(`The character ${PROTECTED} can't be read: MathZetta uses it to mark names`);
         // =B2*2: a spreadsheet formula, whose cells (B2, $C$3) and ranges (B2:B9) are names
         const sheet = /^\s*=(?!=)/.test(expression);
         // $B$1 is B1 (absolute or not, the same cell); outside strings only

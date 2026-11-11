@@ -60,6 +60,7 @@ const NAMED = [...TRIG, ...Object.keys(INVERSE), 'ln', 'det'];
 const CALLS = { atan2: 'atan2', max: 'max', min: 'min', gcd: 'gcd', mean: 'mean', round: 'round', fixed: 'fixed', expm1: 'expm1', random: 'random' };
 
 const GROUPS = { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ']'], '[)': ['[', ')'] };
+const BIG_OPERATORS = ['int', 'lim', '\\sumidx', '\\prodidx'];   // a body after them takes in whatever follows
 const LATEX_SYMBOLS = { '\\partial': '∂', '\\nabla': '∇', '\\ell': 'ℓ', '\\infty': '∞', '\\emptyset': '∅' };
 
 /** Custom functions drawn as decorations: \boxed{x} parses as boxed(x). */
@@ -192,7 +193,7 @@ class Layout {
 
     symbol(v) {
         if (GREEK[v]) v = GREEK[v];
-        if (LATEX_SYMBOLS[v]) return this.text('ord', LATEX_SYMBOLS[v]);
+        if (LATEX_SYMBOLS[v]) return this.text('ord', LATEX_SYMBOLS[v]);   // a null-prototype table: toString is a name
         if (v === '\\+' || v === '\\-') return this.text('ord', v[1]);
         if (v === '-∞') return this.text('ord', MINUS + '∞');
         if (/^[A-Za-z]$/.test(v) || /^[α-ω]$/.test(v)) return this.text('var', v);
@@ -209,7 +210,7 @@ class Layout {
     operation(node, ctx) {
         const { op, args } = node;
         const [a, b] = args;
-        const r = (n, c = {}) => this.render(n, { ...ctx, ...c, forceParens: c.forceParens || false, before: c.before || false });
+        const r = (n, c = {}) => this.render(n, { ...ctx, ...c, forceParens: c.forceParens || false, before: c.before || false, leftFactor: false });
         const kind = OP_CLASS[op] ?? (/^[a-z0-9]+$/i.test(op) ? op : 'other');
         const wrap = (content) => this.wrap(node, ['op', `op-${kind}`], content);
         const side = (child, s) => (needsBrackets(node, child, s) && child.op !== '/' ? this.fence(r(child)) : r(child));
@@ -220,13 +221,23 @@ class Layout {
         const rows = matrixRows(node);   // pmatrix, bmatrix, vmatrix, and [[1, 2], [3, 4]]
         if (rows) return wrap(this.matrix(node, rows, ctx));
         if (GROUPS[op]) return wrap(this.fence(this.list(args, ctx), ...GROUPS[op]));
+        // a choice of equations or inequalities (a CAS's solutions) reads in words: x = 2 or x = 3
+        if ((op === '|' || op === '&') && args.length >= 2 && args.every(isStatement)) {
+            // the other word inside keeps its brackets: (x = 1 or x = 2) and y = 3
+            const part = (n) => ((n.op === '|' || n.op === '&') && n.op !== op ? this.fence(r(n)) : r(n));
+            return wrap(row(args.map((n, i) => (i ? [this.text('conj', op === '|' ? 'or' : 'and'), part(n)] : [part(n)])).flat()));
+        }
         if (RELATIONS[op] && args.length === 2) return wrap(row(side(a, 'left'), this.rel(RELATIONS[op]), side(b, 'right')));
         if (BINARY[op] && args.length === 2) return wrap(row(side(a, 'left'), this.bin(BINARY[op]), side(b, 'right')));
 
         switch (op) {
             case '+': {
                 // a + (-1·x) and a + (-3) read as a − x and a − 3.
-                if (isMinusOneTimes(b)) return wrap(row(side(a, 'left'), this.bin(MINUS), this.wrap(b, ['op', 'op-mul'], this.render(b.args[1], ctx))));
+                if (isMinusOneTimes(b)) {   // bracketed as after any minus: c + (−1)(a + b) is c − (a + b)
+                    const x = b.args[1];
+                    const drawn = needsBrackets({ op: '-' }, x, 'right') ? this.fence(r(x)) : r(x);
+                    return wrap(row(side(a, 'left'), this.bin(MINUS), this.wrap(b, ['op', 'op-mul'], drawn)));
+                }
                 if (b.type === 'number' && b.value.startsWith('-')) return wrap(row(side(a, 'left'), this.bin(MINUS), this.wrap(b, ['number'], this.text('num', b.value.slice(1)))));
                 return wrap(row(side(a, 'left'), this.bin('+'), this.signed(b, side(b, 'right'))));
             }
@@ -238,8 +249,10 @@ class Layout {
                 return wrap(this.fraction(node, ctx));
             case '^':
                 return wrap(this.power(node, ctx));
-            case '_':
-                return wrap(this.script(r(a, { forceParens: true }), null, ctx, r(b, { level: ctx.level + 1 })));
+            case '_': {   // (a + b)₁ keeps its brackets
+                const compound = bracketOp(a) && precedenceOf(bracketOp(a)) < 100;
+                return wrap(this.script(compound ? this.fence(r(a)) : r(a, { forceParens: true }), null, ctx, r(b, { level: ctx.level + 1 })));
+            }
             case 'neg':
                 return wrap(row(this.text('sign', MINUS), unaryNeedsBrackets(op, a) ? this.fence(r(a)) : r(a, { before: ctx.before })));
             case 'pm':
@@ -271,10 +284,11 @@ class Layout {
                 return wrap(this.fence(this.stack(r(a), r(b), false)));
             case '?:':
                 return wrap(this.o.cases ? this.cases(node, ctx) : row(r(a), this.bin('?'), r(b), this.bin(':'), r(args[2])));
-            case 'sum':
-                return wrap(row(args.map((n, i) => (i ? [this.bin('+'), r(n)] : [r(n)])).flat()));
-            case 'prod':
-                return wrap(row(args.map((n, i) => (i ? [this.bin('·'), r(n)] : [r(n)])).flat()));
+            case 'sum': case 'prod': {   // each term bracketed as + and · would bracket it: prod(a + b, c) is (a + b)·c
+                const parent = { op: op === 'sum' ? '+' : '*' };
+                const term = (n, i) => (needsBrackets(parent, n, i ? 'right' : 'left') ? this.fence(r(n)) : r(n));
+                return wrap(row(args.map((n, i) => (i ? [this.bin(op === 'sum' ? '+' : '·'), term(n, i)] : [term(n, i)])).flat()));
+            }
             case 'der':
                 return wrap(this.derivative(node, ctx));
             case 'int':
@@ -302,12 +316,13 @@ class Layout {
     /** 2x, x·2, (x+1)(x−2), sin x cos x. */
     product(node, ctx) {
         const [a, b] = node.args;
-        if (isMinusOneTimes(node)) return row(this.text('sign', MINUS), this.render(b, ctx));
+        if (isMinusOneTimes(node)) return row(this.text('sign', MINUS), unaryNeedsBrackets('neg', b) ? this.fence(this.render(b, ctx)) : this.render(b, ctx));
         const sides = bracketedSides(node);
+        if (BIG_OPERATORS.includes(a.op)) sides.left = true;   // (∑ i)·x: the sum's body would take in the x
         const implicit = isImplicitProduct(a, b, sides);
         // "sin x · y" must keep its brackets: sin(x) y. Before another function it needn't: sin x cos x.
         const nextIsCall = startsWithCall(b);
-        const left = sides.left ? this.fence(this.render(a, ctx)) : this.render(a, { ...ctx, before: implicit && !nextIsCall });
+        const left = sides.left ? this.fence(this.render(a, ctx)) : this.render(a, { ...ctx, before: implicit && !nextIsCall, leftFactor: true });
         const right = sides.right ? this.fence(this.render(b, ctx)) : this.render(b, { ...ctx, before: ctx.before });
         // A thin space before a function name: 2 sin x, x² ln x.
         const join = !implicit ? this.bin('·') : box(this.el(nextIsCall ? 'fnspace' : 'times', ''));
@@ -358,8 +373,14 @@ class Layout {
     fraction(node, ctx) {
         const [a, b] = node.args;
         if (ctx.level > 0 && this.o.scriptFractions === 'slash' && isSimpleArgument(a, true) && isSimpleArgument(b, true)) {
-            const side = (n) => (n.type === 'op' && !isSimpleArgument(n) ? this.fence(this.render(n, ctx)) : this.render(n, ctx));
-            return row(side(a), this.text('ord', '/'), side(b));
+            const inner = { ...ctx, leftFactor: false };
+            // x^{1/(2n)} is not x^{(1/2)n}: a product below the slash keeps its brackets
+            const side = (n, below) => (n.type === 'op' && (!isSimpleArgument(n) || (below && n.op === '*' && !isMinusOneTimes(n)))
+                ? this.fence(this.render(n, inner)) : this.render(n, inner));
+            // a leading minus needs no brackets: e^{−x²/2} reads the same as e^{(−x²)/2}
+            const top = a.type === 'op' && a.op === 'neg' ? this.render(a, inner) : side(a, false);
+            const slash = row(top, this.text('ord', '/'), side(b, true));
+            return ctx.leftFactor ? this.fence(slash) : slash;   // and (1/2)n keeps its own
         }
         // A fraction inside a fraction, or in running text, is set smaller.
         const k = ctx.level > 0 || ctx.inFraction || !this.o.display ? 0.8 : 1;
@@ -382,7 +403,7 @@ class Layout {
     /** x², (x+1)³, e^{x²}, sin²x, x₁². */
     power(node, ctx) {
         const [a, b] = node.args;
-        const up = { ...ctx, level: ctx.level + 1, forceParens: false, before: false, inFraction: false };
+        const up = { ...ctx, level: ctx.level + 1, forceParens: false, before: false, inFraction: false, leftFactor: false };
         const exponent = () => this.render(b, up);
         if (this.o.trigPowers && TRIG.includes(a.op) && isPositiveWhole(b)) {
             return this.wrap(a, ['op', `op-${a.op}`], this.named(a, ctx, exponent()));
@@ -392,7 +413,8 @@ class Layout {
             return this.wrap(a, ['op', 'op-subscript'], this.script(this.render(a.args[0], { ...ctx, forceParens: true }), exponent(), ctx, sub));
         }
         // (sin x)^{1/2}: a named function keeps its own name outside the brackets only as sin²x.
-        const fenceBase = needsBrackets(node, a, 'left') || (a.type === 'number' && a.value.startsWith('-')) || a.op === '/' || NAMED.includes(a.op);
+        const fenceBase = needsBrackets(node, a, 'left') || (a.type === 'number' && a.value.startsWith('-')) || a.op === '/' || NAMED.includes(a.op)
+            || BIG_OPERATORS.includes(a.op);   // (∫x dx)², (∑ i)²: the exponent would sit on the body
         const base = fenceBase ? this.fence(this.render(a, ctx)) : this.render(a, { ...ctx, forceParens: true });
         return this.script(base, exponent(), ctx);
     }
@@ -529,7 +551,7 @@ class Layout {
         const arrow = () => this.rel('→');
         let under;
         switch (args.length) {
-            case 1: return row(this.word('lim'), box(this.el('fnspace', '')), this.render(f, ctx));
+            case 1: return row(this.word('lim'), box(this.el('fnspace', '')), this.body(f, ctx));
             case 2: {
                 const v = firstVariable(f);
                 const approaches = second.type === 'number' || (second.type === 'symbol' && second.value.includes('∞'));
@@ -542,7 +564,7 @@ class Layout {
                 under = row(r(second), arrow(), this.script(r(third), this.wrap(fourth, ['symbol'], this.text('ord', sign)), below));
             }
         }
-        return row(this.under(this.word('lim'), under, ctx), this.render(f, ctx));
+        return row(this.under(this.word('lim'), under, ctx), this.body(f, ctx));
     }
 
     /** A word with something set small beneath it, lim over x → 0; the word keeps the baseline. */
@@ -554,12 +576,18 @@ class Layout {
     }
 
     /** ∑ and ∏ with the index below and the end above. */
+    /** What a limit, sum or product applies to: a sum or anything looser is bracketed, lim (x + 1) not lim x + 1. */
+    body(f, ctx) {
+        const op = bracketOp(f);
+        return op && precedenceOf(op) < precedenceOf('*') ? this.fence(this.render(f, ctx)) : this.render(f, ctx);
+    }
+
     bigOperator(name, args, ctx) {
         const [f, from, to] = args;
         const up = { ...ctx, level: ctx.level + 1 };
         const lo = from ? this.render(from, up) : null;
         const hi = to ? this.render(to, up) : null;
-        const body = this.render(f, ctx);
+        const body = this.body(f, ctx);
         if (!this.o.display || ctx.level > 0) {
             const half = 0.55;
             const sign = svg(name, `${this.p}-bigsign`, `height:${em(2 * half)};width:${em(0.8)};vertical-align:${em(AXIS - half)}`);
@@ -635,6 +663,11 @@ function isSimpleArgument(node, inScript = false) {
     return false;
 }
 
+const STATEMENTS = ['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≈', '≡', '∈', '∉'];
+/** An equation or inequality, or such statements joined by or / and. */
+const isStatement = (n) => n.type === 'op' && n.args.length >= 2
+    && ((n.args.length === 2 && STATEMENTS.includes(n.op)) || ((n.op === '|' || n.op === '&') && n.args.every(isStatement)));
+
 const isShortSymbol = (n) => n.type === 'symbol' && (n.value.length === 1 || /^[α-ωΑ-Ω]$/.test(n.value) || Boolean(GREEK[n.value]));
 const isPositiveWhole = (n) => n.type === 'number' && /^[1-9]\d*$/.test(n.value) && Number(n.value) < 10;
 
@@ -647,3 +680,7 @@ function startsWithCall(node) {
     }
     return false;
 }
+
+// Lookup tables are keyed by what an expression holds: with no prototype, a name like toString or
+// constructor finds nothing rather than Object's own (and is drawn as the name it is).
+for (const table of [OP_CLASS, RELATIONS, BINARY, INVERSE, CALLS, GROUPS, LATEX_SYMBOLS, ACCENTS]) Object.setPrototypeOf(table, null);

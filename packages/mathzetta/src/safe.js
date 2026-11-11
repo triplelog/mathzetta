@@ -12,7 +12,7 @@
  *     c0, c1 …) plus the few keywords and locals of the helpers the
  *     generator writes (factorial, gcd …);
  *   - member access only to listed members: Math.<function or constant>,
- *     Number.isInteger / isFinite, Array.from, .includes, .reduce — never a
+ *     Number.isInteger / isFinite, .includes, .reduce — never a
  *     computed member (`x["constructor"]`), never .constructor / __proto__;
  *   - operators and brackets.
  * Anything else — an unknown name like `alert` or `fetch`, `import(…)`, a
@@ -27,8 +27,8 @@ import { JS_HELPERS } from './js-helpers.js';
 export class UnsafeCodeError extends Error {}
 
 const MATH = new Set(Object.getOwnPropertyNames(Math));
-const MEMBERS = new Set([...MATH, 'isInteger', 'isFinite', 'from', 'includes', 'reduce', 'toFixed']);
-const OBJECTS = { Math: MATH, Number: new Set(['isInteger', 'isFinite']), Array: new Set(['from']) };
+const MEMBERS = new Set([...MATH, 'isInteger', 'isFinite', 'includes', 'reduce', 'toFixed']);
+const OBJECTS = { Math: MATH, Number: new Set(['isInteger', 'isFinite']) };
 /** Names any generated code may use. */
 const BUILTIN = new Set(['Math', 'Number', 'Infinity', 'NaN', 'true', 'false', 'null']);
 /** Statement keywords: for generators that write statements (qblur's CPU passes); `keywords: false` refuses them. */
@@ -69,6 +69,9 @@ export function checkGeneratedJs(code, o = {}) {
         const rest = code.slice(i);
         const space = /^\s+/.exec(rest);
         if (space) { i += space[0].length; continue; }
+        // comments: what the checker would read as code (or a string) JavaScript skips, and the reverse;
+        // <!-- and --> are line comments too in a Function body. The renderer never writes any of them.
+        if (rest.startsWith('/*') || rest.startsWith('//') || rest.startsWith('<!--') || rest.startsWith('-->')) fail('a comment');
         const num = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(rest);
         if (num && !(prev && prev.type === 'id' && /[\w$]$/.test(code[i - 1] ?? ''))) {
             prev = { type: 'num', value: num[0] };

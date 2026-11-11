@@ -71,7 +71,7 @@ function rewriteCalls(text, pattern, replace) {
         if (out == null) continue;
         const [replacement, consumed = 0] = Array.isArray(out) ? out : [out];
         text = text.slice(0, m.index) + replacement + text.slice(close + 1 + consumed);
-        // trunc(x) is x - (x mod 1): nested, each level doubles the text
+        // trunc(x) is (x < 0 ? ceil(x) : floor(x)): nested, each level triples the text
         if (text.length > 100000) throw new Error('The expression expands too much when read');
     }
     return text;
@@ -141,17 +141,63 @@ const SHEET_CALLS = {
     LOG10: (a) => a.length === 1 && `log_{10}(${a[0]})`,
 };
 
+/**
+ * a^b^c^d → ((a^b)^c)^d: a spreadsheet's ^ groups left to right. Each `x ^ y` followed by another ^ is
+ * bracketed, and the bracketed group is the next one's base; an operand is a name, a number, a
+ * protected name, a bracketed group or a call. One scan, however long the chain.
+ */
+function powersLeftToRight(text, operand) {
+    const at = new RegExp(`^(?:${operand})`, 'u');
+    const before = new RegExp(`(?:${operand})$`, 'u');
+    const name = /[\p{L}_][\p{L}\p{N}_.]*$/u;
+    for (let i = text.indexOf('^'); i >= 0; i = text.indexOf('^', i + 1)) {
+        // the exponent: from the first non-space after ^
+        let start = i + 1;
+        while (/\s/.test(text[start] ?? '')) start++;
+        let end;
+        if (text[start] === '(') {
+            end = closing(text, start) + 1;
+        } else {
+            const m = at.exec(text.slice(start));
+            end = m ? start + m[0].length : 0;
+            if (m && text[end] === '(') end = closing(text, end) + 1;   // a call: f(x)
+        }
+        if (end <= start || !/^\s*\^/.test(text.slice(end))) continue;
+        // the base: back from the last non-space before ^
+        let baseEnd = i;
+        while (baseEnd > 0 && /\s/.test(text[baseEnd - 1])) baseEnd--;
+        let base;
+        if (text[baseEnd - 1] === ')') {
+            base = opening(text, baseEnd - 1);
+            const fn = base > 0 && name.exec(text.slice(Math.max(0, base - 64), base));   // a call: SQRT(x)^2^3
+            if (fn) base -= fn[0].length;
+        } else {
+            const m = before.exec(text.slice(Math.max(0, baseEnd - 64), baseEnd));
+            base = m ? baseEnd - m[0].length : -1;
+        }
+        if (base < 0) continue;
+        text = `${text.slice(0, base)}(${text.slice(base, end)})${text.slice(end)}`;
+        i = end + 1;   // the bracket just closed: the next ^ takes the group as its base
+    }
+    return text;
+}
+
+/** Index of the ( matching the ) at `close`, or -1. */
+function opening(text, close) {
+    for (let i = close, depth = 0; i >= 0; i--) {
+        if (text[i] === ')') depth++;
+        else if (text[i] === '(' && --depth === 0) return i;
+    }
+    return -1;
+}
+
 function spreadsheet(text) {
     text = text.replace(/^\s*=/, '').replace(/(?<![\w.])_xlfn\./g, '');
     text = text.replace(/&/g, '+');   // & joins text in a spreadsheet (AND() is the logical one); strings are placeholders by now
     // Excel's minus binds tighter than ^ (-x^2 is (-x)^2), and ^ groups left to right (2^3^2 is 64)
     const operand = '(?:[\\p{L}_][\\p{L}\\p{N}_.]*|\\d+(?:\\.\\d+)?|§\\d+§)';
     text = text.replace(new RegExp(`(^|[(,=<>*/+^-]\\s*)-\\s*(${operand})(?=\\s*\\^)`, 'gu'), '$1(-$2)');
-    for (let again = true; again;) {
-        const before = text;
-        text = text.replace(new RegExp(`(^|[^\\p{L}\\p{N}_.)§])(${operand}\\s*\\^\\s*${operand})(?=\\s*\\^)`, 'u'), '$1($2)');
-        again = text !== before;
-    }
+    text = powersLeftToRight(text, operand);
     return rewriteCalls(text, /(?<![\w.])([A-Z][A-Z0-9]*(?:\.[A-Z]+)?)\s*\(/g, (args, m) => SHEET_CALLS[m[1]]?.(args) || null);
 }
 
@@ -206,7 +252,7 @@ function sql(text) {
         const m = close > 0 && typeTest.exec(text.slice(at, close + 1));
         if (!m) continue;
         const [, v, test] = m;
-        const set = { [`${v} = TRUNC(${v})`]: 'ℤ', [`${v} = TRUNC(${v}) AND ${v} > 0`]: 'ℕ', [`ABS(${v}) < ∞`]: 'ℝ' }[test.trim()];
+        const set = new Map([[`${v} = TRUNC(${v})`, 'ℤ'], [`${v} = TRUNC(${v}) AND ${v} > 0`, 'ℕ'], [`ABS(${v}) < ∞`, 'ℝ']]).get(test.trim());
         if (set) text = `${text.slice(0, at)}((${v}) ∈ ${set})${text.slice(close + 1)}`;
     }
     // CAST(x AS REAL): SQLite's real division
@@ -248,6 +294,8 @@ const NP_BARE = {
     logical_xor: 'logical_xor', prod: 'prod', sum: 'sum', trunc: 'trunc',
 };
 
+const NP_CONSTANTS = { inf: '∞', nan: 'NaN' };
+
 function prefixes(text) {
     text = text.replace(/(?<![\w.])(?:np|numpy)\.random\.random\(\s*\)|(?<![\w.])random\.random\(\s*\)/g, 'Math.random()');
     // matrices: np.array([[1, 2], [3, 4]]) is the list of lists; np.linalg.det(A) is det(A)
@@ -256,10 +304,10 @@ function prefixes(text) {
     text = text.replace(/(?<![\w.])(?:np|numpy)\.(\w+)/g, (whole, name) => {
         if (NP_AS_MATH[name]) return `Math.${NP_AS_MATH[name]}`;
         if (NP_BARE[name]) return NP_BARE[name];
-        return { inf: '∞', nan: 'NaN' }[name] ?? whole;
+        return NP_CONSTANTS[name] ?? whole;
     });
     text = text.replace(/(?<![\w.])(?:math|Math)\.(factorial|isfinite|isclose|prod|inf|nan|abs|trunc)\b/g,
-        (whole, name) => ({ inf: '∞', nan: 'NaN' }[name] ?? name));
+        (whole, name) => NP_CONSTANTS[name] ?? name);
     text = text.replace(/(?<![\w.])Number\.(isInteger|isFinite)\b/g, (whole, name) => name.toLowerCase());
     text = text.replace(/(?<![\w.])scipy\.(?:special|integrate)\.(\w+)/g, '$1');
     text = sympyNames(text);
@@ -274,7 +322,7 @@ const SYMPY_CALLS = {
     sqrt: 'Math.sqrt', exp: 'Math.exp', sin: 'Math.sin', cos: 'Math.cos', tan: 'Math.tan', sinh: 'Math.sinh', cosh: 'Math.cosh', tanh: 'Math.tanh',
     asin: 'Math.asin', acos: 'Math.acos', atan: 'Math.atan', asinh: 'Math.asinh', acosh: 'Math.acosh', atanh: 'Math.atanh', atan2: 'atan2',
     csc: 'csc', sec: 'sec', cot: 'cot', log: 'log', Abs: 'abs', floor: 'floor', ceiling: 'ceil', Max: 'max', Min: 'min',
-    factorial: 'factorial', binomial: 'comb', ff: 'perm', gcd: 'gcd', gcd_list: 'sympy_list_gcd', Mod: 'mod', root: 'sympy_root',
+    factorial: 'factorial', binomial: 'comb', ff: 'perm', gcd: 'gcd', gcd_list: 'sympy_list_gcd', Mod: 'mod', root: 'sympy_root', real_root: 'sympy_root',
     Rational: 'sympy_rational', Integer: 'sympy_value', Float: 'sympy_value', Eq: 'sympy_eq', Ne: 'sympy_ne',
     And: 'sympy_and', Or: 'sympy_or', Not: 'sympy_not', Xor: 'sympy_xor', Nand: 'sympy_nand', Nor: 'sympy_nor',
     Piecewise: 'sympy_piecewise', FiniteSet: 'sympy_set', Interval: 'sympy_interval', Contains: 'sympy_contains',
@@ -323,7 +371,8 @@ const CALLS = {
     mod: (a) => a.length === 2 && `((${a[0]}) \\mod (${a[1]}))`,
     atan: (a) => a.length === 2 && `atan2(${a[0]}, ${a[1]})`,
     exp2: (a) => a.length === 1 && `((2)^(${a[0]}))`,
-    trunc: (a) => a.length === 1 && `((${a[0]}) - ((${a[0]}) \\mod 1))`,
+    // toward zero: ceil below 0, floor above (x - (x mod 1) is floor when mod takes the divisor's sign)
+    trunc: (a) => a.length === 1 && `((${a[0]}) < 0 ? (ceil(${a[0]})) : floor(${a[0]}))`,
     vec2: (a) => `(${a.join(', ')})`,
     vec3: (a) => `(${a.join(', ')})`,
     vec4: (a) => `(${a.join(', ')})`,
@@ -481,4 +530,4 @@ export function codeRewrites(text) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [SHEET_CALLS, SQL_NAMES, NP_AS_MATH, NP_BARE, SYMPY_CONSTANTS, SYMPY_SETS, SYMPY_CALLS, SYMPY_INTERVALS, CALLS]) Object.setPrototypeOf(table, null);
+for (const table of [SHEET_CALLS, SQL_NAMES, NP_AS_MATH, NP_BARE, SYMPY_CONSTANTS, SYMPY_SETS, SYMPY_CALLS, SYMPY_INTERVALS, CALLS, NP_CONSTANTS]) Object.setPrototypeOf(table, null);

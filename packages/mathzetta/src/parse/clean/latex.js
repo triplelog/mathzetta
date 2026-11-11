@@ -33,7 +33,7 @@ const CLOSE = ')}]';
 export function spacedRewrites(input) {
     input = ifThenElse(input);
     // a ≡ b (mod n): the congruence form, applying to the whole statement
-    input = input.replace(/\(\s*\\?b?mod\s+([^()]+?)\s*\)/g, ' \\pmod{$1}');
+    input = input.replace(/\(\s*\\?b?mod\s+([^()\s](?:[^()]*[^()\s])?)\s*\)/g, ' \\pmod{$1}');   // the body starts and ends on a non-space: no backtracking over a run of spaces
     // lim x->0 f, lim x→a f: the spaces show where the subscript ends.
     input = input.replace(/(^|[^A-Za-z\\])lim\s+([^\s_{}]+?)\s*(->|→|\\to)\s*([^\s]+)\s+/g, '$1lim_{$2→$4} ');
     input = unwrapText(input);
@@ -46,6 +46,11 @@ export function spacedRewrites(input) {
             // and so does a protected name: \int_0^b with b a value (§0§) → \int_0^{§0§}
             const kept = /^§\d+§/.exec(input.slice(i + 1));
             if (kept) { input = `${input.slice(0, i + 1)}{${kept[0]}}${input.slice(i + 1 + kept[0].length)}`; continue; }
+            // and a command with no argument: \sum_{n=1}^\infty \frac{1}{n^2} → ^{\infty}, or the spaces go and ∞frac is one name
+            // (a _ after anything but a name or a group is the words phase's own mark, as in 2!_\cdot 3)
+            const scripted = input[i] === '^' || /[A-Za-z}]/.test(input[i - 1] ?? '');
+            const command = scripted && /^\\[A-Za-z]+(?![A-Za-z{\d])/.exec(input.slice(i + 1));   // not \frac12, which takes its digits
+            if (command) { input = `${input.slice(0, i + 1)}{${command[0]}}${input.slice(i + 1 + command[0].length)}`; continue; }
             let j = i + 1;
             if (input[j] === '-') j++;
             while (j < input.length && '.0123456789'.includes(input[j])) j++;
@@ -62,6 +67,8 @@ export function compactRewrites(input) {
     input = input.replace(/(?<![A-Za-z])frac(\d)(\d)/g, 'frac{$1}{$2}');   // \frac12 → \frac{1}{2}
     input = primedGroups(input);
     input = derivatives(input);
+    // each rewrite below re-reads the rest of the text: a bound on how many, or ∫∫∫… is quadratic
+    if (input.split('\\int').length > 101) throw new Error('More than 100 integrals');
     for (let i = 0; i < input.length; i++) {
         const char = input[i];
         const before = (n) => input.slice(Math.max(0, i - n), i);

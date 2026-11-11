@@ -245,6 +245,13 @@ class Speaker {
         return [this.seg(node, this.w.quantity), ...this.speak(node), ...this.closer(node, end)];
     }
 
+    /** quantity(), and in toAudioSpeech() also when `tight`: a part the ear can't otherwise tell where it ends
+     *  (a/(bc) against (a/b)·c, (2x)! against 2·x!). */
+    grouped(node, end, tight) {
+        if (this.isCompound(node) || (this.audio && tight)) return [this.seg(node, this.w.quantity), ...this.speak(node), ...this.closer(node, end)];
+        return this.speak(node);
+    }
+
     /** The pause after a group, and in toAudioSpeech() its end word: ", end root,". */
     closer(node, end) {
         const pause = this.seg(node, this.w.comma);
@@ -271,7 +278,8 @@ class Speaker {
         const [a, b] = args;
         const w = this.w;
         const me = (text) => this.seg(node, text);
-        const list = () => args.flatMap((x, i) => (i ? [me(w.comma), ...this.speak(x)] : this.speak(x)));
+        // max(1, 2 + 3) is not max(1, 2) + 3: alone, the ear needs the last argument's end
+        const list = () => args.flatMap((x, i) => (i ? [me(w.comma), ...this.listed(x)] : this.listed(x)));
 
         if (COMPARISONS[op]) return [...this.speak(a), me(w[COMPARISONS[op]]), ...this.speak(b)];
         if (isCustomFunction(op)) {
@@ -283,28 +291,28 @@ class Speaker {
         }
 
         switch (op) {
-            case '+':
-                if (isMinusOneTimes(b)) return [...this.speak(a), me(w.minus), ...this.speak(b.args[1])];
-                return [...this.speak(a), me(w.plus), ...this.speak(b)];
+            case '+':   // a + (-1·b) reads a minus b, b grouped as after any minus
+                if (isMinusOneTimes(b)) return [...this.leftSide(a), me(w.minus), ...this.quantityIfSum(b.args[1])];
+                return [...this.leftSide(a), me(w.plus), ...this.speak(b)];
             case '-':
-                if (isMinusOneTimes(b)) return [...this.speak(a), me(w.plus), ...this.speak(b.args[1])];
-                return [...this.speak(a), me(w.minus), ...this.quantityIfSum(b)];
+                if (isMinusOneTimes(b)) return [...this.leftSide(a), me(w.plus), ...this.speak(b.args[1])];
+                return [...this.leftSide(a), me(w.minus), ...this.quantityIfSum(b)];
             case '*':
                 return this.product(node);
             case '/':
                 return this.fraction(node);
             case '^':
                 return this.power(node);
-            case '_':
-                return [...this.speak(a), me(w.sub), ...(this.audio ? this.quantity(b, 'endSub') : this.speak(b))];
+            case '_':   // x_{1^2} is not (x_1)^2
+                return [...this.speak(a), me(w.sub), ...(this.audio ? this.grouped(b, 'endSub', b.type === 'op') : this.speak(b))];
             case 'neg':
                 return this.isCompound(a) || a.type === 'op' && a.op === 'neg'
                     ? [me(`${w.negative} ${w.quantity}`), ...this.speak(a), ...this.closer(a, 'endQuantity')]
                     : [me(w.negative), ...this.speak(a)];
             case 'pm':
                 return [me(w.plusOrMinus), ...this.speak(a)];
-            case '!':
-                return [...this.quantity(a), me(w.factorial)];
+            case '!':   // (2x)! is not 2·x!, (-3)! not -(3!)
+                return [...this.grouped(a, 'endQuantity', a.type === 'op' || (a.type === 'number' && a.value.startsWith('-'))), me(w.factorial)];
             case '\\not':
                 return [me(w.not), ...this.quantity(a)];
             case 'sqrt':
@@ -404,12 +412,23 @@ class Speaker {
     /** The arguments of a call: "x", "2 x", "the quantity x plus 1,", or "a, b, c". */
     arguments(args) {
         if (args.length === 1) return this.argument(args[0]);
-        return args.flatMap((x, i) => (i ? [{ text: this.w.comma, id: x.id }, ...this.speak(x)] : this.speak(x)));
+        return args.flatMap((x, i) => (i ? [{ text: this.w.comma, id: x.id }, ...this.listed(x)] : this.listed(x)));
+    }
+
+    /** One of several arguments: as it is, or in toAudioSpeech() fenced if compound. */
+    listed(node) {
+        return this.audio ? this.quantity(node) : this.speak(node);
     }
 
     /** A pause after a compound argument so the next words don't join it. */
     pauseAfter(node) {
         return this.isCompound(node) ? [this.seg(node, this.w.comma)] : [];
+    }
+
+    /** The left of + or −: a condition there is fenced in toAudioSpeech() ((c ? 1 : -1) + 2 is not c ? 1 : -1 + 2). */
+    leftSide(node) {
+        if (!this.audio || node.type !== 'op' || node.op !== '?:') return this.speak(node);
+        return [this.seg(node, this.w.quantity), ...this.speak(node), ...this.closer(node, 'endQuantity')];
     }
 
     quantityIfSum(node) {
@@ -420,9 +439,15 @@ class Speaker {
     product(node) {
         const [a, b] = node.args;
         const w = this.w;
-        if (isMinusOneTimes(node)) return [this.seg(node, w.negative), ...this.speak(b)];
+        if (isMinusOneTimes(node)) return this.speak({ ...node, op: 'neg', args: [b] });   // -1·(a + b): negative the quantity a plus b
         if (b.type === 'symbol' && b.value === '°') return [...this.speak(a), this.seg(node, w.degrees)];
-        const left = this.quantity(a);
+        // (a/b)·c is not a/(bc): alone, a fraction before another factor is fenced ("one half x" needs nothing)
+        const wordFraction = (n) => n.args.every((x) => x.type === 'number' && /^\d$|^10$/.test(x.value));
+        const left = this.audio && a.type === 'op' && a.op === '/' && !wordFraction(a)
+            ? [this.seg(a, w.quantity), ...this.speak(a), ...this.closer(a, 'endFraction')]
+            : this.quantity(a);
+        // 2^x·y is not 2^{xy}: alone, the exponent needs its end before the next factor
+        if (this.audio && a.type === 'op' && a.op === '^' && a.args[1].type !== 'number') left.push(...this.closer(a.args[1], 'endExponent'));
         const right = this.quantity(b);
         // "2 x", "2 pi r", "x squared sine of x" read fine; "2 the square root of x",
         // "rate time" and "x 2" don't.
@@ -452,9 +477,10 @@ class Speaker {
             const unit = d === 2 ? (n === 1 ? w.half : w.halves) : w.ordinals[d] + (n === 1 ? '' : 's');
             return [me(`${w.numerators[n]} ${unit}`)];
         }
-        const top = this.quantity(a, null);   // "over" closes the numerator
+        const isOp = (n, ...ops) => n.type === 'op' && ops.includes(n.op) && !isMinusOneTimes(n);
+        const top = this.grouped(a, null, isOp(a, '/'));   // "over" closes the numerator; (a/b)/c is not a/(b/c)
         const pause = this.isCall(a) ? [me(w.comma)] : [];
-        return [...top, ...pause, me(w.over), ...this.quantity(b, 'endFraction')];
+        return [...top, ...pause, me(w.over), ...this.grouped(b, 'endFraction', isOp(b, '/'))];   // a/(b/c) is not (a/b)/c
     }
 
     /** "x squared", "e to the 2 x", "x to the n minus 1, power", "the quantity x plus 1, squared". */
@@ -464,7 +490,7 @@ class Speaker {
         const me = (text) => this.seg(node, text);
         // a power of a power is fenced off for the ear: (e^-x)^2 is not e^(-x^2)
         const fenceBase = this.isCompound(base) || this.isCall(base) || (base.type === 'number' && base.value.startsWith('-')) || base.type === 'op' && base.op === '/'
-            || (this.audio && base.type === 'op' && base.op === '^');
+            || (this.audio && base.type === 'op' && (base.op === '^' || base.op === 'neg' || isMinusOneTimes(base)));   // (-x)^2 is not -x^2
         const spokenBase = fenceBase ? [me(w.quantity), ...this.speak(base), ...this.closer(base, 'endQuantity')] : this.speak(base);
         // sin^2 x: "sine squared of x"
         if (this.isCall(base) && this.names[base.op] && exp.type === 'number' && /^[2-3]$/.test(exp.value) && base.args.length === 1) {
@@ -478,7 +504,12 @@ class Speaker {
         }
         if (exp.type === 'number' && /^\d+$/.test(exp.value)) return [...spokenBase, me(`${w.toThe} ${this.ordinal(Number(exp.value))}`)];
         const simpleExponent = !this.isCompound(exp) && !(exp.type === 'op' && exp.op === '/' && this.isCompound(exp.args[0]));
-        if (simpleExponent) return [...spokenBase, me(w.toThe), ...this.speak(exp)];
+        if (simpleExponent) {
+            const spoken = this.speak(exp);
+            // "to the the quantity negative 2, squared": an exponent that opens a quantity takes "to the power of"
+            const opens = spoken[0] && spoken[0].text.startsWith(w.quantity);
+            return [...spokenBase, me(opens ? w.toThePowerOf : w.toThe), ...spoken];
+        }
         if (this.audio) return [...spokenBase, me(w.toThePowerOf), me(w.quantity), ...this.speak(exp), ...this.closer(exp, 'endExponent')];
         return [...spokenBase, me(w.toThePowerOf), ...this.speak(exp), me(w.comma)];
     }
@@ -541,6 +572,8 @@ class Speaker {
         } else {
             return [me(`${w.limitAs.replace(/ as$/, '')} ${w.of}`), ...this.speak(f)];
         }
+        // alone, a fraction after "of" has no visible end: lim (sin x)/x is not (lim sin x)/x
+        if (this.audio && f.type === 'op' && f.op === '/') return [me(w.limitAs), ...approach, me(w.of), ...this.grouped(f, 'endLimit', true)];
         return [me(w.limitAs), ...approach, me(w.of), ...this.contents(f, 'endLimit')];
     }
 

@@ -27,7 +27,7 @@
  */
 
 import { asTree, firstVariable } from './tree.js';
-import { expandChain } from './common.js';
+import { expandChain, percentDecimal } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 import { evaluate as floatEvaluate } from './evaluate.js';
 import { parseTree, setBlockHandler } from './parse/index.js';
@@ -41,6 +41,7 @@ const LIMITS = {
     terms: 100000,       // finite sums and products done term by term up to here
     rootIndex: 12,       // combine ⁿ√a · ᵐ√b exactly when lcm(n, m) ≤ this
     steps: 5000000,      // nodes worked out in one calculate() (a sum of sums, a sum to ∞ of a sum to ∞): about a second
+    places: 10000,       // decimal places round, fixed and {{~n …}} write at most (10^places is a BigInt)
 };
 
 // the work of the calculate() call in progress: every calc() is a step (nested calls share it)
@@ -50,6 +51,7 @@ let depth = 0;
 // ---- rationals ------------------------------------------------------------------------
 
 const babs = (n) => (n < 0n ? -n : n);
+const BIG = 0xFFFFFFFFFFFFn;   // 48 bits: below this a gcd is cheap
 const bitLength = (n) => (n === 0n ? 0 : babs(n).toString(2).length);
 function bgcd(a, b) {
     a = babs(a);
@@ -62,6 +64,13 @@ function bgcd(a, b) {
 function Q(n, d = 1n) {
     if (d === 0n) throw new MathError('division by zero');
     if (d < 0n) { n = -n; d = -d; }
+    // the step budget counts work, not nodes: a gcd of big numbers costs about the square of their length
+    // (∑ 1/i to 8000 is 8000 nodes, and 15 s of gcds without this)
+    if (d > BIG && (n > BIG || -n > BIG)) {   // gcd(n, 1) is one step; it is the smaller of the two that costs
+        const words = Math.min(n.toString(16).length - (n < 0n ? 1 : 0), d.toString(16).length) / 16;
+        steps += 1 + (words * words) / 2;
+        if (steps > LIMITS.steps) throw new UnknownError('too much to work out');
+    }
     const g = bgcd(n, d) || 1n;
     return { n: n / g, d: d / g };
 }
@@ -114,6 +123,7 @@ function decimalToQ(text) {
     } else {
         value = Q(BigInt(whole + frac || '0'), 10n ** BigInt(frac.length));
     }
+    if (Math.abs(exponent) > LIMITS.bits / 3) throw new UnknownError('too large to calculate');   // 1e999999999: no 10^999999999
     if (exponent) value = exponent > 0 ? qmul(value, Q(10n ** BigInt(exponent))) : qdiv(value, Q(10n ** BigInt(-exponent)));
     return sign < 0n ? qneg(value) : value;
 }
@@ -219,10 +229,13 @@ function simplifyRoot(n, r) {
     let rest = r;
     const N = BigInt(n);
     const limit = rest < 10n ** 24n ? 1000000n : 10000n;
+    let tried = 0;
     for (let p = 2n; p <= limit && p * p <= rest; p += p === 2n ? 1n : 2n) {
         const pn = p ** N;
         while (rest % pn === 0n) { rest /= pn; coef *= p; }
+        tried++;
     }
+    steps += tried / 4;   // up to half a million trial divisions: charged to the budget like the nodes they stand for
     const whole = iroot(rest, n);
     if (whole ** N === rest) { coef *= whole; rest = 1n; }
     if (rest === 1n) return { coef, root: null };
@@ -364,7 +377,9 @@ const pow = each2((a, b) => {
     if (x === 0 && y === 0) throw new MathError('0^0 is undefined');
     if (x === 0 && y < 0) throw new MathError('division by zero');
     if (x < 0 && !Number.isInteger(y)) throw new MathError('not a real number');
-    return checked(x ** y, x, y);
+    const r = x ** y;
+    if (r === 0 && x !== 0) throw new UnknownError('too small to calculate');   // 10^-50000: past both exact and double
+    return checked(r, x, y);
 });
 
 /** −1, 0 or 1; exact for fractions, with a little tolerance for doubles. */
@@ -374,7 +389,10 @@ function compare(a, b) {
     const x = num(a);
     const y = num(b);
     if (x === y) return 0;
-    if (Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - y) <= 1e-12 * Math.max(1, Math.abs(x), Math.abs(y))) return 0;
+    // Two exact values (e^-30, π/10^13, √2) are known to every digit a double holds: only a relative difference
+    // can be rounding, so e^-30 > 0. Doubles carry their own error, so near 0 an absolute one is allowed too.
+    const scale = isX(a) && isX(b) ? Math.max(Math.abs(x), Math.abs(y)) : Math.max(1, Math.abs(x), Math.abs(y));
+    if (Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - y) <= 1e-12 * scale) return 0;
     return x < y ? -1 : 1;
 }
 
@@ -382,7 +400,8 @@ function equal(a, b) {
     if (Array.isArray(a) || Array.isArray(b)) {
         return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => equal(x, b[i]));
     }
-    if (a && a.kind === 's') return Boolean(b && b.kind === 's' && a.text === b.text);
+    // text equals only the same text, whichever side it is on: 1 = "a" is false, as "a" = 1 is
+    if ((a && a.kind === 's') || (b && b.kind === 's')) return Boolean(a && a.kind === 's' && b && b.kind === 's' && a.text === b.text);
     if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
     return compare(a, b) === 0;
 }
@@ -516,11 +535,14 @@ function whole(v, what) {
     return n;
 }
 
+/** n·(n−1)···(n−k+1) has at most k·log₂ n bits: past the exact limit, refuse before multiplying. */
+const tooBig = (n, k) => Number(k) * bitLength(n) > LIMITS.bits;
+
 function perm(nv, kv) {
     const n = whole(nv, 'permutations');
     const k = whole(kv, 'permutations');
     if (k < 0n || k > n) throw new MathError('undefined');
-    if (k > BigInt(LIMITS.terms)) throw new UnknownError('too large to calculate');
+    if (k > BigInt(LIMITS.terms) || tooBig(n, k)) throw new UnknownError('too large to calculate');
     let r = 1n;
     for (let i = n - k + 1n; i <= n; i++) r *= i;
     return X(Q(r));
@@ -531,7 +553,7 @@ function comb(nv, kv) {
     let k = whole(kv, 'combinations');
     if (k < 0n || k > n) throw new MathError('undefined');
     if (n - k < k) k = n - k;
-    if (k > BigInt(LIMITS.terms)) throw new UnknownError('too large to calculate');
+    if (k > BigInt(LIMITS.terms) || tooBig(n, k)) throw new UnknownError('too large to calculate');
     let r = 1n;
     for (let i = 1n; i <= k; i++) r = (r * (n - k + i)) / i;
     return X(Q(r));
@@ -543,6 +565,7 @@ const ceilV = each1((v) => (isRat(v) ? X(Q(-qfloor(qneg(v.c)))) : fromJS(Math.ce
 /** Round half away from zero to `places` decimals. */
 function roundV(v, placesV) {
     const places = Number(whole(placesV, 'round'));
+    if (Math.abs(places) > LIMITS.places) throw new UnknownError('too many decimal places');
     if (isRat(v)) {
         const scale = Q(10n ** BigInt(Math.abs(places)));
         const scaled = places >= 0 ? qmul(v.c, scale) : qdiv(v.c, scale);
@@ -550,7 +573,9 @@ function roundV(v, placesV) {
         const r = Q(scaled.n < 0n ? -twice : twice);
         return X(places >= 0 ? qdiv(r, scale) : qmul(r, scale));
     }
+    if (places > 15) return num(v);   // a double holds no more digits than that: π to 400 places is π
     const f = 10 ** places;
+    if (f === 0) return 0;            // round(π, -400)
     return Math.sign(num(v)) * Math.round(Math.abs(num(v)) * f) / f;
 }
 
@@ -565,8 +590,11 @@ function fixedV(v, placesV) {
         const digits = (k < 0n ? -k : k).toString().padStart(places + 1, '0');
         return str(`${k < 0n ? '-' : ''}${digits.slice(0, digits.length - places)}${places ? '.' + digits.slice(-places) : ''}`);
     }
-    return str(Number(num(r)).toFixed(places));
+    return str(fixedDouble(num(r), places));
 }
+
+/** x with exactly `places` decimals: toFixed goes to 100, and a double has no digits past that to show. */
+const fixedDouble = (x, places) => x.toFixed(Math.min(places, 100)) + (places > 100 ? '0'.repeat(places - 100) : '');
 
 function modV(a, b) {
     if (isZero(b)) throw new MathError('division by zero');
@@ -703,8 +731,39 @@ const MANY = {
     gcd: (xs) => X(Q(xs.map((x) => whole(x, 'gcd')).reduce(bgcd))),
 };
 
-/** Operators left to the double-precision evaluator (sets, membership, modular statements). */
+/** Operators left to the double-precision evaluator (set operations, random): membership and pmod are worked out exactly first. */
 const DELEGATED = ['∈', '∉', '∪', '∩', 'pmod', 'random', '(]', '[)'];
+
+/** a ≡ b (mod n), x mod n written (mod n): exact, so 2^100 ≡ 1 (mod 3) holds (doubles lose the last digits). */
+function congruence([statement, modulus], v) {
+    const n = v(modulus);
+    if (statement.type === 'op' && ['≡', '='].includes(statement.op) && statement.args.length === 2) {
+        return isZero(modV(sub(v(statement.args[0]), v(statement.args[1])), n));
+    }
+    return modV(v(statement), n);
+}
+
+/** x ∈ ℤ, x ∈ {1, 2}, x ∈ [0, 1): exact where the parts are; undefined to leave it to doubles. */
+function membershipExact(node, v) {
+    const [xNode, set] = node.args;
+    const x = v(xNode);
+    let inside;
+    if (set.type === 'symbol' && ['ℤ', 'ℕ', 'ℚ', 'ℝ'].includes(set.value) && isX(x)) {
+        if (set.value === 'ℝ') inside = true;
+        else if (set.value === 'ℚ') inside = isRat(x);   // π and √2 are exact, and known not to be fractions
+        else inside = isRat(x) && x.c.d === 1n && (set.value === 'ℤ' || x.c.n > 0n);
+    } else if (set.type === 'op' && ['()', '[]', '(]', '[)'].includes(set.op) && set.args.length === 2) {
+        const [lo, hi] = set.args.map(v);
+        const above = compare(x, lo);
+        const below = compare(x, hi);
+        inside = (set.op[0] === '[' ? above >= 0 : above > 0) && (set.op[1] === ']' ? below <= 0 : below < 0);
+    } else if (set.type === 'op' && set.op === '{}') {
+        inside = set.args.some((item) => equal(x, v(item)));   // {10^20} holds 10^20, not 10^20 + 1
+    } else {
+        return undefined;
+    }
+    return node.op === '∈' ? inside : !inside;
+}
 
 function calc(node, env) {
     if (++steps > LIMITS.steps) throw new UnknownError('too much to work out');
@@ -735,11 +794,16 @@ function calc(node, env) {
         const m = v(args[0]);
         if (isMatrix(m)) return M.transpose(m);
     }
+    if (op === 'pmod') return congruence(args, v);
+    if (op === '∈' || op === '∉') {
+        const inside = membershipExact(node, v);
+        if (inside !== undefined) return inside;
+    }
     if (DELEGATED.includes(op)) return delegate(node, env);
     if (op.startsWith('\\:')) {
         const name = op.slice(2);
-        if (typeof env[name] !== 'function' && Object.prototype.hasOwnProperty.call(MATRIX_FUNCTIONS, name)) return MATRIX_FUNCTIONS[name](...args.map(v));
-        const f = env[name];
+        const f = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;   // valueOf(1): the scope's own only
+        if (typeof f !== 'function' && Object.prototype.hasOwnProperty.call(MATRIX_FUNCTIONS, name)) return MATRIX_FUNCTIONS[name](...args.map(v));
         if (typeof f !== 'function') throw new UnknownError(`no function ${op.slice(2)}`);
         return fromJS(f(...args.map((a) => toJS(v(a)))));
     }
@@ -752,6 +816,7 @@ function calc(node, env) {
 function lookup(name, env) {
     if (Object.prototype.hasOwnProperty.call(env, name)) return env[name];
     if (Object.prototype.hasOwnProperty.call(CONSTANTS, name)) return CONSTANTS[name]();
+    if (percentDecimal(name)) return X(decimalToQ(percentDecimal(name)));   // 50% is 1/2, exactly
     throw new UnknownError(`no value for '${name}'`);
 }
 
@@ -845,9 +910,26 @@ function integrate(f, a, b) {
         const right = integrate(f, 0, Infinity);
         return { value: left.value + right.value, error: left.error + right.error };
     }
-    if (b === Infinity) return tanhSinh((u) => f(a + u / (1 - u)) / ((1 - u) * (1 - u)), 0, 1);
-    if (a === -Infinity) return tanhSinh((u) => f(b - u / (1 - u)) / ((1 - u) * (1 - u)), 0, 1);
-    return tanhSinh(f, a, b);
+    if (b === Infinity) return pieces((u) => f(a + u / (1 - u)) / ((1 - u) * (1 - u)), 0, 1);
+    if (a === -Infinity) return pieces((u) => f(b - u / (1 - u)) / ((1 - u) * (1 - u)), 0, 1);
+    return pieces(f, a, b);
+}
+
+/**
+ * Tanh-sinh over [a, b], halving the interval where it doesn't settle: a kink inside (|x| at 0) or many
+ * oscillations (cos x over [0, 1000]) are smooth enough piece by piece. At most 2¹⁰ pieces; the step budget
+ * still bounds the work.
+ */
+function pieces(f, a, b, depth = 0) {
+    try {
+        return tanhSinh(f, a, b);
+    } catch (e) {
+        if (!(e instanceof MathError) || e.message !== 'the integral does not converge' || depth >= 10) throw e;
+    }
+    const m = (a + b) / 2;
+    const left = pieces(f, a, m, depth + 1);
+    const right = pieces(f, m, b, depth + 1);
+    return { value: left.value + right.value, error: left.error + right.error };
 }
 
 /**
@@ -920,6 +1002,13 @@ function limit(args, env) {
         ({ value, error } = approach((h) => g(Math.sign(a) / h)));
     } else if (side) {
         ({ value, error } = approach((h) => g(a + side * h * Math.max(1, Math.abs(a)))));
+        // continuous from that side? Then the exact value at the point is the answer: √x at 0⁺ is 0, not 0.0000087
+        try {
+            const direct = calc(f, { ...env, [name]: atValue });
+            if (Math.abs(num(direct) - value) <= Math.max(error, 1e-6 * Math.max(1, Math.abs(value)))) return direct;
+        } catch (e) {
+            if (!(e instanceof MathError)) throw e;
+        }
     } else {
         const r = approach((h) => g(a + h * Math.max(1, Math.abs(a))));
         const l = approach((h) => g(a - h * Math.max(1, Math.abs(a))));
@@ -941,10 +1030,26 @@ function limit(args, env) {
 }
 
 /**
+ * The value F(h) tends to as h → 0⁺, checked along two sequences of h: one alone, h = 0.1/2ⁱ, can line up
+ * with an oscillation (sin x at x = 10·2ⁱ, (-1)^⌊x⌋ there is always 1) and settle on a value that isn't a limit.
+ */
+function approach(F) {
+    const first = approachAlong(F);
+    const second = approachAlong((h) => F(h * 0.7548776662466927));   // an irrational step: no common period with the first
+    if (first.value === second.value) return first;
+    if (!Number.isFinite(first.value) || !Number.isFinite(second.value)) throw new MathError('the limit does not exist');
+    const size = Math.max(1, Math.abs(first.value));
+    const tolerance = Math.max(first.error, second.error, 1e-6 * size);
+    if (tolerance > 1e-3 * size) throw new MathError('the limit could not be found');   // extrapolated from values that never settled
+    if (Math.abs(first.value - second.value) <= tolerance) return first;
+    throw new MathError('the limit does not exist');
+}
+
+/**
  * The value F(h) tends to as h → 0⁺, from h = 0.1/2ⁱ: Neville extrapolation
  * when F is smooth in h, ±∞ when it keeps growing.
  */
-function approach(F) {
+function approachAlong(F) {
     const hs = [];
     const ys = [];
     for (let i = 0; i < 30; i++) {
@@ -975,6 +1080,21 @@ function approach(F) {
         const x = extrapolate(from);
         const y = extrapolate(from + 1);
         const e = Math.abs(x - y);
+        if (Number.isFinite(x) && (!best || e < best.error)) best = { value: x, error: e };
+    }
+    // F(h) ≈ L + c·hᵖ with p not a whole number (√h, ∛h) defeats the extrapolation above; Aitken's Δ² is exact for it
+    const aitken = (i) => {
+        const d1 = ys[i + 1] - ys[i];
+        const d2 = ys[i + 2] - ys[i + 1];
+        return d2 === d1 ? ys[i + 2] : ys[i + 2] - (d2 * d2) / (d2 - d1);
+    };
+    // only where it holds: steps of one sign shrinking by a steady ratio (not ±1, ±1 … from an oscillation)
+    const ratio = (i) => (ys[i + 2] - ys[i + 1]) / (ys[i + 1] - ys[i]);
+    const geometric = (i) => [i, i + 1].every((k) => ratio(k) > 0 && ratio(k) < 0.95) && Math.abs(ratio(i) - ratio(i + 1)) < 0.05;
+    for (let i = 0; i + 3 < ys.length; i++) {
+        if (!geometric(i)) continue;
+        const x = aitken(i);
+        const e = Math.abs(x - aitken(i + 1));
         if (Number.isFinite(x) && (!best || e < best.error)) best = { value: x, error: e };
     }
     const last = ys[ys.length - 1];
@@ -1010,6 +1130,13 @@ function series(isSum, args, env) {
     return total;
 }
 
+/** Terms that don't shrink to 0 (∑ (-1)ⁿ, ∑ sin n): the biggest near n is as big as those near n₀ + n/16. */
+function termsStay(term, n0, n) {
+    const biggest = (m) => Math.max(...Array.from({ length: 8 }, (_, j) => Math.abs(term(m + j))));
+    const late = biggest(n);
+    return late > 1e-12 && late >= 0.5 * biggest(n0 + Math.floor((n - n0) / 16));
+}
+
 /** ∑ from n₀ to ∞: partial sums S(N) at N = 2ᵏ, extrapolated in 1/N. */
 function infiniteSum(term, n0) {
     const Ns = [];
@@ -1025,12 +1152,18 @@ function infiniteSum(term, n0) {
         }
         Ns.push(N);
         Ss.push(s);
-        if (k >= 6 && Ss[Ss.length - 1] === Ss[Ss.length - 2]) return recognize(s, 0);   // already exact in doubles
+        // already exact in doubles — once the terms are known to shrink: ∑ (-1)ⁿ repeats 0 at every even count
+        if (k >= 6 && Ss[Ss.length - 1] === Ss[Ss.length - 2] && !termsStay(term, n0, n)) return recognize(s, 0);
     }
-    // Diverging like the harmonic series: S(2N) − S(N) doesn't shrink.
+    if (termsStay(term, n0, n)) throw new MathError('the series diverges');
+    // Diverging like the harmonic series: S(2N) − S(N) doesn't shrink. Shrinking only a little (∑ 1/n^1.01,
+    // ∑ 1/(n ln n)) can't be told apart from that by adding terms: no verdict either way.
     const d1 = Ss[Ss.length - 1] - Ss[Ss.length - 2];
     const d2 = Ss[Ss.length - 2] - Ss[Ss.length - 3];
-    if (Math.abs(d1) >= 0.9 * Math.abs(d2) && Math.abs(d1) > 1e-12) throw new MathError('the series diverges');
+    const d3 = Ss[Ss.length - 3] - Ss[Ss.length - 4];
+    const ratio = d1 / d2;
+    if (Math.abs(d1) > 1e-12 && ratio >= 0.999 && d2 / d3 >= 0.999) throw new MathError('the series diverges');
+    if (Math.abs(d1) > 1e-6 * Math.max(1, Math.abs(s)) && ratio >= 0.9) throw new UnknownError('the series grows too slowly to tell whether it has a sum');
     const H = Ns.slice(-7).map((N) => 1 / N);
     const P = Ss.slice(-7);
     const Q2 = Ss.slice(-8, -1);
@@ -1054,7 +1187,9 @@ function recognize(y, error = 0) {
     if (!Number.isFinite(y)) return y;
     const tol = Math.max(1e-10, 4 * error) * Math.max(1, Math.abs(y));
     if (tol > 1e-6 * Math.max(1, Math.abs(y))) return y;
-    if (Math.abs(y) < tol) return rat(0);
+    // 0 only within the answer's own error: ∫₀^0.00001 x dx is 5·10⁻¹¹, not 0
+    if (Math.abs(y) <= Math.max(4 * error, 1e-15)) return rat(0);
+    if (Math.abs(y) < 1e-10) return y;
     const bases = [
         [rat(1), 1000], [PI, 100], [X(Q1, 2), 100], [E, 100],
         ...[2n, 3n, 5n, 6n, 7n].map((r) => [X(Q1, 0, 0, { n: 2, r }), 100]),
@@ -1110,7 +1245,7 @@ function formatDouble(x, o) {
     if (x === Infinity) return '∞';
     if (x === -Infinity) return '-∞';
     if (Object.is(x, -0) || x === 0) return '0';
-    if (o.places !== null && Math.abs(x) < 1e21) return x.toFixed(o.places);
+    if (o.places !== null && Math.abs(x) < 1e21) return fixedDouble(x, o.places);
     const ax = Math.abs(x);
     if (ax >= 1e15 || ax < 1e-6) {
         const [m, e] = x.toExponential(o.digits - 1).split('e');
@@ -1163,9 +1298,22 @@ function formatExact(v, o) {
     return (c.n < 0n ? '-' : '') + text;
 }
 
-/** A number too long to write out: d.ddd…×10^k from its exact digits. */
+/** A number too long to write out: d.ddd…×10^k from its exact digits (a fraction too: 1/10^400 is 1*10^(-400), not 0). */
 function formatBig(v, o) {
-    if (!isRat(v) || v.c.d !== 1n) return formatDouble(num(v), o);
+    if (!isRat(v)) return formatDouble(num(v), o);
+    if (v.c.d !== 1n) {
+        const x = num(v);
+        if (x !== 0 && Number.isFinite(x)) return formatDouble(x, o);   // a double holds it: written as one
+        const n = babs(v.c.n);
+        const d = v.c.d;
+        const k = o.digits + 1 - (n.toString().length - d.toString().length);   // shift so n/d has digits + 1 or + 2 digits
+        const q = k >= 0 ? (n * 10n ** BigInt(k)) / d : n / (d * 10n ** BigInt(-k));
+        const s = q.toString();
+        const rounded = ((BigInt(s.slice(0, o.digits + 1)) + 5n) / 10n).toString();
+        const exponent = s.length - 1 - k + (rounded.length > o.digits ? 1 : 0);
+        const m = trimZeros(`${rounded[0]}.${rounded.slice(1, o.digits)}`);
+        return `${v.c.n < 0n ? '-' : ''}${m}*10^(${exponent})`;
+    }
     const s = babs(v.c.n).toString();
     const kept = BigInt(s.slice(0, o.digits + 1));
     const rounded = ((kept + 5n) / 10n).toString();   // o.digits significant digits
@@ -1193,15 +1341,18 @@ function formatBig(v, o) {
  * @throws {UnknownError} when it can't be worked out (an unset variable, ∫ without limits)
  */
 export function calculate(input, scope = {}, options = {}) {
+    if (depth === 0) steps = 0;   // before the scope is read: reading big numbers is charged too
     const tree = typeof input === 'string' ? parseTree(input) : asTree(input);
     const env = {};
     for (const [k, val] of Object.entries(scope)) env[k] = fromJS(val);
-    if (depth === 0) steps = 0;
     depth++;
     let v;
     try { v = calc(tree, env); } finally { depth--; }
     const o = { decimal: false, places: null, digits: 12, maxDigits: 50, ...options };
     if (o.places === undefined) o.places = null;
+    if (o.places !== null && !(Number.isInteger(o.places) && o.places >= 0 && o.places <= LIMITS.places)) {
+        throw new UnknownError(`places is a whole number from 0 to ${LIMITS.places}`);   // {{~999999999 1/3}}
+    }
     const exact = (x) => (Array.isArray(x) ? x.every(exact) : typeof x !== 'number');
     return { value: toJS(v), text: format(v, o), exact: exact(v) };
 }

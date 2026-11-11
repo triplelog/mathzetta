@@ -12,12 +12,15 @@ import { toMathML } from 'mathzetta/mathml';   // what a page passes as { mathml
 
 let passed = 0;
 const failures = [];
+const pending = [];   // async tests: the report waits for them
 function test(name, fn) {
+    const fail = (e) => failures.push(`${name}\n    ${String(e?.message ?? e).split('\n').join('\n    ')}`);
     try {
-        fn();
-        passed++;
+        const result = fn();
+        if (result && typeof result.then === 'function') pending.push(Promise.resolve(result).then(() => { passed++; }, fail));
+        else passed++;
     } catch (e) {
-        failures.push(`${name}\n    ${e.message.split('\n').join('\n    ')}`);
+        fail(e);
     }
 }
 
@@ -73,10 +76,25 @@ test('sin²x, and sin⁻¹x on request', () => {
     assert.match(text(toHTML('arcsin(x)', { inverseTrig: 'power' })), /^sin−1x$/);
 });
 
+test('a choice of equations reads in words; other logic keeps its signs', () => {
+    assert.equal(text(toHTML('x = 2 | x = 3')), 'x=2orx=3');
+    assert.ok(has(toHTML('x = 2 | x = 3'), 'conj'));
+    assert.equal(text(toHTML(['x', '1', '=', 'x', '2', '=', '|', 'x', '3', '=', '|'])), 'x=1orx=2orx=3');
+    assert.equal(text(toHTML('x > 0 & x < 1')), 'x>0andx<1');
+    assert.equal(text(toHTML('a | b')), 'a∨b');
+    assert.equal(text(toHTML('x < 0 & y | z')), 'x<0∧y∨z', 'one side not a statement: signs');
+    assert.equal(text(toHTML('x ≠ 1 | x ∈ A')), 'x≠1orx∈A');
+    // mixed words keep the grouping
+    assert.ok(has(toHTML('(x = 1 | x = 2) & y = 3'), 'fence'));
+    assert.ok(has(toHTML('x = 1 | (x = 2 & y = 3)'), 'fence'));
+    assert.ok(!has(toHTML(['x', '1', '=', 'x', '2', '=', '|', 'x', '3', '=', '|']), 'fence'));
+});
+
 test('fractions in exponents use a slash', () => {
     assert.equal(text(toHTML('x^{3/2}')), 'x3/2');
     assert.ok(has(toHTML('x^{(n+1)/(n-1)}'), 'frac'), 'compound parts stack');
     assert.ok(has(toHTML('x^{1/2}', { scriptFractions: 'stack' }), 'frac'));
+    assert.equal(text(toHTML('e^{-x^2/2}')), 'e−x2/2', 'a leading minus on top takes no brackets');
 });
 
 test('a + (−1·b) reads a − b; a + (−3) reads a − 3; a − (−b) keeps brackets', () => {
@@ -118,7 +136,9 @@ test('tall content gets tall brackets and a deeper fraction', () => {
 test('{{blocks}} are calculated before drawing', () => {
     assert.equal(text(toHTML('3+4={{3+4}}')), '3+4=7');
     assert.ok(has(toHTML('x = {{1/3 + 1/6}}'), 'frac'), 'an exact fraction is drawn as one');
-    assert.match(text(toHTML('\\sin(\\pi/4) = {{\\sin(\\pi/4)}}')), /=√?2?/);
+    const exact = toHTML('\\sin(\\pi/4) = {{\\sin(\\pi/4)}}');
+    assert.equal(text(exact), 'sinπ4=22', 'the block is √2/2: a root over 2');
+    assert.ok(has(exact.slice(exact.lastIndexOf('mv-rel')), 'sqrt') && has(exact.slice(exact.lastIndexOf('mv-rel')), 'frac'));
     assert.equal(text(toHTML('y = {{a b}}', { scope: { a: 2, b: 3 } })), 'y=6');
     assert.match(text(toHTML('1/0 = {{1/0}}')), /undefined/);
 });
@@ -129,7 +149,7 @@ test('the whole expression has its spoken form as its accessible name', () => {
     assert.match(toHTML('x', { label: 'the unknown' }), /aria-label="the unknown"/);
     assert.match(toHTML('x', { label: (tree) => `tree with ${tree.id + 1} nodes` }), /aria-label="tree with 1 nodes"/);
     assert.ok(!toHTML('x', { label: false }).includes('aria-'));
-    assert.match(toHTML('\\int_0^1 x^2 dx'), /aria-label="the integral from 0 to 1 of x squared, d x"|aria-label="[^"]*integral[^"]*"/);
+    assert.match(toHTML('\\int_0^1 x^2 dx'), /aria-label="the integral from 0 to 1 of x squared, d x"/);
     // the label is for a listener who can't see the drawing: the grouping is in the words
     const label = (input) => toHTML(input).match(/aria-label="([^"]*)"/)[1];
     assert.equal(label('\\sqrt{x+1}+2'), 'the square root of the quantity x plus 1, end root, plus 2');
@@ -199,7 +219,7 @@ test('{{…}} blocks simplify, solve, differentiate and integrate with the CAS',
     assert.equal(drawn('{{d/dx x^2}}'), '2x');
     assert.equal(drawn('{{\\int x^2 dx}}'), 'x33');
     assert.equal(drawn('{{integrate(x^2, x, 0, 3)}}'), '9');
-    assert.equal(drawn('{{solve(x^2 - 5x + 6 = 0, x)}}'), 'x=2∨x=3');
+    assert.equal(drawn('{{solve(x^2 - 5x + 6 = 0, x)}}'), 'x=2orx=3');
     assert.equal(drawn('{{factor(x^2 - 1)}}'), 'x−1x+1');
     assert.equal(drawn('{{approx(pi, 20)}}'), '3.1415926535897932385');
     assert.equal(drawn('{{solve(x^2 = -1, x)}}'), 'no solution');
@@ -225,7 +245,7 @@ test('complex numbers: arithmetic, Re/Im/conj, solving, drawn', () => {
     const drawn = (s) => text(toHTML(s, { blocks }));
     assert.equal(drawn('{{simplify((2+3i)(1-i))}}'), '5+i');
     assert.equal(drawn('{{simplify(Re(3+4i) + |3+4i|)}}'), '8');
-    assert.equal(drawn('{{solve(x^2 + 2x + 5 = 0, x)}}'), 'x=−1−2i∨x=−1+2i');
+    assert.equal(drawn('{{solve(x^2 + 2x + 5 = 0, x)}}'), 'x=−1−2iorx=−1+2i');
     const { parse: postfix } = engineModule;
     assert.ok(toHTML(tokensOf(postfix('z conj'))).includes('mv-over'), 'the conjugate is drawn with an overline');
     assert.equal(text(toHTML(tokensOf(postfix('z re')))), 'Rez');
@@ -239,8 +259,14 @@ test('a CAS with rules of your own, and names for your functions', () => {
 test('the core imports only what every page maps (mathzetta, mathzetta/speech, mathzetta/calculate)', () => {
     const { readdirSync } = nodeFs;
     for (const file of readdirSync(new URL('../src/', import.meta.url)).filter((f) => f.endsWith('.js') && f !== 'cas.js')) {
-        const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
-        const bare = [...source.matchAll(/^\s*(?:import|export)\b[^'\n]*from '([^'.][^']*)'/gm)].map((m) => m[1]);
+        const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+            .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');   // comments mention imports too
+        // every form: multi-line `import { … } from`, `export … from`, `import 'x'`, `import('x')`, either quote
+        const bare = [
+            ...source.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s*(['"])([^'"]+)\1/gm),
+            ...source.matchAll(/^\s*import\s*(['"])([^'"]+)\1/gm),
+            ...source.matchAll(/\bimport\s*\(\s*(['"])([^'"]+)\1/g),
+        ].map((m) => m[2]).filter((name) => !name.startsWith('.'));
         for (const name of bare) assert.ok(['mathzetta', 'mathzetta/speech', 'mathzetta/calculate'].includes(name), `${file} imports '${name}': pages using Inline Math would need it in their import map`);
     }
 });
@@ -486,8 +512,173 @@ test('a step animates unless the reader asked for reduced motion (or the page in
     }
 });
 
+// ---- added 2026-11-11: what the review found ------------------------------------------------
+
+/** The text with each fence as ⟨ — where brackets are drawn, which text() alone can't show. */
+const fenced = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<span[^>]*mv-fence[^>]*>/g, '⟨').replace(/<[^>]+>/g, '');
+
+test('drawings that meant something else: each pair is drawn apart', () => {
+    const PAIRS = [
+        ['-1(a+b)', '-1a+b'], ['c + -1(a+b)', 'c - a + b'], ['(-1*x)^2', '-1*x^2'],
+        ['\\lim_{x\\to 0} (x+1)', '\\lim_{x\\to 0} x + 1'], ['\\sum_{i=1}^n (i+1)', '\\sum_{i=1}^n i + 1'],
+        ['(\\sum_{i=1}^n i)^2', '\\sum_{i=1}^n i^2'], ['(\\int x dx)^2', '\\int x^2 dx'], ['(\\lim_{x\\to0} x)^2', '\\lim_{x\\to0} x^2'],
+        ['(\\sum_{i=1}^n i) x', '\\sum_{i=1}^n i \\cdot x'], ['(a+b)_1', 'a+b_1'], ['x^{(1/2)n}', 'x^{1/(2n)}'],
+    ];
+    for (const [a, b] of PAIRS) {
+        const A = fenced(toHTML(a, { label: false }));
+        const B = fenced(toHTML(b, { label: false }));
+        assert.notEqual(A, B, `${a} and ${b} are both drawn ${A}`);
+    }
+    assert.equal(fenced(toHTML(['a', 'b', '+', 'c', '2', 'prod'], { label: false })), '⟨a+b·c');
+    assert.equal(fenced(toHTML('x^{1/2}', { label: false })), 'x1/2', 'a plain slash fraction takes no brackets');
+});
+
+test('names like toString are drawn as the names they are', () => {
+    for (const name of ['toString', 'constructor', 'valueOf']) assert.equal(text(toHTML(name, { label: false })), name);
+    assert.equal(text(toHTML(['__proto__'], { label: false })), '__proto__');
+});
+
+test('a tree made by hand may hold numbers as numbers', () => {
+    assert.equal(text(toHTML({ type: 'op', op: '+', args: [{ type: 'number', value: 3 }, { type: 'symbol', value: 'x' }] }, { label: false })), '3+x');
+});
+
+test('markdown: links, images, emphasis and entities', () => {
+    const md = (s) => markdownToHTML(s);
+    assert.equal(md('[`toHTML()`](#api)'), '<p><a href="#api"><code>toHTML()</code></a></p>');
+    assert.equal(md('[![build](https://img.example/b.svg)](https://ci.example)'), '<p><a href="https://ci.example"><img src="https://img.example/b.svg" alt="build"></a></p>');
+    assert.equal(md('[a\\_b](#c)'), '<p><a href="#c">a_b</a></p>');
+    assert.equal(md('[x](https://a.com/a\\_b)'), '<p><a href="https://a.com/a_b">x</a></p>');
+    assert.equal(md('![graph of $x^2$](p.png)'), '<p><img src="p.png" alt="graph of $x^2$"></p>');
+    assert.equal(md('[x](https://a.com "where $x>0$")'), '<p><a href="https://a.com" title="where $x&gt;0$">x</a></p>');
+    assert.equal(md('***both***'), '<p><strong><em>both</em></strong></p>');
+    assert.equal(md('***a** b*'), '<p><em><strong>a</strong> b</em></p>');
+    assert.equal(md('***a* b**'), '<p><strong><em>a</em> b</strong></p>');
+    assert.equal(md('&copy; &mdash; a&nbsp;b & c'), '<p>&copy; &mdash; a&nbsp;b &amp; c</p>');
+    assert.equal(md('The year was\n1986. What a year.'), '<p>The year was\n1986. What a year.</p>');
+    assert.ok(md('text\n1. one').includes('<ol>'), 'a list from 1 still interrupts');
+});
+
+test('markdown: typed placeholder characters are only characters', () => {
+    for (const s of ['' + '0' + '', '' + '5' + ' and $x$', '$x$ and ' + '0' + ' again', '`code` ' + '0' + '']) {
+        const html = markdownToHTML(s);
+        assert.ok(!html.includes('undefined'), `${JSON.stringify(s)} → ${html}`);
+        assert.equal((html.match(/mv-md-math/g) || []).length, s.includes('$x$') ? 1 : 0, `${JSON.stringify(s)}: the maths drawn once`);
+        assert.equal((html.match(/<code>/g) || []).length, s.includes('`') ? 1 : 0);
+    }
+});
+
+test('markdown: maths in an indented code block is code, and defines nothing', () => {
+    const drawn = (s) => text(markdownToHTML(s).replace(/aria-label="[^"]*"/g, ''));
+    assert.equal(drawn('    $_A := 5$\n\n$A + 1$'), '$_A := 5$\nA+1');
+    assert.equal(drawn('$_A := 5$\n\n$A + 1$'), '5+1');
+    assert.ok(drawn('- item\n\n    $x$ in the item').includes('x in the item'), 'inside a list item it is maths');
+});
+
+test('markdown: long runs of $ and many saved variables stay fast', () => {
+    let t = Date.now();
+    extractMath('| item | $12.50 | $13.00 |\n'.repeat(8000));
+    assert.ok(Date.now() - t < 300, `$ rows took ${Date.now() - t} ms`);
+    const md = Array.from({ length: 200 }, (_, i) => `$A_{${i}} := ${i}+1$`).join('\n\n');
+    t = Date.now();
+    markdownToHTML(md);
+    assert.ok(Date.now() - t < 300, `200 definitions took ${Date.now() - t} ms`);
+    const page = '$A := 2$, $B := 3A$, so ${{B}}$ and $A := 5$ makes ${{B}}$';
+    assert.match(text(markdownToHTML(page).replace(/aria-label="[^"]*"/g, '')), /so 6 and A≔5 makes 15/);
+});
+
+test('markdown: a definition is drawn as ≔ whatever the class prefix', () => {
+    assert.ok(markdownToHTML('$A := 2+2$', { math: { prefix: 'zz' } }).includes('≔'));
+});
+
+/** Just enough DOM for a View: listeners, attributes, classes, a live region after the element. */
+class FakeElement {
+    constructor() { this.listeners = new Map(); this.attrs = {}; this.classes = new Set(); this.dataset = {}; }
+    get classList() {
+        const c = this.classes;
+        return { add: (...x) => x.forEach((v) => c.add(v)), remove: (...x) => x.forEach((v) => c.delete(v)), contains: (v) => c.has(v) };
+    }
+    set className(v) { this.classes = new Set(String(v).split(/\s+/).filter(Boolean)); }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return this.attrs[k] ?? null; }
+    removeAttribute(k) { delete this.attrs[k]; }
+    addEventListener(type, fn) { if (!this.listeners.has(type)) this.listeners.set(type, new Set()); this.listeners.get(type).add(fn); }
+    removeEventListener(type, fn) { this.listeners.get(type)?.delete(fn); }
+    count(type) { return this.listeners.get(type)?.size ?? 0; }
+    set innerHTML(html) {
+        this.html = html;
+        const root = new FakeElement();
+        root.querySelector = () => null;
+        root.contains = () => true;
+        const label = /aria-label="([^"]*)"/.exec(html);
+        if (label) root.attrs['aria-label'] = label[1];
+        this.firstElementChild = root;
+    }
+    insertAdjacentElement(where, element) { this.nextElementSibling = element; element.parent = this; }
+    remove() { this.removed = true; if (this.parent && this.parent.nextElementSibling === this) this.parent.nextElementSibling = null; }
+}
+
+test('view: on() stops, destroy() stops everything, one live region per element, set() closes an open editor', async () => {
+    const { View, render } = await import('../src/view.js');
+    const hadDocument = 'document' in globalThis;
+    globalThis.document = { createElement: () => new FakeElement() };
+    try {
+        const element = new FakeElement();
+        const view = render(element, 'x + 1', { announce: true });
+        const off = view.on('click', () => {});
+        assert.equal(element.count('click'), 1);
+        off();
+        assert.equal(element.count('click'), 0);
+        view.set('x + 2');
+        assert.ok(!view.root.classes.has('mv-clickable'), 'a stopped handler leaves nothing clickable after set()');
+
+        view.on('click', () => {});
+        view.editable({ toText: String });
+        const live = element.nextElementSibling;
+        const again = render(element, 'y', { announce: true });
+        assert.equal(again.live, live, 'the live region is reused, not added again');
+        view.destroy();
+        assert.equal(element.count('click') + element.count('keydown') + element.count('dblclick'), 0);
+        assert.ok(live.removed, 'the live region this view added is gone');
+
+        let cancelled = 0;
+        const third = new View(new FakeElement(), 'x', {});
+        third.editor = { cancelEdit: () => { cancelled++; } };
+        third.set('x + 1');
+        assert.equal(cancelled, 1, 'an editor over the old expression is closed, not committed to the new one');
+    } finally {
+        if (hadDocument) { /* a real page's document stays */ } else delete globalThis.document;
+    }
+});
+
+test('view: a step moves each part from where it was, not from inside a part that moved as a whole', async () => {
+    const { View } = await import('../src/view.js');
+    const hadElement = 'Element' in globalThis;
+    const moves = [];
+    globalThis.Element = class { };
+    globalThis.Element.prototype.animate = () => {};
+    try {
+        // x² + x → x² − x: ids 0 (the x in x²), 1, 2 (x²), 3 (the lone x), 4; the lone x stays at 300
+        const place = { 0: 0, 1: 10, 2: 0, 3: 300, 4: 0 };
+        const view = Object.create(View.prototype);
+        const fake = (id) => ({
+            getBoundingClientRect: () => ({ left: place[id], top: 0, width: 10, height: 10 }),
+            animate: (frames) => moves.push({ id, transform: frames[0].transform ?? '' }),
+        });
+        view.elementOf = (n) => fake(n.id);
+        view.tree = treeOf('x^2 + x');
+        const before = view.snapshot();
+        view.tree = treeOf('x^2 - x');
+        view.morph(before, { duration: 1, easing: 'linear' });
+        const lone = moves.filter((m) => m.id === 3 && /translate\((?!0px, 0px)/.test(m.transform));
+        assert.deepEqual(lone, [], `the lone x moved: ${JSON.stringify(lone)}`);
+    } finally {
+        if (!hadElement) delete globalThis.Element;
+    }
+});
+
 // ---- report -------------------------------------------------------------------------
 
+await Promise.all(pending);
 if (failures.length) {
     console.log(failures.map((f) => `✗ ${f}`).join('\n'));
     console.log(`\n${passed} passed, ${failures.length} failed`);

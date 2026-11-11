@@ -18,4 +18,4 @@ for (const file of readdirSync(unit).filter((f) => f.endsWith('.test.js')).sort(
 runTables();
 
 console.log(`(${counts.known} known failures, listed in test/known-failures.json)`);
-process.exit(report() ? 0 : 1);
+process.exit((await report()) ? 0 : 1);

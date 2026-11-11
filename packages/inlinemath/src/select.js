@@ -17,6 +17,13 @@
 
 import { parseTree, toPostfix, walk, operator, VARIADIC } from './mathzetta.js';
 
+/** A tree with its ids (and where-it-came-from marks) dropped, so it can be numbered again inside another. */
+export function bare(node) {
+    const { id, from, ...rest } = node;
+    if (rest.args) rest.args = rest.args.map(bare);
+    return rest;
+}
+
 /** A subtree's postfix as one string: two parts look the same exactly when these match. */
 export const signature = (node) => toPostfix(node).join(' ');
 

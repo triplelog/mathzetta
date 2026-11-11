@@ -16,7 +16,7 @@ dy/dx = ky	d y d x equals k y	d y d x equals k y
 \frac{d^2y}{dx^2}	d squared y d x squared	d squared y d x squared
 \frac{d}{dx}(x^2+1)	the derivative with respect to x of x squared plus 1	the derivative with respect to x of the quantity x squared plus 1
 \frac{d}{dx}\sin x	the derivative with respect to x of sine of x	the derivative with respect to x of sine of x
-\lim_{x\to 0}\frac{\sin x}{x}	the limit as x approaches 0 of sine of x, over x	the limit as x approaches 0 of sine of x, over x
+\lim_{x\to 0}\frac{\sin x}{x}	the limit as x approaches 0 of sine of x, over x	the limit as x approaches 0 of the quantity sine of x, over x
 \lim_{x\to\infty}\left(1+\frac{1}{x}\right)^x	the limit as x approaches infinity of the quantity 1 plus 1 over x, to the x	the limit as x approaches infinity of the quantity 1 plus 1 over x, end quantity, to the x
 \lim_{x\to 0^+}\ln x	the limit as x approaches 0 from the right of the natural log of x	the limit as x approaches 0 from the right of the natural log of x
 e^x	e to the x	e to the x

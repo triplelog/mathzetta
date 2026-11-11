@@ -3,7 +3,7 @@
  * calculator for the full build; lite.js uses this as it is). No DOM needed, so this runs in Node too.
  */
 
-import { parseTree, fromPostfix } from './mathzetta.js';
+import { parseTree, fromPostfix, walk } from './mathzetta.js';
 import { layout } from './layout.js';
 import { select, numberTree } from './select.js';
 
@@ -19,7 +19,11 @@ export function treeOf(input, options = {}) {
     if (typeof input === 'string') return parseTree(input, blocks ? { blocks: (text) => blocks(text, options.scope) } : {});
     if (Array.isArray(input)) return fromPostfix(input);
     if (input && typeof input === 'object' && input.type) {
-        return input.id === undefined ? numberTree(structuredClone(input)) : input;
+        if (input.id !== undefined) return input;
+        // a tree made by hand: values as MathZetta writes them, text ({ type: 'number', value: 3 } is '3')
+        const tree = structuredClone(input);
+        walk(tree, (n) => { if (n.type !== 'op' && n.value !== undefined) n.value = String(n.value); });
+        return numberTree(tree);
     }
     throw new Error('Inline Math needs an expression, standard postfix or a tree');
 }

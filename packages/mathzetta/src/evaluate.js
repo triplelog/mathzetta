@@ -8,7 +8,8 @@
  */
 
 import { treeOf } from './input.js';
-import { expandChain } from './common.js';
+import { firstVariable } from './tree.js';
+import { expandChain, percentDecimal } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 
 // ---- matrices (lists of equally long lists): the matrix product, powers, determinants -----------
@@ -44,13 +45,29 @@ const power = (a, b) => {
     if (!Number.isInteger(b)) throw new Error('A matrix to a power that is not a whole number');
     return M.power(a, BigInt(b));
 };
-/** det(A); det([[1, 2], [3, 4]]) arrives as one argument per row. */
-const matrixArg = (f) => (xs) => f(xs.length > 1 && xs.every(isVector) ? xs : xs[0]);
+/** det(A); det([[1, 2], [3, 4]]) arrives as one argument per row. Anything but a matrix is refused by name. */
+const matrixArg = (f, name) => (xs) => {
+    const A = xs.length > 1 && xs.every(isVector) ? xs : xs[0];
+    if (!isMatrixValue(A)) throw new Error(`${name}() needs a matrix`);
+    return f(A);
+};
+const vectors = (f, name) => ([u, v]) => {
+    if (!isVectorValue(u) || !isVectorValue(v)) throw new Error(`${name}() needs two lists`);
+    return f(u, v);
+};
 const MATRIX_FUNCTIONS = {
-    det: matrixArg(M.det), inv: matrixArg(M.inverse), inverse: matrixArg(M.inverse), transpose: matrixArg(M.transpose),
-    trace: matrixArg(M.trace), tr: matrixArg(M.trace), rank: matrixArg(M.rank), rref: matrixArg(M.rref),
-    identity: ([n]) => M.identity(n), dot: ([u, v]) => M.dot(u, v), cross: ([u, v]) => M.cross(u, v),
-    linsolve: ([A, b]) => M.solve(A, b),
+    det: matrixArg(M.det, 'det'), inv: matrixArg(M.inverse, 'inv'), inverse: matrixArg(M.inverse, 'inverse'),
+    transpose: matrixArg(M.transpose, 'transpose'), trace: matrixArg(M.trace, 'trace'), tr: matrixArg(M.trace, 'tr'),
+    rank: matrixArg(M.rank, 'rank'), rref: matrixArg(M.rref, 'rref'),
+    identity: ([n]) => {   // as calculate(): a whole number of rows, at most 100 (identity(60000) is 3.6 billion cells)
+        if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('identity(n) takes a whole number from 1 to 100');
+        return M.identity(n);
+    },
+    dot: vectors(M.dot, 'dot'), cross: vectors(M.cross, 'cross'),
+    linsolve: ([A, b]) => {
+        if (!isMatrixValue(A) || !Array.isArray(b)) throw new Error('linsolve() needs a matrix and a list');
+        return M.solve(A, b);
+    },
 };
 const rowsOf = (node, scope) => node.args.map((r) => (r.type === 'op' && r.op === '[]' ? r.args.map((c) => value(c, scope)) : [value(r, scope)]));
 
@@ -82,10 +99,20 @@ const comb = (n, k) => {
     return Math.round(r);
 };
 const gcd2 = (a, b) => (b ? gcd2(b, a % b) : Math.abs(a));
+/** a mod n takes the divisor's sign, as in maths and calculate(): -7 mod 3 is 2 (JavaScript's % gives -1). */
+const mod = (a, n) => ((a % n) + n) % n;
+/** Halves away from zero, as calculate(), spreadsheets and SQL do: round(-2.5) is -3 (Math.round gives -2). */
+const roundHalfAway = (x) => Math.sign(x) * Math.round(Math.abs(x));
+/** The real root: an odd root of a negative number is negative, cbrt(-8) = -2 (as calculate()). */
+const root = (n, x) => (x < 0 && Number.isInteger(n) && n % 2 !== 0 ? -((-x) ** (1 / n)) : x ** (1 / n));
+/** Lists are equal entry by entry, as calculate() compares them: [1, 2] = [1, 2]. */
+const same = (a, b) => (Array.isArray(a) && Array.isArray(b)
+    ? a.length === b.length && a.every((x, i) => same(x, b[i]))
+    : a == b);   // eslint-disable-line eqeqeq -- = compares loosely, === strictly
 
 const ONE = {
     neg: (a) => -a, pm: (a) => [a, -a], '!': factorial, '\\not': (a) => !a,
-    sqrt: Math.sqrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil, det: (A) => M.det(A),
+    sqrt: Math.sqrt, abs: Math.abs, floor: Math.floor, ceil: Math.ceil, det: (A) => MATRIX_FUNCTIONS.det([A]),
     ln: Math.log, loglog: (a) => Math.log(Math.log(a)), logloglog: (a) => Math.log(Math.log(Math.log(a))),   // ln ln, as every renderer and calculate()
     expm1: Math.expm1,
     sin: Math.sin, cos: Math.cos, tan: Math.tan,
@@ -100,15 +127,19 @@ const TWO = {
     '-': (a, b) => (Array.isArray(a) || Array.isArray(b) ? each((x, y) => x - y)(a, b) : a - b),
     '*': times,
     '/': (a, b) => (isMatrix(b) ? times(a, M.inverse(b)) : Array.isArray(a) || Array.isArray(b) ? each((x, y) => x / y)(a, b) : a / b),
-    '^': power, mod: (a, b) => a % b,
+    '^': power, mod,
     log: (base, x) => Math.log(x) / Math.log(base),
-    root: (n, x) => x ** (1 / n),
+    root,
     atan2: Math.atan2,
-    round: (x, d) => Math.round(x * 10 ** d) / 10 ** d,
+    round: (x, d) => roundHalfAway(x * 10 ** d) / 10 ** d,
     '±': (a, b) => [a + b, a - b],
-    fixed: (x, d) => Number(x).toFixed(d),   // text, with exactly d decimals
+    fixed: (x, d) => {   // text, with exactly d decimals (toFixed takes 0 to 100)
+        const digits = Math.trunc(d);
+        if (!(digits >= 0 && digits <= 100)) throw new Error('fixed() takes 0 to 100 decimals');
+        return Number(x).toFixed(digits);
+    },
     perm, comb,
-    '=': (a, b) => a == b, '===': (a, b) => a === b, '≠': (a, b) => a != b, '≠=': (a, b) => a !== b,
+    '=': same, '===': (a, b) => a === b, '≠': (a, b) => !same(a, b), '≠=': (a, b) => a !== b,
     '≈': (a, b) => Math.abs(a - b) < 1e-9,
     '≡': (a, b) => a === b,
     '∪': (a, b) => [...new Set([...[].concat(a), ...[].concat(b)])],
@@ -122,7 +153,7 @@ const MANY = {
     max: (xs) => Math.max(...xs), min: (xs) => Math.min(...xs),
     sum: (xs) => xs.reduce((a, b) => a + b, 0), prod: (xs) => xs.reduce((a, b) => a * b, 1),
     mean: (xs) => xs.reduce((a, b) => a + b, 0) / xs.length,
-    gcd: (xs) => xs.reduce(gcd2),
+    gcd: (xs) => xs.reduce(gcd2, 0),
     '()': (xs) => xs, '[]': (xs) => xs, '{}': (xs) => xs,
 };
 
@@ -152,6 +183,7 @@ function value(node, scope) {
         case 'symbol':
             if (Object.prototype.hasOwnProperty.call(scope, node.value)) return scope[node.value];
             if (Object.prototype.hasOwnProperty.call(CONSTANTS, node.value)) return CONSTANTS[node.value];
+            if (percentDecimal(node.value)) return Number(percentDecimal(node.value));   // 50% is 0.5
             throw new Error(`No value for '${node.value}'`);
     }
 
@@ -161,11 +193,12 @@ function value(node, scope) {
     if (op === '?:') return value(args[0], scope) ? value(args[1], scope) : value(args[2], scope);
     if (op === '∈' || op === '∉') return membership(node, scope);
     if (op === 'random') return Math.random();
-    if ((op === '\\sumidx' || op === '\\prodidx') && args.length === 3 && args[1].type === 'op' && args[1].op === '='
-        && args[1].args[0].type === 'symbol') {
-        // ∑ from i = a to b, a whole number of steps (at most a million)
-        const [body, from, to] = [args[0], args[1].args[1], args[2]];
-        const name = args[1].args[0].value;
+    if ((op === '\\sumidx' || op === '\\prodidx') && args.length === 3) {
+        // ∑ from i = a to b, a whole number of steps (at most a million); ∑_0^3 i^2 names no index: the body's variable
+        const named = args[1].type === 'op' && args[1].op === '=' && args[1].args[0].type === 'symbol';
+        const [body, from, to] = [args[0], named ? args[1].args[1] : args[1], args[2]];
+        const name = named ? args[1].args[0].value : firstVariable(body);
+        if (!name) throw new Error(`Can't evaluate '${op}' without an index`);
         const lo = value(from, scope), hi = value(to, scope);
         if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo > 1e6) throw new Error(`Can't evaluate '${op}' over that range`);
         let acc = op === '\\sumidx' ? 0 : 1;
@@ -182,7 +215,7 @@ function value(node, scope) {
             const [l, r] = statement.args.map((s) => value(s, scope));
             return (l - r) % n === 0;
         }
-        return value(statement, scope) % n;
+        return mod(value(statement, scope), n);
     }
 
     if (op === 'pmatrix' || op === 'bmatrix') return rowsOf(node, scope);

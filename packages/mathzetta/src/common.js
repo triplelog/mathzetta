@@ -22,6 +22,32 @@ export function firstLeaf(node) {
     return node.type === 'op' ? '' : node.value;
 }
 
+/**
+ * A percentage leaf ("20%", "12.5%") as the decimal it stands for ("0.2", "0.125"), the point moved two
+ * places so no double rounding creeps in; null for anything else. Code has no % literal (JavaScript reads
+ * 50% as a syntax error, SQL as a name), so the code outputs and evaluate() write and read this.
+ */
+export function percentDecimal(value) {
+    const m = typeof value === 'string' && /^(-?)(\d*)(?:\.(\d*))?%$/.exec(value);
+    if (!m || !(m[2] || m[3])) return null;
+    const digits = (m[2] || '0').padStart(3, '0') + (m[3] ?? '');
+    const point = digits.length - (m[3] ?? '').length - 2;
+    const text = `${digits.slice(0, point).replace(/^0+(?=\d)/, '')}.${digits.slice(point)}`.replace(/\.?0+$/, '');
+    return m[1] + (text === '' ? '0' : text);
+}
+
+/**
+ * ∑_0^3 i^2 names no index: the same sum with its index written, i = 0 (the body's first variable), as
+ * the outputs that write a sum as a call do, so it reads back. Anything else comes back unchanged.
+ */
+export function withIndex(node, firstVariable) {
+    if (!['\\sumidx', '\\prodidx'].includes(node.op) || node.args.length !== 3) return node;
+    const [body, from, to] = node.args;
+    if (from.type === 'op' && from.op === '=') return node;
+    const index = firstVariable(body);
+    return index ? { ...node, args: [body, { type: 'op', op: '=', args: [{ type: 'symbol', value: index }, from] }, to] } : node;
+}
+
 /** `-1 * x`, which every format writes as plain `-x`. */
 export function isMinusOneTimes(node) {
     if (node.op !== '*') return false;
@@ -31,15 +57,15 @@ export function isMinusOneTimes(node) {
 
 /**
  * The operator that decides whether a node needs brackets inside another.
- * `sum(a, b)` behaves like `+`, `prod(a, b)` like `*`, and neither `-1 * x`
- * (written `-x`) nor a group like {1, 2} ever needs them. Leaves have none.
+ * `sum(a, b)` behaves like `+`, `prod(a, b)` like `*`, `-1 * x` (written `-x`)
+ * like a negation, and a group like {1, 2} never needs them. Leaves have none.
  */
 export function bracketOp(node) {
     if (node.type !== 'op') return null;
     if (operator(node.op)?.group) return null;   // (a, b), {1, 2}: already bracketed
     if (node.op === 'sum') return '+';
     if (node.op === 'prod') return '*';
-    if (isMinusOneTimes(node)) return null;
+    if (isMinusOneTimes(node)) return 'neg';   // drawn -x, so it brackets like -x: (-x)^2, (-x)!
     return node.op;
 }
 
@@ -61,7 +87,7 @@ export const needsBrackets = (parent, child, side) =>
 export function unaryNeedsBrackets(parentOp, child) {
     const op = bracketOp(child);
     const childPrec = op && operator(op)?.prec;
-    if (!childPrec) return false;
+    if (!childPrec) return parentOp !== '\\not' && startsWithSign(child);   // a leaf: -(-5), (-5)!
     if (parentOp === '!') return childPrec <= operator('!').prec;   // (5!)! not 5!!
     if (parentOp === '\\not') return childPrec < operator('\\not').prec;
     // A minus sign in front of a product, quotient or power changes nothing:
@@ -165,8 +191,10 @@ export const customName = (op) => op.slice(2);
  */
 export function derivativeOrder(node) {
     const by = node.args[1];
-    let n = 0;
-    let body = node;
+    // the first derivative is always this node's; more are counted while the variable is the same leaf
+    // (with a compound "variable", d/d(x+1), the body must still be peeled once, or it is drawn for ever)
+    let n = 1;
+    let body = node.args[0];
     while (body.type === 'op' && body.op === 'der' && sameLeaf(body.args[1], by)) {
         n++;
         body = body.args[0];

@@ -15,7 +15,7 @@
  * a display highlight the part being spoken about.
  */
 
-import { operator, VARIADIC } from './operators.js';
+import { operator, VARIADIC, isCustomFunction } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 
 export const num = (value) => ({ type: 'number', value: String(value) });
@@ -62,6 +62,8 @@ export function fromPostfix(tokens) {
             if (!Number.isInteger(count) || count < 0) {
                 throw new Error(`'${token}' takes a variable number of arguments, so it must follow a count`);
             }
+            // as parse() refuses max(): only a group ({}, the empty set) or a function of the caller's own takes none
+            if (count === 0 && !def.group && !isCustomFunction(token)) throw new Error(`'${token}' needs at least one argument`);
         }
         if (stack.length < count) {
             throw new Error(`'${token}' needs ${count} operand${count === 1 ? '' : 's'}`);

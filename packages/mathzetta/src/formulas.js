@@ -19,7 +19,7 @@ import { toCode } from './render/code.js';
 import { toMathml } from './render/mathml.js';
 import { toSqlCode } from './render/sql.js';
 import { toExcelFormula } from './render/excel.js';
-import { replaceColumnNames, columnIndexOf } from './columns.js';
+import { replaceColumnNames, columnIndexOf, placeholderFor } from './columns.js';
 
 
 /**
@@ -62,10 +62,8 @@ export function strToSQL(header, formula, unknownStringSelections = new Map(), o
     const compiled = compile(header, formula, unknownStringSelections);
     if (!compiled.success) return compiled;
     // a name that is no column (and wasn't mapped to one) would reach the database as an identifier
-    const CONSTANT = new Set(['pi', 'π', 'e', 'tau', 'τ', '°', '∞', '-∞']);   // written as SQL's own (PI(), EXP(1) …)
-    const unknown = compiled.columnsAsIndexes.filter((t, i) => (compiled.types[i] === 'unknown' && !CONSTANT.has(t))
-        || (isCustomFunction(t) && !(typeof options.functions === 'function' ? options.functions(t.slice(2)) : (options.functions ?? []).includes(t.slice(2)))));
-    if (unknown.length) return { success: false, error: `unknown name ${unknown.map((t) => (isCustomFunction(t) ? t.slice(2) + '(…)' : t)).join(', ')}`, unknownStrings: compiled.unknownStrings };
+    const unknown = unknownNames(compiled, options);
+    if (unknown) return { success: false, error: unknown, unknownStrings: compiled.unknownStrings };
     const columns = compiled.columnsAsNames.filter((_, i) => compiled.types[i] === 'column');
     let sqlExpression;
     try {
@@ -98,6 +96,9 @@ export function strToSQL(header, formula, unknownStringSelections = new Map(), o
 export function strToExcel(header, formula, unknownStringSelections = new Map(), options = {}) {
     const compiled = compile(header, formula, unknownStringSelections);
     if (!compiled.success) return compiled;
+    // A name that is no column is written as a name (a spreadsheet reads it as a named range, or #NAME?): unlike
+    // SQL, where it would reach the database, nothing is refused — it is in unknownStrings for the caller to decide
+    // (tabview writes values only; the Sheets sidebar asks). f(…) is written only for the functions listed.
     const tree = fromPostfix(compiled.columnsAsIndexes);
     const COLUMN = '\u0000column:';   // a name no formula can type
     (function visit(node) {
@@ -120,6 +121,16 @@ export function strToExcel(header, formula, unknownStringSelections = new Map(),
         success: true, excelFormula, tree: namedTree(compiled), postfixArray: compiled.columnsAsIndexes,
         types: compiled.types, unknownStrings: compiled.unknownStrings,
     };
+}
+
+const CONSTANTS = new Set(['pi', 'π', 'e', 'tau', 'τ', '°', '∞', '-∞']);   // written as SQL's or a spreadsheet's own (PI(), EXP(1) …)
+
+/** The names that are neither columns, constants nor functions the caller lists: an error message, or null. */
+function unknownNames(compiled, options) {
+    const listed = (name) => (typeof options.functions === 'function' ? options.functions(name) : (options.functions ?? []).includes(name));
+    const unknown = compiled.columnsAsIndexes.filter((t, i) => (compiled.types[i] === 'unknown' && !CONSTANTS.has(t))
+        || (isCustomFunction(t) && !listed(t.slice(2))));
+    return unknown.length ? `unknown name ${unknown.map((t) => (isCustomFunction(t) ? t.slice(2) + '(…)' : t.replace(/^_(?=c\d+$)/, ''))).join(', ')}` : null;
 }
 
 /**
@@ -172,7 +183,8 @@ function compile(header, formula, selections) {
 
     let postfix;
     try {
-        postfix = parse(replaceColumnNames(formula, header));
+        // the placeholders kept whole: in LaTeX (\sqrt{x}) letters side by side are a product, and tktkA would be t·k·t·k·A
+        postfix = parse(replaceColumnNames(formula, header), { names: header.map((_, i) => placeholderFor(i)) });
     } catch (error) {
         return { success: false, error: error.message, unknownStrings: [] };
     }
@@ -189,6 +201,9 @@ function compile(header, formula, selections) {
             if (chosen) ({ type, value } = chosen);
         }
         types.push(type);
+        // an unknown name spelt like a column's slot (c1) must not become one in the JavaScript: it stays
+        // unknown there, and the row evaluator refuses it like any other name
+        if (type === 'unknown' && /^c\d+$/.test(value)) value = `_${value}`;
         columnsAsIndexes.push(type === 'column' ? `c${value}` : value);
         columnsAsNames.push(type === 'column' ? header[value] : value);
     });

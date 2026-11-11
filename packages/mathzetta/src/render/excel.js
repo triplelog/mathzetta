@@ -20,7 +20,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows } from '../common.js';
+import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -52,6 +52,7 @@ function leaf(node, opts) {
     }
     const ref = opts.cell(v);
     if (ref !== undefined) return ref;
+    if (percentDecimal(v)) return v;   // a spreadsheet reads 50% itself
     if (Object.prototype.hasOwnProperty.call(CONSTANTS, v)) return CONSTANTS[v];
     if (v === '∞' || v === '-∞') fail('∞ (spreadsheets have no infinity)');
     if (v === 'null' || v === 'undefined') return '""';
@@ -75,9 +76,16 @@ const AGGREGATES = { sum: 'SUM', prod: 'PRODUCT', mean: 'AVERAGE', max: 'MAX', m
 const UNSUPPORTED = { der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
     pm: '±', '±': '±', '∪': '∪', '∩': '∩', '→': '→' };
 
+const COMPARING = new Set(['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≡']);
+
 /** Brackets for a spreadsheet: as in maths, except that powers and negation bracket more. */
 function excelBracketOp(node) {
     if (node.type !== 'op') return null;
+    // written as bare operators, not calls: sum(a, b) is a+b, a ≈ b is ABS(…)<1E-9, x ∈ ℤ is x=INT(x)
+    if ((node.op === 'sum' || node.op === 'prod') && node.args.length > 1) return bracketOp(node);
+    if (node.op === '≈') return '<';
+    if (node.op === 'pmod' && node.args[0].type === 'op' && ['≡', '='].includes(node.args[0].op)) return '=';
+    if (node.op === '∈' && node.args[1].type === 'symbol' && node.args[1].value === 'ℤ') return '=';
     if (FUNCTIONS[node.op] || AGGREGATES[node.op] || isCustomFunction(node.op) || operator(node.op)?.group) return null;
     if (['root', 'log', 'mod', 'max', 'min', 'gcd', 'atan2', 'random', 'expm1', 'loglog', 'logloglog', '?:', '≈', '∈', '∉', 'pmod', '\\nand', '\\nor', '\\xor'].includes(node.op)) return null;
     if (RECIPROCALS[node.op]) return '/';
@@ -105,7 +113,9 @@ function operation(node, render, opts) {
     if (chained) return render(chained);
     const { op, args } = node;
     const [a, b] = args;
-    const side = (child, s) => (needsParens(op, excelBracketOp(child), s) ? `(${render(child)})` : render(child));
+    // every comparison has the same precedence in a spreadsheet: c=(a<b) needs its brackets
+    const side = (child, s) => (needsParens(op, excelBracketOp(child), s) || (COMPARING.has(op) && COMPARING.has(excelBracketOp(child)))
+        ? `(${render(child)})` : render(child));
     const list = () => args.map(render).join(', ');
     if (UNSUPPORTED[op]) fail(UNSUPPORTED[op]);
 
@@ -140,10 +150,11 @@ function operation(node, render, opts) {
         case '+': case '-': case '/':
             return `${side(a, 'left')}${op}${side(b, 'right')}`;
         case '*':
-            return isMinusOneTimes(node) ? `-${side(b, 'right')}` : `${side(a, 'left')}*${side(b, 'right')}`;
+            if (isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render, opts);   // -x, bracketed as -x is
+            return `${side(a, 'left')}*${side(b, 'right')}`;
         case 'neg': {
             const inner = render(a);   // -(x^2): a spreadsheet's minus would take x first
-            return a.type === 'op' && !isAtom(a, inner) ? `-(${inner})` : `-${inner}`;
+            return (a.type === 'op' && !isAtom(a, inner)) || inner.startsWith('-') ? `-(${inner})` : `-${inner}`;
         }
         case '^': {
             if (a.type === 'symbol' && a.value === 'e') return `EXP(${render(b)})`;
@@ -152,6 +163,12 @@ function operation(node, render, opts) {
             return `${isAtom(a, base) ? base : `(${base})`}^${isAtom(b, exponent) ? exponent : `(${exponent})`}`;
         }
         case 'root': {
+            const n = a.type === 'number' && /^\d+$/.test(a.value) ? Number(a.value) : 0;
+            if (n > 1 && n % 2 === 1) {   // an odd root of a negative number is real: POWER(-8, 1/3) is #NUM!
+                const x = render(b);
+                const v = isAtom(b, x) ? x : `(${x})`;
+                return `IF(${v}<0, -POWER(-${v}, 1/${n}), POWER(${v}, 1/${n}))`;
+            }
             const index = render(a);
             return `POWER(${render(b)}, 1/${isAtom(a, index) ? index : `(${index})`})`;
         }
@@ -207,7 +224,7 @@ function operation(node, render, opts) {
 function membership(x, set, render) {
     const v = render(x);
     if (set.type === 'symbol') {
-        const tests = { 'ℤ': `${v}=INT(${v})`, 'ℕ': `AND(${v}=INT(${v}), ${v}>0)`, 'ℝ': `ISNUMBER(${v})` };
+        const tests = { __proto__: null, 'ℤ': `${v}=INT(${v})`, 'ℕ': `AND(${v}=INT(${v}), ${v}>0)`, 'ℝ': `ISNUMBER(${v})` };
         return tests[set.value] ?? fail(`∈ ${set.value}`);
     }
     if (set.type === 'op' && ['()', '[]', '(]', '[)'].includes(set.op) && set.args.length === 2) {

@@ -22,6 +22,8 @@ export function toLatex(node, options = {}) {
 }
 
 const paren = (s) => `\\left(${s}\\right)`;
+const PLUS = { op: '+' };    // the parent sum(…) and prod(…) bracket their terms as
+const TIMES = { op: '*' };
 
 /** α → alpha, Ω → Omega: Greek letters are written as LaTeX commands. */
 const GREEK_NAMES = Object.fromEntries(Object.entries(GREEK).map(([name, letter]) => [letter, name]));
@@ -31,7 +33,7 @@ const BLACKBOARD = { 'ℝ': 'R', 'ℕ': 'N', 'ℤ': 'Z', 'ℚ': 'Q', 'ℂ': 'C' 
 
 function leaf(node) {
     const v = node.value;
-    if (node.type === 'string') return `\\text{${v}}`;
+    if (node.type === 'string') return `\\text{${textEscape(v)}}`;   // typed text: it must not close the \text{} or start a command
     if (node.type === 'number') return v;
     if (GREEK[v]) return '\\' + v;
     if (GREEK_NAMES[v]) return '\\' + GREEK_NAMES[v];
@@ -49,10 +51,14 @@ function leaf(node) {
  * A name from a postfix array or tree can hold anything: LaTeX's command characters are written as
  * characters, so `\href{…}` in a name stays text (parse() never makes such names).
  */
-const texEscape = (v) => v.replace(/[\\{}$#&~]/g, (c) => ({ '\\': '\\backslash ', '~': '\\sim ' })[c] ?? `\\${c}`);
+const MATH_SPECIAL = { '\\': '\\backslash ', '~': '\\sim ', '^': '\\hat{}', '_': '\\_' };
+const texEscape = (v) => v.replace(/[\\{}$#&~%^_]/g, (c) => MATH_SPECIAL[c] ?? `\\${c}`);
+/** The same for text mode (a string's \text{…}), whose commands differ. */
+const TEXT_SPECIAL = { '\\': '\\textbackslash{}', '~': '\\textasciitilde{}', '^': '\\textasciicircum{}' };
+const textEscape = (v) => v.replace(/[\\{}$#&~%^_]/g, (c) => TEXT_SPECIAL[c] ?? `\\${c}`);
 
 function name(v) {
-    if (/[\\{}$#&~]/.test(v)) return `\\mathrm{${texEscape(v)}}`;
+    if (/[\\{}$#&~^_]/.test(v)) return `\\mathrm{${texEscape(v)}}`;
     const greek = GREEK_NAMES[v[0]];
     if (greek && v.length > 1) return `\\${greek} ${name(v.slice(1))}`;
     if (/^[A-Za-z]{2,}$/.test(v)) return `\\mathrm{${v}}`;
@@ -97,12 +103,15 @@ function operation(node, render) {
     switch (op) {
         case '→':
             return `${side(a, 'left')}\\to ${side(b, 'right')}`;
+        // -1·x is written -x, bracketed as -x is; a + (-1·x) is a - x, and a - (-1·x) is a + x
         case '+':
-            return side(a, 'left') + (isMinusOneTimes(b) ? ' ' : ' + ') + side(b, 'right');
+            if (isMinusOneTimes(b)) return operation({ ...node, op: '-', args: [a, b.args[1]] }, render);
+            return side(a, 'left') + ' + ' + side(b, 'right');
         case '-':
-            return side(a, 'left') + (isMinusOneTimes(b) ? ' + ' + render(b).slice(1) : ' - ' + side(b, 'right'));
+            if (isMinusOneTimes(b)) return operation({ ...node, op: '+', args: [a, b.args[1]] }, render);
+            return side(a, 'left') + ' - ' + side(b, 'right');
         case '*': {
-            if (isMinusOneTimes(node)) return '-' + render(b);
+            if (isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render);
             const l = side(a, 'left');
             const r = side(b, 'right');
             if (!isImplicitProduct(a, b, bracketedSides(node))) return `${l} \\cdot ${r}`;
@@ -134,7 +143,10 @@ function operation(node, render) {
         case 'sqrt':
             return `\\sqrt{${render(a)}}`;
         case 'root':
-            return `\\sqrt[${render(a)}]{${render(b)}}`;
+        {
+            const index = render(a);   // a ] inside the index ((0, 5]) would end it: \sqrt[{…}]
+            return `\\sqrt[${index.includes(']') ? `{${index}}` : index}]{${render(b)}}`;
+        }
         case 'abs':
             return `\\left|${render(a)}\\right|`;
         case 'floor':
@@ -159,12 +171,12 @@ function operation(node, render) {
             const lines = piecewise(node).map(({ value, when }) => `${render(value)} & ${when ? `\\text{if } ${render(when)}` : '\\text{otherwise}'}`);
             return `\\begin{cases}${lines.join(' \\\\ ')} \\end{cases}`;
         }
-        case 'sum':
-            return args.map(render).join(' + ');
+        case 'sum':   // written out as a + b + c: each term bracketed as a + would bracket it
+            return args.map((x, i) => (needsBrackets(PLUS, x, i ? 'right' : 'left') ? paren(render(x)) : render(x))).join(' + ');
         case 'mean':
             return `\\frac{${args.map(render).join(' + ')}}{${args.length}}`;
-        case 'prod':
-            return args.map(render).join(' \\cdot ');
+        case 'prod':   // prod(a + b, c) is (a + b) · c
+            return args.map((x, i) => (needsBrackets(TIMES, x, i ? 'right' : 'left') ? paren(render(x)) : render(x))).join(' \\cdot ');
         case 'der': {
             // dy/dx, d²y/dx²; d/dx [x^2 + 1] gets brackets, d/dx sin x doesn't.
             const { n, body, by, variable } = derivativeOrder(node);
@@ -232,4 +244,4 @@ function bigOperator(symbol, args, render) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [BLACKBOARD, COMPARISONS, NAMED, GROUPS, GREEK_NAMES]) Object.setPrototypeOf(table, null);
+for (const table of [BLACKBOARD, COMPARISONS, NAMED, GROUPS, GREEK_NAMES, MATH_SPECIAL, TEXT_SPECIAL]) Object.setPrototypeOf(table, null);

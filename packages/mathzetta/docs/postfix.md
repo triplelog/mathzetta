@@ -35,6 +35,7 @@ highlight exactly the part an explanation is talking about.
 | number | `3` `-2` `0.5` `.5` `1.333..` | digits and dots, optional leading `-`. A minus written directly on a number is folded in: `-5`, not `5 neg`. A trailing `..` marks a repeating decimal (kept as written; code output drops the dots). |
 | symbol | `x` `theta` `θ` `pi` `e` `∞` `-∞` `°` `true` `speed` | anything that isn't a number, string or operator. Greek letters arrive as unicode (`\alpha` → `α`); `π` arrives as `pi`. |
 | string | `"abc"` `'abc'` | quotes included. |
+| percentage | `50%` `12.5%` | a number with `%`: its value is the number / 100. Code outputs write the decimal (`0.5`); spreadsheets keep `50%`. |
 | sign | `\+` `\-` | a lone sign, as in `x^+` or `{-}`. |
 
 Names can carry primes: `y′′` is the symbol for y″, and `\:f′` is the
@@ -48,7 +49,7 @@ Fixed arity — no count token:
 | Token | Arity | Meaning | Example postfix |
 | --- | --- | --- | --- |
 | `+` `-` `*` `/` `^` | 2 | arithmetic | `a b ^` = a<sup>b</sup> |
-| `mod` | 2 | remainder | `a n mod` |
+| `mod` | 2 | remainder, with the divisor's sign (floored, as in maths): `-7 mod 3` is 2. JavaScript and SQL, whose `%`/`MOD` take the dividend's, are written to match | `a n mod` |
 | `≡` | 2 | congruent | `a b ≡` |
 | `pmod` | 2 | a statement taken mod n | `a b ≡ n pmod` = a ≡ b (mod n) |
 | `±` | 2 | plus or minus | `a b ±` |
@@ -57,7 +58,7 @@ Fixed arity — no count token:
 | `!` | 1 | factorial | `n !` |
 | `_` | 2 | subscript | `x 1 _` = x<sub>1</sub> |
 | `sqrt` `abs` `floor` `ceil` | 1 | | `x sqrt` |
-| `root` | 2 | n-th root: index, radicand | `3 x root` = ∛x |
+| `root` | 2 | n-th root: index, radicand. An odd root of a negative number is real: `3 -8 root` is −2 | `3 x root` = ∛x |
 | `ln` | 1 | natural log | `x ln` |
 | `log` | 2 | log with a base: base, value | `2 8 log` = log₂ 8 |
 | `loglog` `logloglog` | 1 | ln ln x, ln ln ln x | |
@@ -66,7 +67,7 @@ Fixed arity — no count token:
 | `sinh` `cosh` `tanh` | 1 | | |
 | `arcsin` `arccos` `arctan` `arcsinh` `arccosh` `arctanh` | 1 | inverses | |
 | `atan2` | 2 | y, x | `y x atan2` |
-| `round` | 2 | value, decimal places | `x 0 round` |
+| `round` | 2 | value, decimal places; a half goes away from zero (`round(-2.5)` is −3) in every output | `x 0 round` |
 | `fixed` | 2 | value, decimal places: rounded, then written with exactly that many decimals — a text (`2.500`); code outputs give a string, GLSL rounds | `x 2 fixed` |
 | `perm` `comb` | 2 | ⁿPₖ, (n choose k) | `5 2 comb` |
 | `random` | 0 | | `random` |

@@ -53,13 +53,21 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
   const math = [];
   let out = '';
   let i = 0;
-  const s = String(markdown);
+  // the private-use characters placeholders are made of: typed ones become U+FFFD (same length, so start and end still fit)
+  const s = String(markdown).replace(/[\uE000-\uE003]/g, '\uFFFD');
   const atLineStart = (k) => k === 0 || s[k - 1] === '\n';
+  const code = indentedCode(s);   // start → end of each indented code block: maths there is code too
+  let noCloser = -1;   // no $ closes inline maths before this index (it doesn't depend on where the maths opened)
   const keep = (source, display, raw) => {
     math.push({ source, display, raw, start: i, end: i + raw.length });
     return placeholder(math.length - 1);
   };
   while (i < s.length) {
+    if (code.has(i)) {
+      out += s.slice(i, code.get(i));
+      i = code.get(i);
+      continue;
+    }
     // a fenced code block: copied as is, except ```math, which is display maths
     if (atLineStart(i)) {
       const fence = /^( {0,3})(`{3,}|~{3,})([^\n]*)\n?/.exec(s.slice(i));
@@ -114,13 +122,14 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
           i = end + 2;
           continue;
         }
-      } else if (delimiters.includes('$') && s[i + 1] && !/\s/.test(s[i + 1])) {
-        const end = closingDollar(s, i + 1);
+      } else if (delimiters.includes('$') && s[i + 1] && !/\s/.test(s[i + 1]) && i + 1 >= noCloser) {
+        const { end, stop } = closingDollar(s, i + 1);
         if (end > -1) {
           out += keep(s.slice(i + 1, end), false, s.slice(i, end + 1));
           i = end + 1;
           continue;
         }
+        noCloser = stop;   // every $ before `stop` opens nothing either: one scan per paragraph, not per $
       }
     }
     out += c;
@@ -129,16 +138,45 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
   return { text: out, math };
 }
 
-/** The $ that closes inline maths opened before `from`: not after a space, not before a digit, within the paragraph. */
+/**
+ * The $ that closes inline maths opened before `from`: not after a space, not before a digit, within the paragraph.
+ * @returns {{ end: number, stop: number }} end -1 if none; stop: where the search ended (code, a blank line, the end)
+ */
 function closingDollar(s, from) {
   for (let j = from; j < s.length; j++) {
     const c = s[j];
     if (c === '\\') { j++; continue; }
-    if (c === '`') return -1;   // maths doesn't run into code
-    if (c === '\n' && /^\n[ \t]*\n/.test(s.slice(j))) return -1;
-    if (c === '$' && !/\s/.test(s[j - 1]) && !/\d/.test(s[j + 1] ?? '') && s[j + 1] !== '$') return j;
+    if (c === '`') return { end: -1, stop: j };   // maths doesn't run into code
+    if (c === '\n' && /^\n[ \t]*\n/.test(s.slice(j, j + 64))) return { end: -1, stop: j };
+    if (c === '$' && !/\s/.test(s[j - 1]) && !/\d/.test(s[j + 1] ?? '') && s[j + 1] !== '$') return { end: j, stop: j };
   }
-  return -1;
+  return { end: -1, stop: s.length };
+}
+
+/**
+ * Indented code blocks, as the renderer finds them: a line indented four spaces (or a tab) after a blank
+ * line or at the start, outside a list, and the indented or blank lines after it. Start → end offsets.
+ */
+function indentedCode(s) {
+  const blocks = new Map();
+  const indented = (line) => /^( {4}|\t)/.test(line);
+  let at = 0;
+  let prevBlank = true;
+  let inList = false;
+  let start = -1;
+  for (const line of s.split('\n')) {
+    const blank = !line.trim();
+    if (start > -1 && !(blank || indented(line))) {
+      blocks.set(start, at - 1);   // up to the newline before this line
+      start = -1;
+    }
+    if (start < 0 && !blank && indented(line) && prevBlank && !inList) start = at;
+    if (!blank && !indented(line)) inList = LIST_ITEM.test(line) || (inList && /^\s/.test(line));
+    prevBlank = blank;
+    at += line.length + 1;
+  }
+  if (start > -1) blocks.set(start, s.length);
+  return blocks;
 }
 
 // ---- drawing the maths --------------------------------------------------------------------
@@ -177,9 +215,9 @@ function savingOf(source) {
 }
 
 /** `A = …` drawn as `A ≔ …`: the first relation is the definition's. */
-function asDefinition(html) {
+function asDefinition(html, prefix = 'mv') {
     return html
-        .replace('<span class="mv-rel">=</span>', '<span class="mv-rel mv-rel-def">≔</span>')
+        .replace(`<span class="${prefix}-rel">=</span>`, `<span class="${prefix}-rel ${prefix}-rel-def">≔</span>`)
         .replace(/(aria-label="[^"]*?) equals /, '$1 is defined as ')
         .replace('<mo>=</mo>', '<mo>≔</mo>');
 }
@@ -267,10 +305,15 @@ function drawAll(markdown, options, store, owner) {
         };
     };
 
-    refresh();
+    // worked out only when a {{…}} block will read them: a page of 200 definitions and no blocks is not 200 recalculations
+    let stale = true;
 
     const drawItem = (item, i) => {
         const { source, display } = item;
+        if (stale && source.includes('{{')) {
+            refresh();
+            stale = false;
+        }
         const cls = display ? 'mv-md-display' : 'mv-md-math';
         const wrap = (html, extra = '') => `<span class="${cls}${extra}" data-mv-md="${i}">${html}</span>`;
         try {
@@ -292,13 +335,13 @@ function drawAll(markdown, options, store, owner) {
                     if (!hidden) {
                         const tree = numberTree({ type: 'op', op: '=', args: [bare(treeOf(save.lhs)), rhs.id === undefined ? rhs : bare(rhs)] });
                         trees[i] = tree;
-                        html = asDefinition(toHTML(tree, drawOpts));
+                        html = asDefinition(toHTML(tree, drawOpts), drawOpts.prefix);
                     }
                 }
                 defs.delete(name);
                 defs.set(name, def);
                 mine.set(name, def);
-                refresh();
+                stale = true;
                 if (hidden && !input) return '';
                 return wrap(html, input ? ' mv-md-input-def' : '');
             }
@@ -306,7 +349,7 @@ function drawAll(markdown, options, store, owner) {
             if (changed) numberTree(tree);
             trees[i] = tree;
             const html = toHTML(tree, drawOpts);
-            if (!changed && options.define !== false && define(source, numbers, defs)) refresh();
+            if (!changed && options.define !== false && define(source, numbers, defs)) stale = true;
             return wrap(html);
         } catch (error) {
             return `<span class="mv-md-error" data-mv-md="${i}" title="${escape(error.message)}"><code>${escape(item.raw)}</code></span>`;
@@ -340,13 +383,20 @@ function define(source, numbers, saved) {
 const SAFE_URL = /^(https?:|mailto:|#|\/|\.{0,2}\/|[^:]*$)/i;
 const safeUrl = (u) => (SAFE_URL.test(u.trim()) ? escape(u.trim()) : '#');
 
-/** Inline Markdown: code, links, images, emphasis, breaks. Placeholders pass through. */
-function inline(text, options, sourceOf) {
-  const parts = [];
+const HELD = /\uE002(\d+)\uE003/g;
+const unescape = (t) => t.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+/**
+ * Inline Markdown: code, links, images, emphasis, breaks. Placeholders pass through. `parts` is shared with
+ * a link's label (read by the same function), so what was held outside it still resolves inside it.
+ */
+function inline(text, options, sourceOf, parts = []) {
   const hold = (html) => {
     parts.push(html);
-    return `${parts.length - 1}`;
+    return `\uE002${parts.length - 1}\uE003`;
   };
+  // an attribute or address: what was held there as its text (a\_b is a_b), maths as typed — then escaped once
+  const plain = (s) => unescape(sourceOf(s).replace(HELD, (_, n) => (parts[Number(n)] ?? '').replace(/<[^>]*>/g, '')));
   let t = text;
   // code spans (maths placeholders inside are written back as their source)
   t = t.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, run, code) => hold(`<code>${escape(sourceOf(code.trim()))}</code>`));
@@ -359,21 +409,33 @@ function inline(text, options, sourceOf) {
   // images and links
   // an address may hold balanced brackets: wiki/Function_(mathematics)
   t = t.replace(/!\[([^\]]*)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, alt, url, title) =>
-    hold(`<img src="${safeUrl(url)}" alt="${escape(alt)}"${title ? ` title="${escape(title)}"` : ''}>`));
+    hold(`<img src="${safeUrl(plain(url))}" alt="${escape(plain(alt))}"${title ? ` title="${escape(plain(title))}"` : ''}>`));
   t = t.replace(/\[([^\]]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, label, url, title) =>
-    hold(`<a href="${safeUrl(url)}"${title ? ` title="${escape(title)}"` : ''}>${inline(label, options, sourceOf)}</a>`));
-  t = escape(t);
+    hold(`<a href="${safeUrl(plain(url))}"${title ? ` title="${escape(plain(title))}"` : ''}>${inline(label, options, sourceOf, parts)}</a>`));
+  // escaped as text, except an entity reference written as one: &copy; &mdash; &#8212;
+  t = t.replace(/&(?!#\d{1,7};|#x[0-9a-f]{1,6};|[a-z][a-z0-9]{1,31};)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  t = t.replace(/(\*\*\*|___)(?=\S)([\s\S]*?\S)\1/g, '<strong><em>$2</em></strong>');   // ***both***, nested the right way round
+  // ***a** b* and ***a* b**: the inner run closes first
+  t = t.replace(/(\*\*\*|___)(?=\S)([^*_]*?\S)(\*\*|__)(?![*_])([\s\S]*?\S)(\*|_)(?![*_])/g, '<em><strong>$2</strong>$4</em>');
+  t = t.replace(/(\*\*\*|___)(?=\S)([^*_]*?\S)(\*|_)(?![*_])([\s\S]*?\S)(\*\*|__)(?![*_])/g, '<strong><em>$2</em>$4</strong>');
   t = t.replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '<strong>$2</strong>');
   t = t.replace(/(^|[^*\w])\*(?=\S)([\s\S]*?\S)\*(?!\*)/g, '$1<em>$2</em>');
   t = t.replace(/(^|[^_\w])_(?=\S)([\s\S]*?\S)_(?![_\w])/g, '$1<em>$2</em>');
   t = t.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<del>$1</del>');
   t = t.replace(/( {2,}|\\)\n/g, '<br>\n');
-  return t.replace(/(\d+)/g, (_, n) => parts[Number(n)]);
+  // a held piece can hold another (a link's label): resolve until none is left
+  for (let k = 0; k < 8 && /\uE002\d+\uE003/.test(t); k++) t = t.replace(HELD, (_, n) => parts[Number(n)] ?? '');
+  return t;
 }
 
 const BLOCK_START = /^( {0,3})(#{1,6}\s|>|```|~~~|([-*+]|\d{1,9}[.)])\s|(\*[ \t]*){3,}$|(-[ \t]*){3,}$|(_[ \t]*){3,}$)/;
 const LIST_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])(\s+|$)/;
 const TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+/** Does this line end a paragraph? A block starts, but an underline is a heading's and only a list from 1 interrupts:
+ *  "The year was\n1986. What a year." stays one paragraph. */
+const interrupts = (line) => BLOCK_START.test(line) && !/^ {0,3}[-=]+\s*$/.test(line)
+    && !/^ {0,3}(?!1[.)])\d{1,9}[.)]\s/.test(line);
 
 /** Block Markdown → HTML. */
 function blocks(lines, options, sourceOf) {
@@ -483,7 +545,7 @@ function blocks(lines, options, sourceOf) {
     }
     // paragraph (or a setext heading)
     const text = [];
-    while (i < lines.length && lines[i].trim() && !(text.length && BLOCK_START.test(lines[i]) && !/^ {0,3}[-=]+\s*$/.test(lines[i]))) {
+    while (i < lines.length && lines[i].trim() && !(text.length && interrupts(lines[i]))) {
       if (text.length && /^ {0,3}(=+|-+)\s*$/.test(lines[i])) {
         const level = lines[i].trim()[0] === '=' ? 1 : 2;
         out.push(`<h${level}>${para(text.join('\n'))}</h${level}>`);
@@ -501,19 +563,20 @@ function blocks(lines, options, sourceOf) {
 
 /** The built-in renderer: Markdown → HTML, raw HTML escaped unless options.html. */
 export function renderMarkdown(markdown, options = {}, sourceOf = (t) => t) {
-  return blocks(String(markdown).replace(/\r\n?/g, '\n').split('\n'), options, sourceOf);
+  // typed U+E002/U+E003 would be read as held pieces: they become U+FFFD
+  return blocks(String(markdown).replace(/\r\n?/g, '\n').replace(/[\uE002\uE003]/g, '\uFFFD').split('\n'), options, sourceOf);
 }
 
 // ---- together ---------------------------------------------------------------------------
 
 /** The Markdown around the drawn maths. */
 function assemble({ text, math, drawn }, options) {
-    const sourceOf = (t) => t.replace(PLACEHOLDER, (_, n) => math[Number(n)].raw);
+    const sourceOf = (t) => t.replace(PLACEHOLDER, (_, n) => math[Number(n)]?.raw ?? '');
     const html = options.render ? options.render(text) : renderMarkdown(text, options, sourceOf);
     return html
         // display maths alone in a paragraph is a block of its own
         .replace(new RegExp(`<p>\\s*${OPEN}(\\d+)${CLOSE}\\s*</p>`, 'g'), (whole, n) => (math[Number(n)].display && drawn[Number(n)] ? `<div class="mv-md-block">${drawn[Number(n)]}</div>` : whole))
-        .replace(PLACEHOLDER, (_, n) => drawn[Number(n)])
+        .replace(PLACEHOLDER, (_, n) => drawn[Number(n)] ?? '')
         // a paragraph that only saved variables ($_A := 2+2$) leaves nothing behind
         .replace(/<p>\s*<\/p>\n?/g, '');
 }

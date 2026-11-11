@@ -55,6 +55,12 @@ export class View {
      * point is the motion, started by the reader).
      */
     set(input, { animate = false, duration = 600, easing = 'ease-in-out' } = {}) {
+        // an editor still open over the old expression would put its text at the old one's path
+        if (this.editor) {
+            const open = this.editor;
+            this.editor = null;
+            open.cancelEdit?.();
+        }
         const before = shouldAnimate(animate) && this.tree ? this.snapshot() : null;
         const isStep = this.tree !== undefined;
         this.tree = treeOf(input, this.options);
@@ -140,13 +146,35 @@ export class View {
             fn({ node, id, path: pathOf(this.tree, id), element, event });
         };
         this.element.addEventListener(type, listener);
-        this.handlers.push([type, listener]);
+        const entry = [type, listener];
+        this.handlers.push(entry);
         this.root.classList.add(`${this.p}-clickable`);
         if (type === 'click') { this.clicks.push(fn); this.keyboard(); }
         return () => {
             this.element.removeEventListener(type, listener);
             this.clicks = this.clicks.filter((f) => f !== fn);
+            this.handlers = this.handlers.filter((h) => h !== entry);   // or every set() would mark it clickable again
+            if (!this.handlers.length && this.root) this.root.classList.remove(`${this.p}-clickable`);
         };
+    }
+
+    /**
+     * Stop listening: every handler from on(), the keys, double-click editing; any editor open is closed and
+     * the live regions this view added are removed. The drawing stays. Call it before dropping a view whose
+     * element lives on (a page that draws a new View into the same element).
+     */
+    destroy() {
+        if (this.editor) { const open = this.editor; this.editor = null; open.cancelEdit?.(); }
+        for (const [type, listener] of this.handlers) this.element.removeEventListener(type, listener);
+        this.handlers = [];
+        this.clicks = [];
+        if (this.keyListener) this.element.removeEventListener('keydown', this.keyListener);
+        if (this.editListener) this.element.removeEventListener('dblclick', this.editListener);
+        this.keyListener = this.editListener = null;
+        this.keysOn = this.editOn = false;
+        for (const live of new Set([this.live, this.partsLive])) if (live && live.dataset?.mvMadeBy === 'view') live.remove();
+        this.live = this.partsLive = null;
+        return this;
     }
 
     // ---- editing a part in place ---------------------------------------------------
@@ -165,12 +193,13 @@ export class View {
         this.keyboard();
         if (!this.editOn && this.element.addEventListener) {
             this.editOn = true;
-            this.element.addEventListener('dblclick', (event) => {
+            this.editListener = (event) => {
                 const element = event.target.closest?.('[data-node]');
                 if (!element || !this.root.contains(element)) return;
                 event.preventDefault();
                 this.edit(select(this.tree, Number(element.dataset.node))[0]);
-            });
+            };
+            this.element.addEventListener('dblclick', this.editListener);
         }
         return this;
     }
@@ -185,8 +214,9 @@ export class View {
         let label = 'Edit';
         try { label = `Edit ${toAudioSpeech(node)}`; } catch { /* the plain name will do */ }
         const back = () => { if (returnFocus && this.root.focus) this.root.focus(); };
-        return openEditor(element, this.editing.toText(node), {
+        this.editor = openEditor(element, this.editing.toText(node), {
             label,
+            prefix: this.p,
             parse: (text) => treeOf(text, this.options),
             commit: (part, typed) => {
                 this.set(replaceAt(this.tree, path, part), { animate: true });
@@ -197,6 +227,7 @@ export class View {
             },
             cancel: back,
         });
+        return this.editor;
     }
 
     // ---- the keyboard: what a click does, without a pointer -----------------------
@@ -218,7 +249,8 @@ export class View {
         if (this.keysOn || !this.element.addEventListener) return;
         this.keysOn = true;
         this.partsLive = this.live || liveRegionFor(this.element, true, this.p);
-        this.element.addEventListener('keydown', (event) => this.key(event));
+        this.keyListener = (event) => this.key(event);
+        this.element.addEventListener('keydown', this.keyListener);
     }
 
     key(event) {
@@ -303,7 +335,7 @@ export class View {
 
     // ---- animation between steps --------------------------------------------
 
-    /** Where each drawn part is now, grouped by what it looks like. */
+    /** Where each drawn part is now, grouped by what it looks like; each entry knows the old node it was. */
     snapshot() {
         const bySignature = new Map();
         const visit = (n) => {
@@ -311,7 +343,7 @@ export class View {
             if (e) {
                 const sig = signature(n);
                 if (!bySignature.has(sig)) bySignature.set(sig, []);
-                bySignature.get(sig).push(e.getBoundingClientRect());
+                bySignature.get(sig).push({ rect: e.getBoundingClientRect(), node: n, sig });
             }
             if (n.type === 'op') n.args.forEach(visit);
         };
@@ -325,11 +357,23 @@ export class View {
      */
     morph(before, { duration, easing }) {
         if (typeof Element === 'undefined' || !Element.prototype.animate) return;
+        // a part that moves as a whole takes its old parts with it: they are no source for another (x² + x → x² − x:
+        // the lone x comes from the old lone x, not from inside x²)
+        const consume = (oldNode) => {
+            if (oldNode.type !== 'op') return;
+            for (const child of oldNode.args) {
+                const list = before.get(signature(child));
+                const at = list ? list.findIndex((entry) => entry.node === child) : -1;
+                if (at > -1) list.splice(at, 1);
+                consume(child);
+            }
+        };
         const visit = (n) => {
             const e = this.elementOf(n);
             const old = e && before.get(signature(n));
             if (old && old.length) {
-                const from = old.shift();
+                const { rect: from, node: was } = old.shift();
+                consume(was);
                 const to = e.getBoundingClientRect();
                 const dx = from.left - to.left;
                 const dy = from.top - to.top;
@@ -358,7 +402,11 @@ function liveRegionFor(element, announce, prefix) {
     if (!announce) return null;
     if (typeof announce === 'object' && announce.nodeType === 1) return announce;
     if (typeof document === 'undefined' || !element.insertAdjacentElement) return null;
+    // one region per element: drawing a new view into the same element reuses the last one's
+    const next = element.nextElementSibling;
+    if (next && next.dataset?.mvMadeBy === 'view' && next.classList.contains(`${prefix}-sr-only`)) return next;
     const live = document.createElement('span');
+    live.dataset.mvMadeBy = 'view';
     live.className = `${prefix}-sr-only`;
     live.setAttribute('aria-live', 'polite');
     live.setAttribute('aria-atomic', 'true');

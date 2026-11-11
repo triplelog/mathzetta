@@ -47,14 +47,15 @@ const MEMBERS = {
     math: new Set(['sqrt', 'floor', 'ceil', 'trunc', 'log', 'log2', 'log10', 'exp', 'expm1', 'pow', 'hypot', 'fabs',
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'asin', 'acos', 'atan', 'asinh', 'acosh', 'atanh', 'atan2',
         'degrees', 'radians', 'pi', 'e', 'tau', 'inf', 'nan', 'isclose', 'isfinite', 'factorial', 'perm', 'comb',
-        'gcd', 'lcm', 'prod']),
+        'gcd', 'lcm', 'prod', 'cbrt']),
     random: new Set(['random']),
     np: new Set(['sqrt', 'floor', 'ceil', 'trunc', 'log', 'log2', 'log10', 'exp', 'expm1', 'power', 'hypot', 'abs',
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'arcsin', 'arccos', 'arctan', 'arcsinh', 'arccosh', 'arctanh', 'arctan2',
-        'degrees', 'radians', 'pi', 'e', 'inf', 'nan', 'isclose', 'isfinite', 'isin', 'mod', 'round', 'where',
+        'degrees', 'radians', 'pi', 'e', 'inf', 'nan', 'isclose', 'isfinite', 'isin', 'mod', 'round', 'where', 'cbrt',
         'maximum', 'minimum', 'gcd', 'logical_and', 'logical_or', 'logical_not', 'logical_xor', 'random',
-        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd']),
+        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd', 'char']),
     'np.random': new Set(['random']),
+    'np.char': new Set(['mod']),   // what fixed() writes for numpy: np.char.mod("%.2f", x)
     scipy: new Set(['integrate', 'special']),
     'scipy.integrate': new Set(['quad']),
     'scipy.special': new Set(['factorial', 'perm', 'comb']),
@@ -62,7 +63,7 @@ const MEMBERS = {
         'sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'atan2',
         'Abs', 'floor', 'ceiling', 'factorial', 'binomial', 'ff', 'gcd', 'gcd_list', 'Max', 'Min', 'Mod', 'Eq', 'Ne',
         'And', 'Or', 'Not', 'Xor', 'Nand', 'Nor', 'Piecewise', 'FiniteSet', 'Interval', 'Contains', 'S', 'Union', 'Intersection',
-        'diff', 'integrate', 'limit', 'summation', 'product']),
+        'diff', 'integrate', 'limit', 'summation', 'product', 'real_root']),
     'sympy.S': new Set(['Reals', 'Integers', 'Naturals', 'Rationals', 'Complexes']),
     'sympy.Interval': new Set(['open', 'Lopen', 'Ropen']),
 };
@@ -71,7 +72,7 @@ const IMPORTS = {
     'scipy.integrate': 'import scipy.integrate', 'scipy.special': 'import scipy.special',
 };
 /** Built-ins the renderer calls. */
-const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float']);
+const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float', 'format', 'str']);   // format, str: what fixed() writes
 const KEYWORDS = new Set(['for', 'in', 'if', 'else', 'and', 'or', 'not', 'lambda', 'True', 'False', 'None']);
 const PUNCT = ['**', '==', '!=', '<=', '>=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '+', '-', '*', '/', '%', '<', '>'];
 const NAME = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*/u;
@@ -96,6 +97,9 @@ function scanPython(code, variables, functions) {
         else if (rest[0] === '"') {
             text = match(/^"(?:[^"\\\n\r]|\\(?:["\\bfnrt]|u[0-9a-fA-F]{4}))*"/);
             if (!text) fail('a string that is not a plain "…" literal');
+            // f"{…}", rb"…": a name just before a quote is a prefix to Python, and an f-string runs code
+            const prev = tokens[tokens.length - 1];
+            if (prev && (prev.type === 'id' || prev.type === 'num' || prev.type === 'str')) fail('a string right after a value');
             tokens.push({ type: 'str', value: text });
         } else {
             text = PUNCT.find((p) => rest.startsWith(p));
@@ -522,7 +526,7 @@ function prepare(template, formulas, options) {
     const sympy = options.sympy ?? read.sympy;
     const errors = options.errors ?? read.errors;
     const slots = read.slots.map((slot) => {
-        const formula = formulas[slot.name] ?? slot.formula;
+        const formula = (Object.prototype.hasOwnProperty.call(formulas, slot.name) ? formulas[slot.name] : undefined) ?? slot.formula;   // a slot called toString
         const result = { ...slot, default: slot.formula, formula, fn: null, error: null };
         try {
             if (formula == null || (typeof formula === 'string' && !formula.trim())) {

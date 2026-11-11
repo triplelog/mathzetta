@@ -198,7 +198,7 @@ suite('sql: sqlite dialect strings', () => {
         ['x ∈ [1, 5)', '(x >= 1 AND x < 5)'],
         ['x ∉ {1, 2, 3}', 'x NOT IN (1, 2, 3)'],
         ['x ∈ ℤ', "(typeof(x) IN ('integer', 'real') AND x = TRUNC(x))"],
-        ['a mod 3', 'MOD(a, 3)'],
+        ['a mod 3', 'MOD(MOD(a, 3) + 3, 3)'],   // mod takes the divisor's sign; SQL's MOD takes a's
         ['log_2(x)', 'LOG(2, x)'],
         ['x ≈ 1', 'ABS((x) - (1)) < 1e-9'],
         ['"O\'Neil" = name', "'O''Neil' = name"],
@@ -375,7 +375,8 @@ suite('security: untrusted formulas', () => {
     });
     test("SQL: a string's text can't end the literal early (SQL reads no backslash escapes)", () => {
         eq(toSQL("'x\\' OR 1=1; --' + 1"), "'x'' OR 1=1; --' || 1");
-        eq(toSQL('"x\\" OR 1=1; --" + 1'), '"x"" OR 1=1; --" || 1');
+        eq(toSQL('"x\\" OR 1=1; --" + 1'), "'x\" OR 1=1; --' || 1");   // single quotes in both dialects: "…" is a column in SQL
+        eq(toSQL('"x\\" OR 1=1; --" + 1', { stringQuote: '"' }), '"x"" OR 1=1; --" || 1');
         eq(toSQL("'x\\' OR 1=1; --' + 1", { stringQuote: "'" }), "'x'' OR 1=1; --' || 1");
         eq(toSQL('`a` + 1'), "'a' || 1");
         eq(toSQL("'plain' + 1"), "'plain' || 1");
@@ -413,9 +414,12 @@ suite('security: untrusted formulas', () => {
 // ---- added 2026-11-03: nothing an untrusted formula can do runs for long ----
 suite('limits: work, size and depth', () => {
     const quick = (fn, ms = 2000) => {
+        // fn holds its own assertion (an answer, or a refusal with `throws`): it must pass, and fast
         const t = Date.now();
-        try { fn(); } catch { /* refusing is fine */ }
+        let failure;
+        try { fn(); } catch (error) { failure = error; }
         eq(Date.now() - t < ms, true, `took ${Date.now() - t} ms`);
+        if (failure) throw failure;
     };
     test('perm and comb stop once the answer is ∞', () => {
         quick(() => eq(evaluate('perm(100000000000, 100000000000)'), Infinity), 200);

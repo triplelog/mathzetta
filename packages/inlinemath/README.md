@@ -35,6 +35,7 @@ render(div, 'x^2', { announce: true });     // read each new step to a screen re
 view.announce('Step 2: expand');            // your own words, through the same region
 view.segments();                            // [{ text: 'x', id: 3 }, { text: 'squared', id: 5 }, …]
 view.editable({ toText, onEdit: ({ text }) => … }); // double-click a part (or F2 on it) to edit it in place
+view.destroy();                                // stop listening (handlers, keys, editing) before drawing a new view into el
 ```
 
 **Editing a part.** `view.editable({ toText })` (`import { toText } from 'mathzetta/text'`; in the
@@ -288,7 +289,7 @@ import { toHTML } from '@mathzetta/inlinemath';
 import { casBlocks, stepsHTML, mathCAS } from '@mathzetta/inlinemath/cas';
 
 toHTML("f'(x) = {{diff(x^3 sin(x), x)}}", { blocks: casBlocks() })
-toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })    // x = 2 ∨ x = 3
+toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })    // x = 2 or x = 3
 el.innerHTML = stepsHTML(mathCAS().solve('sqrt(x + 1) = x - 1', 'x', { steps: 'brief' }).steps)
 ```
 

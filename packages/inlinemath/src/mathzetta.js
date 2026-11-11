@@ -9,10 +9,10 @@
  */
 
 export {
-    parse, parseTree, fromPostfix, toPostfix, asTree, walk, firstVariable,
+    parse, parseTree, fromPostfix, toPostfix, walk, firstVariable,
     operator, precedenceOf, isCustomFunction, VARIADIC,
     GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable,
     firstLeaf, customName, derivativeOrder, bracketedSides, bracketOp,
     MATRICES, matrixRows,
 } from 'mathzetta';
-export { toSpeech, toSpeechSegments, toAudioSpeech } from 'mathzetta/speech';
+export { toSpeechSegments, toAudioSpeech } from 'mathzetta/speech';

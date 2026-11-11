@@ -1,5 +1,6 @@
 /**
- * Tree → plain text with maths symbols: `x^2 + 3 * x`, `√(x)`, `∫[0, 1] x dx`.
+ * Tree → plain text with maths symbols: `x^2 + 3 * x`, `√(x)`, `∫ x dx`; limits, definite integrals and sums
+ * as the calls MathZetta reads back: `int(x, x, 0, 1)`, `lim(2 * x + 1, x → 3)`, `sum(i^2, i = 1, n)`.
  * Meant for people to read, not for any program to parse.
  */
 
@@ -36,9 +37,10 @@ function operation(node, render) {
     const list = () => args.map(render).join(', ');
     const unary = (child) => (unaryNeedsBrackets(op, child) ? `(${render(child)})` : render(child));
 
-    if (op === '*' && isMinusOneTimes(node)) return '-' + render(b);
-    if (op === '+' && isMinusOneTimes(b)) return `${side(a, 'left')} ${render(b)}`;
-    if (op === '-' && isMinusOneTimes(b)) return `${side(a, 'left')} + ${render(b).slice(1)}`;
+    // -1·x is written -x, bracketed as -x is; a + (-1·x) is a - x, and a - (-1·x) is a + x
+    if (op === '*' && isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render);
+    if (op === '+' && isMinusOneTimes(b)) return operation({ ...node, op: '-', args: [a, b.args[1]] }, render);
+    if (op === '-' && isMinusOneTimes(b)) return operation({ ...node, op: '+', args: [a, b.args[1]] }, render);
     if (op === '^') {
         const base = side(a, 'left');
         return `${base.startsWith('-') ? `(${base})` : base}^${side(b, 'right')}`;
@@ -69,8 +71,9 @@ function operation(node, render) {
         case 'comb': return `comb(${render(a)}, ${render(b)})`;
         case '_': return `${render(a)}_${render(b)}`;
         case '?:': return `${render(a)} ? ${render(b)} : ${render(args[2])}`;
-        case 'sum': return args.map(render).join(' + ');
-        case 'prod': return args.map(render).join(' * ');
+        // each term bracketed as + and * would bracket it: prod(a + b, c) is (a + b) * c
+        case 'sum': return args.map((x, i) => (needsParens('+', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' + ');
+        case 'prod': return args.map((x, i) => (needsParens('*', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' * ');
         case 'der': {
             const { n, body, by, variable } = derivativeOrder(node);
             const power = n > 1 ? `^${n}` : '';
@@ -90,25 +93,16 @@ function integral(args, render) {
     const [f, second, third, fourth] = args;
     const v = args.length >= 2 && isVariable(second) ? render(second) : firstVariable(f) || 'x';
     const body = `${render(f)} d${v}`;
-    switch (args.length) {
-        case 1: return `∫ ${body}`;
-        case 2: return isVariable(second) ? `∫ ${body}` : `∫[${render(second)}] ${body}`;
-        case 3: return isVariable(second) ? `∫[${render(third)}] ${body}` : `∫[${render(second)}, ${render(third)}] ${body}`;
-        default: return `∫[${render(third)}, ${render(fourth)}] ${body}`;
-    }
+    // ∫ x dx reads back as written; with bounds, the call does (∫[0, 1] x dx would not, nor show where the body ends)
+    if (args.length === 1 || (args.length === 2 && isVariable(second))) return `∫ ${body}`;
+    return `int(${args.map(render).join(', ')})`;
 }
 
 function limit(args, render) {
     const [f, second, third, fourth] = args;
-    switch (args.length) {
-        case 1: return `lim ${render(f)}`;
-        case 2: return `lim[${render(second)}] ${render(f)}`;
-        case 3: return `lim[${render(second)}→${render(third)}] ${render(f)}`;
-        default: {
-            const side = firstLeaf(fourth).toLowerCase().startsWith('r') ? '⁺' : '⁻';
-            return `lim[${render(second)}→${render(third)}${side}] ${render(f)}`;
-        }
-    }
+    // lim(f, x → a), lim(f, x, a[, r|l]): the calls MathZetta reads back, the body bracketed by the call itself
+    if (args.length === 4) return `lim(${render(f)}, ${render(second)}, ${render(third)}, ${firstLeaf(fourth).toLowerCase().startsWith('r') ? 'r' : 'l'})`;
+    return `lim(${args.map(render).join(', ')})`;
 }
 
 function bigOperator(symbol, args, render) {
@@ -117,6 +111,9 @@ function bigOperator(symbol, args, render) {
     // sum(f, i = a, b) and prod(f, i ∈ S) read back as indexed (parse/build.js)
     if (args.length === 3 && from.type === 'op' && from.op === '=') return `${name}(${render(f)}, ${render(from)}, ${render(to)})`;
     if (args.length === 2 && from.type === 'op' && from.op === '∈') return `${name}(${render(f)}, ${render(from)})`;
+    // ∑_0^3 i^2 names no index: the body's variable is it, written out so it reads back
+    const index = firstVariable(f);
+    if (args.length === 3 && index) return `${name}(${render(f)}, ${index} = ${render(from)}, ${render(to)})`;
     if (args.length === 1) return `${symbol} ${render(f)}`;
     if (args.length === 2) return `${symbol}[${render(from)}] ${render(f)}`;
     return `${symbol}[${render(from)}, ${render(to)}] ${render(f)}`;

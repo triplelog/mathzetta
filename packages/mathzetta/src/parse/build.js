@@ -133,9 +133,10 @@ function normalize(name, args) {
             if (args.length === 3) return nthDerivative(args);
             break;
         case 'log':
-            if (args[0].type === 'symbol' && args[0].value === 'e') return op('ln', [args[1]]);
+            if (args.length === 2 && args[0].type === 'symbol' && args[0].value === 'e') return op('ln', [args[1]]);
             break;
         case 'lim':
+            checkArity(name, args);   // lim() is refused like max()
             return op('lim', oneSided(args));
         case '\\:if':   // IF(condition, value, otherwise) — without the third, the value is `unchanged`
             if (args.length === 2 || args.length === 3) return op('?:', [args[0], args[1], args[2] ?? sym('unchanged')]);
@@ -149,9 +150,10 @@ function normalize(name, args) {
  * x→0^+ is a one-sided limit: lim(f, x→a^+) and lim(f, x, a^+) become
  * lim(f, x, a, r) — and l for a^-.
  */
+const SIDES = { '\\+': 'r', '\\-': 'l' };   // a^+ and a^-: the side a limit is taken from
 function oneSided(args) {
     const side = (n) => (n.type === 'op' && n.op === '^' && n.args[1].type === 'symbol'
-        ? { '\\+': 'r', '\\-': 'l' }[n.args[1].value] : undefined);
+        ? SIDES[n.args[1].value] : undefined);
     const [f, second, third] = args;
     if (args.length === 2 && second.type === 'op' && second.op === '→' && side(second.args[1])) {
         const [x, a] = second.args;
@@ -187,4 +189,4 @@ function checkArity(name, args) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [RENAMES]) Object.setPrototypeOf(table, null);
+for (const table of [RENAMES, SIDES]) Object.setPrototypeOf(table, null);

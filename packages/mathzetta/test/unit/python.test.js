@@ -374,3 +374,32 @@ suite('python: sympy', () => {
         });
     }
 });
+
+// ---- added 2026-11-11: negatives and halves, where Python's own %, round and format differ from maths ----
+suite('python: negatives and halves give what evaluate() gives', () => {
+    const CASES = ['x mod 3', 'x mod -3', 'round(x)', 'round(x, 1)', 'trunc(x)', 'cbrt(x)', 'root(5, x)', 'x xor 0', 'x ≈ 0',
+        '-1*(x+1)', 'max(x)', 'fixed(x, 0)', 'fixed(x, 2)'];
+    const VALUES = [-7, -2.5, -2.25, -0.5, 0, 0.125, 2.5, 7];
+    const check = (write, preamble, label) => {
+        const lines = VALUES.flatMap((x) => CASES.map((c) => `x = ${x}\nprint(repr(${write(c)}))`));
+        const out = runPython(`${preamble}\n${lines.join('\n')}`).trim().split('\n');
+        let k = 0;
+        for (const x of VALUES) {
+            for (const c of CASES) {
+                // numpy's reprs: array(-7.), np.float64(2.5), np.True_, array('-3', dtype='<U2')
+                const raw = out[k++].replace(/^(?:np\.)?\w+\((.*?)(?:, dtype=[^)]*)?\)$/, '$1').replace(/^np\.(True|False)_$/, '$1');
+                const want = evaluate(c, { x });
+                const got = raw === 'True' ? true : raw === 'False' ? false : /^['"]/.test(raw) ? raw.slice(1, -1) : Number(raw.replace(/^np\.\w+\(|\)$/g, ''));
+                const same = typeof want === 'number' ? Math.abs(got - want) < 1e-9 : String(got) === String(want);
+                eq(same, true, `${label} ${c} at x = ${x}: python ${raw}, evaluate ${want}`);
+            }
+        }
+    };
+    if (!hasPython) {
+        test('python3 not found: skipped', () => {});
+        return;
+    }
+    test('python', () => check((c) => toPython(c), 'import math', 'python'));
+    // .item(): the plain Python value, every digit (an array's repr keeps eight)
+    if (hasNumpy) test('numpy', () => check((c) => `np.asarray(${toPython(c, { numpy: true })}).item()`, 'import numpy as np', 'numpy'));
+});

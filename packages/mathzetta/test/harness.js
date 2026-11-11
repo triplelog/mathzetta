@@ -9,6 +9,7 @@
 import { deepStrictEqual } from 'node:assert';
 
 const results = { passed: 0, failed: [] };
+const pending = [];   // async tests: report() waits for them
 let current = '';
 
 export function suite(name, body) {
@@ -17,11 +18,18 @@ export function suite(name, body) {
 }
 
 export function test(name, body) {
+    const full = `${current}: ${name}`;
+    const fail = (error) => results.failed.push({ name: full, message: error?.message ?? String(error) });
     try {
-        body();
-        results.passed++;
+        const result = body();
+        if (result && typeof result.then === 'function') {
+            // counted once it settles: a test that resolves later is not a pass until then
+            pending.push(Promise.resolve(result).then(() => { results.passed++; }, fail));
+        } else {
+            results.passed++;
+        }
     } catch (error) {
-        results.failed.push({ name: `${current}: ${name}`, message: error.message });
+        fail(error);
     }
 }
 
@@ -46,8 +54,9 @@ export function throws(body, pattern) {
     throw new Error('expected an error');
 }
 
-/** Print the summary; returns true when everything passed. */
-export function report() {
+/** Print the summary once every async test has settled; resolves true when everything passed. */
+export async function report() {
+    await Promise.all(pending);
     for (const f of results.failed) console.log(`  FAIL ${f.name}\n      ${f.message}`);
     console.log(`\n${results.passed} passed, ${results.failed.length} failed`);
     return results.failed.length === 0;

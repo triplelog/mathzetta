@@ -33,9 +33,10 @@ suite('fixed: round, then exactly that many decimals', () => {
         eq(toSpeech('fixed(x, 0)'), 'x, written as a whole number');
         eq(toJavaScript('fixed(x, 2)'), 'Number(x).toFixed(2)');
         eq(toJavaScript('fixed(x + 1, n)'), 'Number(x + 1).toFixed(n)');
-        eq(toPython('fixed(x, 2)'), "format(x, '.2f')");
-        eq(toPython('fixed(x, n)'), "format(x, '.' + str(n) + 'f')");
-        eq(toPython('fixed(x, 2)', { numpy: true }), "np.char.mod('%.2f', x)");
+        // rounded first, halves away from zero: format(2.5, '.0f') alone is '2', format(0.125, '.2f') '0.12'
+        eq(toPython('fixed(x, 2)'), 'format((math.floor(x * 10 ** 2 + 0.5) if x >= 0 else -math.floor(-x * 10 ** 2 + 0.5)) / 10 ** 2, ".2f")');
+        eq(toPython('fixed(x, n)'), 'format((math.floor(x * 10 ** n + 0.5) if x >= 0 else -math.floor(-x * 10 ** n + 0.5)) / 10 ** n, "." + str(n) + "f")');
+        eq(toPython('fixed(x, 2)', { numpy: true }), 'np.char.mod("%.2f", np.where(x >= 0, np.floor(x * 10.0 ** 2 + 0.5), -np.floor(-x * 10.0 ** 2 + 0.5)) / 10.0 ** 2)');
         eq(toSQL('fixed(x, 2)'), 'ROUND(CAST(x AS NUMERIC), 2)');
         eq(toSQL('fixed(x, 2)', { dialect: 'sqlite' }), "printf('%.2f', x)");
         eq(toExcel('fixed(x, 2)'), '=FIXED(x, 2)');
@@ -350,7 +351,7 @@ suite('GLSL', () => {
         eq(toGLSL('atan2(y, x)'), 'atan(y, x)');
         eq(toGLSL('a mod b'), 'mod(a, b)');
         eq(toGLSL('round(x)'), 'mz_round(x)');
-        eq(toGLSL('round(x)', { version: 300 }), 'round(x)');
+        eq(toGLSL('round(x)', { version: 300 }), 'mz_round(x)', "GLSL's round() may take a half either way; mz_round takes it away from zero");
         eq(toGLSL('sinh(x)', { version: 300 }), 'sinh(x)');
     });
     test('logic and conditions', () => {
@@ -456,7 +457,7 @@ suite('excel', () => {
     });
     test('functions by their spreadsheet names; strings with doubled quotes', () => {
         eq(toExcel('n! / (k! (n-k)!) + \\binom{n}{k} + (x mod 7)'), '=FACT(n)/(FACT(k)*FACT(n-k))+COMBIN(n, k)+MOD(x, 7)');
-        eq(toExcel('floor(x) + ceil(y) + e^x + \\sqrt[3]{x}'), '=INT(x)+-INT(-y)+EXP(x)+POWER(x, 1/3)');
+        eq(toExcel('floor(x) + ceil(y) + e^x + \\sqrt[3]{x}'), '=INT(x)+-INT(-y)+EXP(x)+IF(x<0, -POWER(-x, 1/3), POWER(x, 1/3))');
         eq(toExcel('sec(x) + (a xor b)'), '=1/COS(x)+(NOT(a)<>NOT(b))');   // functions every spreadsheet has (not SEC, XOR)
         eq(toExcel('ceil(x / 2) * 3'), '=-INT(-(x/2))*3');
         eq(toExcel('name = "Ann \\"Jr\\""'), '=name="Ann ""Jr"""');
@@ -551,7 +552,7 @@ suite('chains, text joins, %, expm1 in the outputs', () => {
         eq(toLaTeX('3 < x < 7'), '3 < x < 7');
     });
     test('+ on text joins: || in SQL, & in spreadsheets', () => {
-        eq(toSQL('"a"+"b"+"c"'), '"a" || "b" || "c"');
+        eq(toSQL('"a"+"b"+"c"'), "'a' || 'b' || 'c'");
         eq(toSQL('"x"+1', { dialect: 'sqlite' }), "'x' || 1");
         eq(toExcel('"a"+"b"'), '="a"&"b"');
         eq(toSQL('1+2'), '1 + 2');

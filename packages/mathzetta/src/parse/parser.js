@@ -228,6 +228,7 @@ class Parser {
         if (t === 'lim' && after === '_') return this.limit();
         if ((t === '\\sumidx' || t === '\\prodidx') && after === '_') return this.bigOperator(t);
         if (isFunction(t)) return this.functionCall(t);
+        if (t === PERCENT_MOD) throw new Error("'%' is missing an operand");
         if (isCloser(t) || isOperatorWord(t)) {
             throw new Error(`'${t}' is missing an operand`);
         }
@@ -401,22 +402,30 @@ function functionsOfOneVariable(tokens) {
 }
 
 function splitOperand(token, mode) {
+    if (token === '%') return [PERCENT_MOD];   // nothing on either side: parseOperand refuses it
+    if (!token.includes('%')) return splitPiece(token, mode);
+    // 10%3, x%y%z: every % between pieces is mod — split in one pass (re-reading the tail each time was cubic)
+    const pieces = token.split('%');
+    if (pieces.length > 1 && pieces[pieces.length - 1] === '') {   // a closing % is a percentage: 1%2% → 1 mod 2%
+        pieces.pop();
+        pieces[pieces.length - 1] += '%';
+    }
+    const out = [];
+    pieces.forEach((piece, k) => {
+        if (k > 0) out.push(PERCENT_MOD);
+        if (piece !== '') out.push(...splitPiece(piece, mode));
+    });
+    return out;
+}
+
+/** One piece with no % inside it (perhaps a closing one): `4x` → 4 x, `10%` stays whole. */
+function splitPiece(token, mode) {
     const again = (text) => expandOperands(tokenize(text, mode), mode);
     let end = 0;   // length of a numeric prefix
     while (end < token.length && isNumber(token.slice(0, end + 1))) end++;
-    if (end === 0) {
-        if (token[0] === '%') return [PERCENT_MOD, ...again(token.slice(1))];
-        const percent = token.indexOf('%');   // x%3 → x mod 3
-        if (percent > 0 && percent < token.length - 1) {
-            return [...splitOperand(token.slice(0, percent), mode), PERCENT_MOD, ...again(token.slice(percent + 1))];
-        }
-        return [token];
-    }
+    if (end === 0 || end === token.length) return [token];
     const rest = token.slice(end);
-    if (rest[0] === '%') {
-        return rest.length === 1 ? [token] : [token.slice(0, end), PERCENT_MOD, ...again(rest.slice(1))];
-    }
-    return [token.slice(0, end), ...again(rest)];
+    return rest === '%' ? [token] : [token.slice(0, end), ...again(rest)];
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`

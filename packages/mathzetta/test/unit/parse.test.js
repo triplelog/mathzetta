@@ -344,3 +344,101 @@ suite('plain English reads back what speech says', () => {
         eq(P('cost is more than budget'), 'cost budget >');
     });
 });
+
+// ---- added 2026-11-11: the parser review (hangs, prototype keys, internal errors, spellings) ----
+import { englishRewrites, PHRASES, TRIGGER } from '../../src/parse/clean/english.js';
+
+suite('reading: what used to hang, crash or come out wrong', () => {
+    const P = (s) => parse(s, { blocks: null }).join(' ');
+    test('a typed § is refused, never looped on (it marks names inside MathZetta)', () => {
+        for (const s of ['2§', '§', 'x+§', '§0§+ab']) throws(() => parse(s, { names: ['ab'] }), /§ can't be read/);
+    });
+    test('a lone % is refused, not read as the internal %mod', () => {
+        for (const s of ['%', '%x', 'x+%']) throws(() => parse(s), /'%' is missing an operand/);
+        eq(P('10%3'), '10 3 mod');
+        eq(P('1%2%'), '1 2% mod');
+        eq(P('1%1%1%1'), '1 1 mod 1 mod 1 mod');
+    });
+    test('log() and lim() are refused like max(), not with an internal TypeError', () => {
+        throws(() => parse('log()'), /'log' takes 2 arguments/);
+        throws(() => parse('x + log()'), /'log' takes 2 arguments/);
+        throws(() => parse('lim()'), /'lim' needs at least one argument/);
+    });
+    test('names like constructor reach no lookup table: the postfix is all strings', () => {
+        for (const s of ['lim(f, x, a^constructor)', 'lim_{x→a^{valueOf}} f', 'np.constructor', "(typeof(x) IN ('a', 'b') AND constructor)"]) {
+            let postfix;
+            try { postfix = parse(s); } catch { continue; }   // refusing is fine too
+            eq(postfix.every((t) => typeof t === 'string' && !t.includes('native code') && t !== '[object Object]'), true, `${s} → ${JSON.stringify(postfix)}`);
+        }
+        eq(P('lim(f, x, a^constructor)'), 'f x a constructor ^ 3 lim');
+    });
+    test('a spreadsheet ^ groups left to right, however long the chain', () => {
+        eq(P('=a^b^c'), 'a b ^ c ^');
+        eq(P('=a^b^c^d'), 'a b ^ c ^ d ^');
+        eq(P('=a^b^c^d^e'), 'a b ^ c ^ d ^ e ^');
+        eq(P('=-x^2^3^4'), 'x neg 2 ^ 3 ^ 4 ^');
+        eq(P('=SQRT(x)^2^3'), 'x sqrt 2 ^ 3 ^');
+        eq(P('=(a+1)^b^c'), 'a 1 + b ^ c ^');
+        eq(P('=a ^ b ^ SQRT(c) ^ d'), 'a b ^ c sqrt ^ d ^');
+    });
+    test('trunc is toward zero (floor below zero would be x - (x mod 1))', () => {
+        for (const s of ['trunc(x)', 'np.trunc(x)', 'math.trunc(x)', 'Math.trunc(x)', '=TRUNC(x)']) eq(P(s), 'x 0 < x ceil x floor ?:', s);
+    });
+    test('a script that is a command alone: \\sum_{n=1}^\\infty \\frac{1}{n^2} is a sum to ∞, not ∞frac', () => {
+        eq(P('\\sum_{n=1}^\\infty \\frac{1}{n^2}'), '1 n 2 ^ / n 1 = ∞ 3 \\sumidx');
+        eq(P('x^\\pi'), 'x pi ^');
+        eq(P('x^\\frac12'), 'x 1 2 / ^');   // \frac takes its digits
+        eq(P('2! \\cdot 3'), '2 ! 3 *');    // the words phase's own _ is no subscript
+    });
+    test("LaTeX's \\% is a percent sign: 12\\% reads back as 12%", () => {
+        eq(P('12\\% + 23\\% = 35\\%'), '12% 23% + 35% =');
+    });
+    test('the English phase is skipped unless a word it reads is there — and every phrase has one', () => {
+        eq(PHRASES.filter((p) => !TRIGGER.test(p)), []);
+        for (const s of ['sin x + 2', '\\frac{dy}{dx}', 'arctanh(x)', 'T(t) = T_s + (T_0 - T_s)e^{-kt}']) eq(englishRewrites(s), s);
+        eq(P('x is at least 3'), 'x 3 ≥');
+    });
+    test('protected names: one placeholder per name, put back in one pass', () => {
+        eq(parse('cost + cost*rate', { names: ['cost', 'rate'] }), ['cost', 'cost', 'rate', '*', '+']);
+        eq(parse('"a"B + "b"'), ['"a"B', '"b"', '+']);
+    });
+});
+
+suite('limits: inputs that were slow', () => {
+    const quick = (s, ms = 300) => {
+        const t = Date.now();
+        try { parse(s); } catch { /* refusing is fine */ }
+        eq(Date.now() - t < ms, true, `${JSON.stringify(s.slice(0, 20))}… took ${Date.now() - t} ms`);
+    };
+    test('(mod followed by spaces (was cubic: 39 s)', () => quick('(mod ' + ' '.repeat(4990)));
+    test('a chain of % (was cubic: 22 s)', () => { quick('1%'.repeat(2400) + '1'); quick('x%'.repeat(2400) + 'x'); });
+    test('∫∫∫… is refused past 100 integrals (each one re-read the rest)', () => {
+        throws(() => parse('∫'.repeat(101) + 'x'), /More than 100 integrals/);
+        quick('∫'.repeat(2000));
+    });
+    test('many strings, cells or names (restoring them was quadratic)', () => {
+        quick('=' + 'A1+'.repeat(1600) + '1');
+        quick('"a"+'.repeat(1200) + '1');
+        const t = Date.now();
+        try { parse('ab+'.repeat(1200) + '1', { names: ['ab'] }); } catch { /* too deep is fine */ }
+        eq(Date.now() - t < 300, true);
+    });
+});
+
+suite('{{…}} blocks: the hook', () => {
+    test('blocks: null leaves them as groups; a handler of your own fills them; setBlockHandler sets the default', async () => {
+        const { setBlockHandler } = await import('../../src/index.js');
+        const { calculateBlock } = await import('../../src/calculate.js');   // loading it set calculateBlock
+        eq(parse('2 + {{1+1}}', { blocks: null }), ['2', '1', '1', '+', '+']);
+        eq(parse('2 + {{anything}}', { blocks: () => '7' }), ['2', '7', '+']);
+        eq(parse('{{a/b}}', { blocks: (text, scope) => String(scope.a / scope.b), scope: { a: 1, b: 4 } }), ['0.25']);
+        eq(parse('2 + {{1+1}}'), ['2', '2', '+']);
+        setBlockHandler(null);
+        try {
+            eq(parse('2 + {{1+1}}'), ['2', '1', '1', '+', '+']);
+        } finally {
+            setBlockHandler(calculateBlock);
+        }
+        eq(parse('x = {{1/3 + 1/6}}'), ['x', '1', '2', '/', '=']);
+    });
+});

@@ -30,12 +30,10 @@ export function nameOf(node) {
     return null;
 }
 
-/** A tree with its ids (and where-it-came-from marks) dropped, so it can be numbered again inside another. */
-export function bare(node) {
-    const { id, from, ...rest } = node;
-    if (rest.args) rest.args = rest.args.map(bare);
-    return rest;
-}
+// bare(): ids and where-it-came-from marks dropped; it lives in select.js so edit.js (and with it the
+// main entry, for View.editable) doesn't pull in this store
+import { bare } from './select.js';
+export { bare };
 
 /** Ids dropped (to be numbered again), `from` marks kept. */
 function renumber(node) {

@@ -28,6 +28,13 @@ const COMPARISONS = [
     ['greater than', '>'], ['more than', '>'], ['less than', '<'], ['not equal to', '≠'], ['equal to', '='],
 ];
 const CMP = '[<>≤≥=≠≈]';
+const ORDINALS = { second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
+Object.setPrototypeOf(ORDINALS, null);
+// named functions as speech says them (sine of x, the natural log of x), longest first
+const FUNCTION_WORDS = Object.entries({ sine: 'sin', cosine: 'cos', tangent: 'tan', secant: 'sec', cosecant: 'csc', cotangent: 'cot',
+    'natural log': 'ln', 'natural logarithm': 'ln', 'arcsine': 'arcsin', 'arccosine': 'arccos', 'arctangent': 'arctan',
+    'hyperbolic sine': 'sinh', 'hyperbolic cosine': 'cosh', 'hyperbolic tangent': 'tanh', floor: 'floor', ceiling: 'ceil' })
+    .sort((a, b) => b[0].length - a[0].length);
 
 const PROPERTIES = [
     // after the subject: `x is positive` → x > 0
@@ -38,8 +45,23 @@ const PROPERTIES = [
     ['is a real number', '∈ ℝ'], ['is real', '∈ ℝ'], ['is a rational number', '∈ ℚ'], ['is rational', '∈ ℚ'],
 ];
 
+// Every rewrite below needs one of these words (`and`/`or`: `x > 3 and < 7`). Most input has none, and
+// the hundred-odd regexes are most of the time parse() takes: test once, skip them all. A new phrase
+// needs one of its words here (parse.test.js checks every phrase in the tables does).
+export const TRIGGER = /(?<![A-Za-z])(?:is|between|exceeds|equals?|does|doesn't|least|most|than|divides|and|or|of|to|squared|cubed|twice|percent|by|over|times|plus|minus|modulo)(?![A-Za-z])/i;
+
+/** Every phrase the rewrites below read (test/unit/parse.test.js checks each has a TRIGGER word). */
+export const PHRASES = [
+    ...COMPARISONS.map(([w]) => w), ...PROPERTIES.map(([w]) => w), ...FUNCTION_WORDS.map(([w]) => `${w} of`),
+    'is not strictly between', 'is not between', 'is strictly between', 'is between', 'between', 'is in the closed interval from',
+    'is within', 'is a multiple of', 'is divisible by', 'divides', 'is even', 'is odd', 'is not in', 'is in', 'is an element of',
+    'is not', 'is', 'and <', 'or >', 'the absolute value of', 'the square root of', 'the cube root of', 'to the power of',
+    'to the third', 'to the n', 'squared', 'cubed', 'half of', 'twice', 'percent', 'divided by', 'over', 'multiplied by',
+    'times', 'plus', 'minus', 'modulo',
+];
+
 export function englishRewrites(text) {
-    if (!/[A-Za-z]{2}/.test(text)) return text;
+    if (!TRIGGER.test(text)) return text;
     let t = text;
 
     // ranges first: they contain `and`, which must not split them
@@ -92,15 +114,10 @@ export function englishRewrites(text) {
     t = t.replace(new RegExp(String.raw`(?<![\w.])(?:the\s+)?square\s+root\s+of\s+(${OPERAND})`, 'gi'), 'sqrt($1)');
     t = t.replace(new RegExp(String.raw`(?<![\w.])(?:the\s+)?cube\s+root\s+of\s+(${OPERAND})`, 'gi'), 'root(3, $1)');
     t = t.replace(new RegExp(String.raw`(${OPERAND})\s+to\s+the\s+power\s+of\s+(${OPERAND})`, 'gi'), '($1)^($2)');
-    const ORDINALS = { second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 };
     t = t.replace(new RegExp(String.raw`(${OPERAND})\s+to\s+the\s+(${Object.keys(ORDINALS).join('|')}|(\d+|n)(?:st|nd|rd|th))(?:\s+power)?(?![\w.])`, 'gi'),
         (w, x, ord, n) => `(${x})^(${ORDINALS[ord.toLowerCase()] ?? n})`);
     t = t.replace(new RegExp(String.raw`(${OPERAND})\s+to\s+the\s+(${OPERAND})(?![\w.])`, 'gi'), '($1)^($2)');   // x to the n
-    // named functions as speech says them: sine of x, the natural log of x
-    const FUNCTION_WORDS = { sine: 'sin', cosine: 'cos', tangent: 'tan', secant: 'sec', cosecant: 'csc', cotangent: 'cot',
-        'natural log': 'ln', 'natural logarithm': 'ln', 'arcsine': 'arcsin', 'arccosine': 'arccos', 'arctangent': 'arctan',
-        'hyperbolic sine': 'sinh', 'hyperbolic cosine': 'cosh', 'hyperbolic tangent': 'tanh', floor: 'floor', ceiling: 'ceil' };
-    for (const [words, fn] of Object.entries(FUNCTION_WORDS).sort((a, b) => b[0].length - a[0].length)) {
+    for (const [words, fn] of FUNCTION_WORDS) {
         t = t.replace(new RegExp(String.raw`(?<![\w.])(?:the\s+)?${W(words)}\s+of\s+(${OPERAND})`, 'gi'), `${fn}($1)`);
     }
     t = t.replace(new RegExp(String.raw`(${OPERAND})\s+squared(?![\w.])`, 'gi'), '($1)^2');

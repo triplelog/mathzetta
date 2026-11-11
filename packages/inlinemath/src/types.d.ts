@@ -9,7 +9,7 @@ export type { Input, Node, BlockHandler };
  * input ('x^2': every part that is x²), a path ({ path: [0, 1] }, as @mathzetta/cas reports it), a test,
  * or a list of any of these.
  */
-export type Target = number | string | { path: number[] } | ((node: Node) => boolean) | Target[];
+export type Target = number | string | Node | { path: number[] } | ((node: Node, parent?: Node | null) => boolean) | Target[];
 
 export interface LayoutOptions {
     /** CSS class prefix (default 'mv'). */
@@ -97,8 +97,7 @@ export class View {
     highlight(target: Target, className?: string): this;
     unhighlight(target?: Target | null, className?: string): this;
     color(target: Target, colour: string): this;
-    /** Listen for an event on a part; returns a function that stops listening. */
-    /** Listen for an event on the parts. A 'click' listener also makes the drawing work from the keyboard:
+    /** Listen for an event on the parts; returns a function that stops listening. A 'click' listener also makes the drawing work from the keyboard:
      *  one tab stop, arrow keys walk the parts (each spoken), Enter or Space calls the listener for the
      *  current part — `event` is then the KeyboardEvent. */
     on(type: string, fn: (info: ClickInfo) => void): () => void;
@@ -117,6 +116,9 @@ export class View {
     /** The expression read aloud in pieces, each tagged with the node it describes. */
     segments(options?: SpeechOptions): { text: string; id?: number }[];
     showSegment(segment: { id?: number } | null, className?: string): this;
+    /** Stop listening (on() handlers, keys, double-click editing), close an open editor and remove the live
+     *  regions this view added; the drawing stays. */
+    destroy(): this;
 }
 /** Draw into an element and return the live view. */
 export function render(element: Element, input: Input, options?: ViewOptions): View;

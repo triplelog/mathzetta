@@ -8,7 +8,7 @@
  * around a node are not tagged.
  */
 
-import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, derivativeOrder, bracketedSides, piecewise, bracketOp, MATRICES, matrixRows } from '../common.js';
+import { GREEK, needsBrackets, unaryNeedsBrackets, startsWithSign, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, derivativeOrder, bracketedSides, piecewise, bracketOp, MATRICES, matrixRows } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { isCustomFunction, precedenceOf } from '../operators.js';
 
@@ -17,7 +17,8 @@ export function toMathml(node) {
     return `<math>${render(node)}</math>`;
 }
 
-const idAttr = (node) => (node.id === undefined ? '' : ` id="mz-${node.id}"`);
+// ids are postfix indexes; a hand-made tree's id goes in an attribute only if it is one
+const idAttr = (node) => (Number.isInteger(node.id) ? ` id="mz-${node.id}"` : '');
 const el = (tag, node, content, attrs = '') => `<${tag}${attrs}${idAttr(node)}>${content}</${tag}>`;
 const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');   // element content: quotes are fine
 const mo = (s) => `<mo>${s}</mo>`;
@@ -88,17 +89,20 @@ function operation(node) {
     if (GROUPS[op]) return el('mrow', node, mo(GROUPS[op][0]) + commas(args.map(render)) + mo(GROUPS[op][1]));
 
     switch (op) {
+        // -1·x is written -x, bracketed as -x is; a + (-1·x) is a - x, and a - (-1·x) is a + x
         case '+':
-            return el('mrow', node, side(a, 'left') + (isMinusOneTimes(b) ? '' : mo('+')) + side(b, 'right'));
+            if (isMinusOneTimes(b)) return operation({ ...node, op: '-', args: [a, b.args[1]] });
+            return el('mrow', node, side(a, 'left') + mo('+') + side(b, 'right'));
         case '-':
-            return el('mrow', node, side(a, 'left') + mo(isMinusOneTimes(b) ? '+' : MINUS) + side(b, 'right'));
+            if (isMinusOneTimes(b)) return operation({ ...node, op: '+', args: [a, b.args[1]] });
+            return el('mrow', node, side(a, 'left') + mo(MINUS) + side(b, 'right'));
         case '*':
-            if (isMinusOneTimes(node)) return el('mrow', node, mo(MINUS) + render(b));
+            if (isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] });
             return el('mrow', node, side(a, 'left') + mo(isImplicitProduct(a, b, bracketedSides(node)) ? '\u2062' : '⋅') + side(b, 'right'));
         case '/':
             return el('mfrac', node, render(a) + render(b));
         case '^': {
-            const bracketBase = needsBrackets(node, a, 'left') || (a.type === 'number' && a.value.startsWith('-'));
+            const bracketBase = needsBrackets(node, a, 'left') || startsWithSign(a);
             return el('msup', node, (bracketBase ? fenced(render(a)) : render(a)) + render(b));
         }
         case '_':
@@ -141,10 +145,10 @@ function operation(node) {
                 `<mtr><mtd>${render(value)}</mtd><mtd>${when ? row(`<mtext>if&#160;</mtext>${render(when)}`) : '<mtext>otherwise</mtext>'}</mtd></mtr>`);
             return el('mrow', node, `<mo>{</mo><mtable columnalign="left left">${rows.join('')}</mtable>`);
         }
-        case 'sum':
-            return el('mrow', node, args.map(render).join(mo('+')));
+        case 'sum':   // each term bracketed as + and · would bracket it: prod(a + b, c) is (a + b) · c
+            return el('mrow', node, args.map((x, i) => (needsBrackets({ op: '+' }, x, i ? 'right' : 'left') ? fenced(render(x)) : render(x))).join(mo('+')));
         case 'prod':
-            return el('mrow', node, args.map(render).join(mo('⋅')));
+            return el('mrow', node, args.map((x, i) => (needsBrackets({ op: '*' }, x, i ? 'right' : 'left') ? fenced(render(x)) : render(x))).join(mo('⋅')));
         case 'der': {
             const { n, body, by, variable } = derivativeOrder(node);
             const d = n > 1 ? `<msup>${mi('d')}<mn>${n}</mn></msup>` : mi('d');

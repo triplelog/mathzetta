@@ -31,10 +31,11 @@
 
 /* ---- letters and signs -------------------------------------------------- */
 .mv-var { font-style: italic; padding-right: 0.03em; }
-.mv-num, .mv-word, .mv-name, .mv-ord, .mv-text, .mv-d { font-style: normal; }
+.mv-num, .mv-word, .mv-name, .mv-ord, .mv-text, .mv-d, .mv-conj { font-style: normal; }
 .mv-prime { margin-left: 0.04em; }
 .mv-bin { margin: 0 0.22em; }
 .mv-rel { margin: 0 0.28em; }
+.mv-conj { margin: 0 0.6em; }   /* x = 2 or x = 3 */
 .mv-punct { margin-right: 0.17em; }
 .mv-sign { margin-right: 0.04em; }
 .mv-times { display: inline-block; width: 0.06em; }
