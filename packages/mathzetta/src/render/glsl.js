@@ -266,27 +266,15 @@ function operation(node, render, es3, filter = false) {
         }
         case '()': case '[]': case '{}': case '(]': case '[)':
             return args.length >= 2 && args.length <= 4 ? `vec${args.length}(${list()})` : `float[](${list()})`;
-        case '∪':
-            return `union_(${render(a)}, ${render(b)})`;
-        case '∩':
-            return `intersection(${render(a)}, ${render(b)})`;
         case '→':
             return `${render(a)}, ${render(b)}`;
         case '_':   // x_1 is the variable x_1; x_i indexes an array
             if (b.type === 'number' && /^\d+$/.test(b.value)) return `${render(a)}_${b.value}`;
             if (b.type === 'symbol') return `${render(a)}_${render(b)}`;
             return `${render(a)}[int(${render(b)})]`;
-        case 'der':
-            return `derivative(${render(a)}, ${render(b)})`;
-        case 'int':
-            return `integrate(${list()})`;
-        case 'lim':
-            return `limit(${list()})`;
-        case '\\sumidx':
-            return `summation(${list()})`;
-        case '\\prodidx':
-            return `product(${list()})`;
     }
+    // a shader has no symbolic maths and no sets to combine: refused by name, never a call that won't compile
+    if (NO_GLSL[op]) throw new Error(`No GLSL for ${NO_GLSL[op]}`);
     throw new Error(`No GLSL for '${op}'`);
 }
 
@@ -347,8 +335,14 @@ function membership(node, render) {
         const test = `(${set.args.map((item) => `${v} == ${render(item)}`).join(' || ')})`;
         return negate ? `!${test}` : test;
     }
-    return `${negate ? '!' : ''}contains(${render(set)}, ${v})`;
+    // a set known only by name (ℚ, a variable): GLSL has no lists to look in
+    throw new Error(`No GLSL for ∈ ${set.type === 'symbol' ? set.value : 'this set'}: only intervals, {listed values}, ℝ, ℤ and ℕ`);
 }
+
+const NO_GLSL = {
+    der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
+    '∪': 'a union of sets', '∩': 'an intersection of sets',
+};
 
 /**
  * Helper functions the GLSL output may call. Paste this above main() in
@@ -844,4 +838,4 @@ export function filterVertexShader(options = {}) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [CONSTANTS, GREEK_NAMES, BUILTIN, ES3_ONLY, RECIPROCALS, COMPARISONS, NUMBER_SETS, REACH]) Object.setPrototypeOf(table, null);
+for (const table of [CONSTANTS, GREEK_NAMES, BUILTIN, ES3_ONLY, RECIPROCALS, COMPARISONS, NUMBER_SETS, REACH, NO_GLSL]) Object.setPrototypeOf(table, null);

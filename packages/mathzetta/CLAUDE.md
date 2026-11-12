@@ -78,8 +78,10 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   one starts passing, so remove fixed entries.
 - Never evaluate user input with `eval`/`new Function`; `evaluate()` and
   `calculate()` exist for that. (`createRowEvaluator` compiles renderer output only.)
-- Every operator in the table must render in every format —
-  test/unit/operators.test.js enforces it.
+- Every operator in the table must render in every format, or be refused by name ("No JavaScript for a
+  derivative") where the language has no such function and none can be written inline (as JavaScript's
+  factorial, gcd, det and union helpers are) — never a call to a function that doesn't exist. test/unit/operators.test.js
+  lists the refusals per format; agreement.test.js checks every name each output calls exists in its language.
 - A new export goes in `src/types.d.ts` and the entry's `.d.ts`.
 - **Input is untrusted** (typed into pages, stored in embeds, carried in links); the checks are in
   `test/unit/formulas.test.js` ("security: untrusted formulas"). Keep to them: a value written inside quotes in

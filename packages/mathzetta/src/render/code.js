@@ -2,11 +2,12 @@
  * Tree → JavaScript or Python source.
  *
  * The output is an expression that evaluates the maths, using only the
- * language's standard library (`Math.*`, or Python's `math`). Variables are
- * left as bare identifiers for the caller to supply. Symbolic operators that
- * have no numeric meaning — derivatives, integrals, limits — become calls to
- * functions named for them (`derivative(f, x)`, `sympy.diff(f, x)`), which
- * the caller must provide.
+ * language's standard library (`Math.*`, or Python's `math`) and what can be
+ * written inline beside it (JavaScript's factorial, gcd, det, union helpers) or
+ * imported by name (numpy, scipy, SymPy). Variables are left as bare identifiers
+ * for the caller to supply. What a language can't do — a derivative, a limit or
+ * an indefinite integral in JavaScript or numeric Python — is refused with an
+ * error naming it, never written as a call to a function that doesn't exist.
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
@@ -15,7 +16,7 @@ import { firstVariable } from '../tree.js';
 import { JS_HELPERS } from '../js-helpers.js';
 
 const JS = {
-    name: 'javascript',
+    name: 'javascript', title: 'JavaScript',
     pi: 'Math.PI', e: 'Math.E', tau: '(2 * Math.PI)', inf: 'Infinity', degree: '(Math.PI/180)',
     true: 'true', false: 'false', null: 'null',
     math: (fn) => `Math.${fn}`,
@@ -42,18 +43,18 @@ const JS = {
         return `(${x} < 0 ? -Math.round(-${x} * ${p}) : Math.round(${x} * ${p})) / ${p}`;
     },
     fixed: (v, d) => `Number(${v}).toFixed(${d})`,   // a string with exactly d decimals
-    derivative: (f, x) => `derivative(${f}, ${x})`,
     matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
-    det: (m) => `det(${m})`,
-    integral: (parts) => `integrate(${parts.join(', ')})`,
-    limit: (parts) => `limit(${parts.join(', ')})`,
+    det: (m) => `${JS_HELPERS.det}(${m})`,
+    union: (a, b) => `${JS_HELPERS.union}(${a}, ${b})`,
+    intersection: (a, b) => `${JS_HELPERS.intersection}(${a}, ${b})`,
+    // no derivative, integral or limit: JavaScript has none, and none can be written inline
     indexed: (kind, idx, lower, condition, body) => kind === 'sum'
         ? `(()=>{let sum = 0; let loopCount = 0; for (let ${idx}=${lower};${condition};${idx}++) {if (loopCount++ > 1000000){break};sum += ${body};}; return sum;})()`
         : `(()=>{let prod = 1; let loopCount = 0; for (let ${idx}=${lower};${condition};${idx}++) {if (loopCount++ > 1000000){break};prod *= ${body};}; return prod;})()`,
 };
 
 const PY = {
-    name: 'python', python: true,
+    name: 'python', title: 'Python', python: true,
     pi: 'math.pi', e: 'math.e', tau: 'math.tau', inf: 'math.inf', degree: '(math.pi/180)',
     true: 'True', false: 'False', null: 'None',
     math: (fn) => `math.${fn}`,
@@ -82,13 +83,14 @@ const PY = {
     // a string with exactly d decimals; rounded first, as format() alone takes 2.5 to '2' and 0.125 to '0.12'
     // (in double quotes: checkGeneratedPython takes only "…" strings)
     fixed: (v, d, literal) => (literal === null ? `format(${PY.round(v, d)}, "." + str(${d}) + "f")` : `format(${PY.round(v, literal)}, ".${literal}f")`),
-    derivative: (f, x) => `sympy.diff(${f}, ${x})`,
     matrix: (rows) => `[${rows.map((r) => `[${r.join(', ')}]`).join(', ')}]`,
-    det: (m) => `numpy.linalg.det(${m})`,
-    integral: (parts, f, v, bounds) => (bounds
-        ? `scipy.integrate.quad(lambda ${v}: ${f}, ${bounds.join(', ')})[0]`
-        : `sympy.integrate(${f}, sympy.Symbol(${JSON.stringify(v)}))`),
-    limit: (parts) => `sympy.limit(${parts.join(', ')})`,
+    det: (m) => `np.linalg.det(${m})`,   // imported as numpy is everywhere: import numpy as np
+    union: (a, b) => `sorted(set(${a}) | set(${b}))`,
+    intersection: (a, b) => `sorted(set(${a}) & set(${b}))`,
+    // a definite integral is a number (scipy's quad); a derivative, a limit or an integral with no bounds is
+    // maths about a function, which numbers can't hold: the SymPy flavour ({ sympy: true }) has them
+    integral: (parts, f, v, bounds) => `scipy.integrate.quad(lambda ${v}: ${f}, ${bounds.join(', ')})[0]`,
+    symbolic: 'the SymPy flavour, { sympy: true }, has it',
     indexed: (kind, idx, lower, condition, body, upper) => kind === 'sum'
         ? `sum(${body} for ${idx} in range(${lower}, ${upper} + 1))`
         : `math.prod(${body} for ${idx} in range(${lower}, ${upper} + 1))`,
@@ -111,7 +113,9 @@ const comparison = ([, right], node, render) => {
 };
 const NP = {
     ...PY,
-    name: 'numpy',
+    name: 'numpy', title: 'numpy',
+    union: (a, b) => `np.union1d(${a}, ${b})`,
+    intersection: (a, b) => `np.intersect1d(${a}, ${b})`,
     pi: 'np.pi', e: 'np.e', tau: '(2 * np.pi)', inf: 'np.inf', degree: '(np.pi/180)',
     math: (fn) => `np.${NP_NAMES[fn] ?? fn}`,
     list: { ...PY.list, '{}': ['[', ']'] },   // np.isin reads a set as one object
@@ -201,14 +205,14 @@ export function boundVariables(node) {
 }
 const SY = {
     ...PY,
-    name: 'sympy',
+    name: 'sympy', title: 'SymPy', symbolic: null,
     noStrings: true,
     pi: S('pi'), e: S('E'), tau: '(2*sympy.pi)', inf: S('oo'), degree: '(sympy.pi/180)',
     true: S('true'), false: S('false'), null: 'None',
     math: (fn) => S({ log: 'log', asin: 'asin', acos: 'acos', atan: 'atan', asinh: 'asinh', acosh: 'acosh', atanh: 'atanh', atan2: 'atan2', expm1: 'expm1', ceil: 'ceiling' }[fn] ?? fn),
     abs: S('Abs'), random: 'random.random()',
     matrix: (rows) => `sympy.Matrix(${PY.matrix(rows)})`,
-    det: (m) => `${m}.det()`,
+    det: (m) => `sympy.det(${m})`,   // the function, not Matrix(…).det(): a method on a result is no name the checker can see
     both: (a, b) => `sympy.And(${a}, ${b})`, either: (a, b) => `sympy.Or(${a}, ${b})`, not: (x) => `sympy.Not(${x})`,
     close: (a, b) => `sympy.Abs((${a}) - (${b})) < sympy.Rational(1, 10**9)`,
     exactNumber: (v) => {
@@ -492,9 +496,9 @@ function operation(node, render, lang) {
         case 'pmod':
             return congruence(node, render, lang);
         case '∪':
-            return `union(${render(a)}, ${render(b)})`;
+            return lang.union(render(a), render(b));
         case '∩':
-            return `intersection(${render(a)}, ${render(b)})`;
+            return lang.intersection(render(a), render(b));
         case '\\not':
             return lang.not(unary(a));
         case '!': {
@@ -573,10 +577,12 @@ function operation(node, render, lang) {
         case '_':
             return b.type === 'op' ? `${render(a)}[${render(b)}]` : `${render(a)}_${render(b)}`;
         case 'der':
+            if (!lang.derivative) refuse(lang, 'a derivative');
             return lang.derivative(render(a), render(b));
         case 'int':
             return integral(args, render, lang);
         case 'lim':   // a 4th argument says which side: "r" or "l"
+            if (!lang.limit) refuse(lang, 'a limit');
             // the side is r or l and nothing else: it is written inside quotes, so text there could close them
             return lang.limit(args.map((x, i) => {
                 if (i !== 3) return render(x);
@@ -645,18 +651,32 @@ function integral(args, render, lang) {
     else if (args.length === 2 && !hasVariable) bounds = [second];
     bounds = bounds.map(render);
 
+    if (!lang.integral) refuse(lang, 'an integral');
     if (!lang.python) return lang.integral([render(f), hasVariable ? v : JSON.stringify(v), ...bounds]);
     const definite = bounds.length ? [bounds[0], bounds[1] ?? lang.inf] : null;
+    if (!definite && lang.symbolic) refuse(lang, 'an integral with no bounds');
     return lang.integral(null, render(f), v, definite);
+}
+
+/** No such thing in this language, and nothing to write in its place: an error, never a call to a function it lacks. */
+function refuse(lang, what) {
+    const symbolic = lang.symbolic && /derivative|limit|integral/.test(what);   // what SymPy does and numbers can't
+    throw new Error(`No ${lang.title} for ${what}${symbolic ? ` (${lang.symbolic})` : ''}`);
 }
 
 /** \sumidx(f, i=1, n): a loop from the lower bound up to n. */
 function indexed(kind, args, render, lang) {
     const [f, from, to] = args;
-    if (args.length < 3) {
-        const name = kind === 'sum' ? 'summation' : 'product';
-        return `${name}(${args.map(render).join(', ')})`;
+    // \sum_{i ∈ [3, 10]}: an interval with numbers at its ends is a loop between them
+    if (args.length === 2 && from.type === 'op' && from.op === '∈' && from.args[0].type === 'symbol'
+        && ['[]', '(]', '[)', '()'].includes(from.args[1].op) && from.args[1].args.every((e) => e.type === 'number' && Number.isFinite(Number(e.value)))) {
+        const idx = from.args[0].value;
+        const [lo, hi] = from.args[1].args.map((e) => Number(e.value));
+        const first = from.args[1].op[0] === '[' ? Math.ceil(lo) : Math.floor(lo) + 1;
+        const last = from.args[1].op[1] === ']' ? Math.floor(hi) : Math.ceil(hi) - 1;
+        return lang.indexed(kind, idx, String(first), `${idx}<=${last}`, render(f), String(last));
     }
+    if (args.length < 3) refuse(lang, `a ${kind === 'sum' ? 'sum' : 'product'} with no bounds to count between`);
     let idx;
     let lower;
     if (from.type === 'op' && from.op === '=' && from.args[0].type === 'symbol') {

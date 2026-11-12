@@ -218,7 +218,7 @@ suite('sql: sqlite dialect strings', () => {
     const unsupported = ['5!', 'gcd(a, b)', 'perm(5, 2)', 'comb(5, 2)', 'der(x^2, x)', 'int(x, x)',
         'lim(1/x, x→0)', 'x = ±3', 'a ± b', '(a, b)', 'a_1', '{1, 2} ∪ {3}', '{1, 2} ∩ {3}'];
     for (const input of unsupported) test(`${input} throws`, () => throws(() => lite(input), /No SQLite SQL for/));
-    test('gcd message', () => throws(() => lite('gcd(a, b)'), /^No SQLite SQL for 'gcd'$/));
+    test('gcd message', () => throws(() => lite('gcd(a, b)'), /^No SQLite SQL for gcd$/));
 });
 
 suite('sql: strToSQL dialect', () => {
@@ -231,7 +231,7 @@ suite('sql: strToSQL dialect', () => {
     test('unsupported operators are an error result', () => {
         const r = strToSQL(header, 'HR!', new Map(), { dialect: 'sqlite' });
         eq(r.success, false);
-        eq(r.error, "No SQLite SQL for '!'");
+        eq(r.error, 'No SQLite SQL for a factorial');
     });
     test('columns that look like constants stay columns', () => {
         eq(strToSQL(['e', 'pi'], 'e * pi').sqlExpression, '"e" * "pi"');
@@ -359,9 +359,11 @@ suite('evaluate: sets, intervals, chains', () => {
 suite('security: untrusted formulas', () => {
     const refuses = (fn, pattern) => throws(fn, pattern);
     test("a limit's side is r or l: text there can't close the quotes", () => {
-        refuses(() => toJavaScript("lim(x, x, 0, ' + alert(document.domain) + ')"), /side is r or l/);
-        refuses(() => toPython("lim(x, x, 0, ' + alert(1) + ')"), /side is r or l/);
-        eq(toJavaScript('lim(x, x, 0, r)'), 'limit(x, x, 0, "r")');
+        // JavaScript and numeric Python have no limit at all now (refused by name); SymPy writes only r or l
+        refuses(() => toJavaScript("lim(x, x, 0, ' + alert(document.domain) + ')"), /No JavaScript for a limit/);
+        refuses(() => toPython("lim(x, x, 0, ' + alert(1) + ')", { sympy: true }), /No SymPy for text/);
+        eq(toPython('lim(x, x, 0, q)', { sympy: true }), 'sympy.limit(x, x, 0)');   // a side that is no side: none written
+        eq(toPython('lim(x, x, 0, r)', { sympy: true }), 'sympy.limit(x, x, 0, "+")');
     });
     test('SQL: no function the caller did not list, no name that is not a column', () => {
         const r = strToSQL(['Value'], '\\text{SELECT secret FROM users WHERE}(1) = "admin"', new Map(), { dialect: 'sqlite' });

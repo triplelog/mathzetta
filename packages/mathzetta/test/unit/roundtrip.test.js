@@ -50,8 +50,6 @@ const KNOWN = [
         "a spreadsheet's array constant {1,2;3,4} (and MDETERM) is written but not read back"],
     [['bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['javascript', 'python', 'numpy', 'sympy'],
         'a column of one-entry rows, [[x], [y]], reads back as the list [x, y]: the product is the same numbers, one level of brackets less'],
-    [['\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}', '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}', 'det([[1, 2], [3, 4]])'], ['sympy'],
-        "SymPy's determinant is a method, Matrix(…).det(), which the reader doesn't take apart"],
 ];
 
 const known = new Map();
@@ -116,8 +114,9 @@ suite('round trip: mathzetta reads what it writes', () => {
     test('every listed exception still fails (remove the ones that work now)', () => eq([...unexpectedPasses], []));
     // each format on its own, near what it checks today: a writer that starts throwing (and is skipped) shows here
     test('the sweep covers the cases, in every format', () => {
-        // on 2026-11-11: 2068 for most, sympy 1978, sql 2063, sqlite 1905, excel 1965 (the rest have no such code)
-        const FLOOR = { sympy: 1950, sql: 2040, sqlite: 1880, excel: 1940 };
+        // on 2026-11-11: 2068 for most, sympy 1978, sql 2027, glsl 2013, sqlite 1905, excel 1965 (the rest have
+        // no such code: SQL and GLSL refuse derivatives, integrals, limits, sums to n and set operations)
+        const FLOOR = { sympy: 1950, sql: 2000, glsl: 1990, sqlite: 1880, excel: 1940 };
         eq(checked > 20000, true, `${checked} checks`);
         eq(EVERY.filter((f) => counts[f] < (FLOOR[f] ?? 2040)).map((f) => `${f}: ${counts[f]}`), []);
     });

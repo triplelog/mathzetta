@@ -71,7 +71,7 @@ Fixed arity — no count token:
 | `fixed` | 2 | value, decimal places: rounded, then written with exactly that many decimals — a text (`2.500`); code outputs give a string, GLSL rounds | `x 2 fixed` |
 | `perm` `comb` | 2 | ⁿPₖ, (n choose k) | `5 2 comb` |
 | `random` | 0 | | `random` |
-| `der` | 2 | derivative: expression, variable | `x 2 ^ x der` = d/dx x² |
+| `der` | 2 | derivative: expression, variable. Drawn and spoken everywhere; worked out by `calculate` (at a point) and SymPy. JavaScript, numeric Python, SQL, GLSL and spreadsheets refuse it by name, as they refuse `int` (without numeric bounds in Python), `lim` and, in SQL and GLSL, indexed sums and products | `x 2 ^ x der` = d/dx x² |
 | `=` `≠` `<` `>` `≤` `≥` | 2 | comparison | |
 | `===` `≠=` | 2 | strict (in)equality, from `===` and `!==` | |
 | `∈` `∉` | 2 | membership; the right side is usually a group | `x 0 1 2 [] ∈` |

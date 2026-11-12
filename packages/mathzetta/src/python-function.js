@@ -53,7 +53,8 @@ const MEMBERS = {
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'arcsin', 'arccos', 'arctan', 'arcsinh', 'arccosh', 'arctanh', 'arctan2',
         'degrees', 'radians', 'pi', 'e', 'inf', 'nan', 'isclose', 'isfinite', 'isin', 'mod', 'round', 'where', 'cbrt',
         'maximum', 'minimum', 'gcd', 'logical_and', 'logical_or', 'logical_not', 'logical_xor', 'random',
-        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd', 'char']),
+        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd', 'char', 'linalg', 'union1d', 'intersect1d', 'array']),
+    'np.linalg': new Set(['det']),
     'np.random': new Set(['random']),
     'np.char': new Set(['mod']),   // what fixed() writes for numpy: np.char.mod("%.2f", x)
     scipy: new Set(['integrate', 'special']),
@@ -63,7 +64,7 @@ const MEMBERS = {
         'sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'atan2',
         'Abs', 'floor', 'ceiling', 'factorial', 'binomial', 'ff', 'gcd', 'gcd_list', 'Max', 'Min', 'Mod', 'Eq', 'Ne',
         'And', 'Or', 'Not', 'Xor', 'Nand', 'Nor', 'Piecewise', 'FiniteSet', 'Interval', 'Contains', 'S', 'Union', 'Intersection',
-        'diff', 'integrate', 'limit', 'summation', 'product', 'real_root']),
+        'diff', 'integrate', 'limit', 'summation', 'product', 'real_root', 'Matrix', 'det']),
     'sympy.S': new Set(['Reals', 'Integers', 'Naturals', 'Rationals', 'Complexes']),
     'sympy.Interval': new Set(['open', 'Lopen', 'Ropen']),
 };
@@ -72,9 +73,9 @@ const IMPORTS = {
     'scipy.integrate': 'import scipy.integrate', 'scipy.special': 'import scipy.special',
 };
 /** Built-ins the renderer calls. */
-const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float', 'format', 'str']);   // format, str: what fixed() writes
+const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float', 'format', 'str', 'sorted', 'set']);   // format, str: what fixed() writes; sorted(set(a) | set(b)): ∪
 const KEYWORDS = new Set(['for', 'in', 'if', 'else', 'and', 'or', 'not', 'lambda', 'True', 'False', 'None']);
-const PUNCT = ['**', '==', '!=', '<=', '>=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '+', '-', '*', '/', '%', '<', '>'];
+const PUNCT = ['**', '==', '!=', '<=', '>=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '+', '-', '*', '/', '%', '<', '>', '|', '&'];   // | and &: set union and intersection
 const NAME = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*/u;
 
 /**

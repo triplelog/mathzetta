@@ -68,13 +68,17 @@ function leaf(node, options) {
 }
 
 const FUNCTIONS = {
-    sqrt: 'SQRT', abs: 'ABS', floor: 'FLOOR', ceil: 'CEIL', ln: 'LN', expm1: 'EXPM1',
-    sin: 'SIN', cos: 'COS', tan: 'TAN', csc: 'CSC', sec: 'SEC', cot: 'COT',
+    sqrt: 'SQRT', abs: 'ABS', floor: 'FLOOR', ceil: 'CEIL', ln: 'LN',
+    sin: 'SIN', cos: 'COS', tan: 'TAN', cot: 'COT',
     sinh: 'SINH', cosh: 'COSH', tanh: 'TANH', arcsin: 'ASIN', arccos: 'ACOS', arctan: 'ATAN',
     arcsinh: 'ASINH', arccosh: 'ACOSH', arctanh: 'ATANH', atan2: 'ATAN2',
-    perm: 'PERM', comb: 'COMB', max: 'GREATEST', min: 'LEAST', gcd: 'GCD',
-    random: 'RANDOM', der: 'DERIVATIVE', int: 'INTEGRATE', lim: 'LIMIT',
-    '\\sumidx': 'SUMMATION', '\\prodidx': 'PRODUCT', '!': 'FACTORIAL',
+    max: 'GREATEST', min: 'LEAST', gcd: 'GCD', random: 'RANDOM', '!': 'FACTORIAL',
+};
+
+/** What SQL has no function for and can't be written with others: refused by name, never a call that fails in the database. */
+const NO_SQL = {
+    der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
+    '∪': 'a union of sets', '∩': 'an intersection of sets',
 };
 
 const INFIX = {
@@ -86,6 +90,11 @@ const GROUPS = { '()': ['(', ')'], '{}': ['(', ')'], '[]': ['ARRAY[', ']'], '(]'
 
 // What SQLite has no function for. Groups of several items and intervals
 // are only allowed as the right side of ∈ / ∉.
+/** What a SQLite refusal calls each operator (the rest as NO_SQL words them). */
+const SQLITE_WORDS = {
+    '!': 'a factorial', gcd: 'gcd', perm: 'permutations (perm)', comb: 'combinations (comb)', '±': '±', pm: '±',
+    _: 'an index into a list', '→': '→', pmatrix: 'a matrix', bmatrix: 'a matrix', vmatrix: 'a determinant', det: 'a determinant',
+};
 const SQLITE_UNSUPPORTED = new Set([
     '!', 'gcd', 'perm', 'comb', 'der', 'int', 'lim', '\\sumidx', '\\prodidx',
     '±', 'pm', '∪', '∩', '_', '→', 'pmatrix', 'bmatrix', 'vmatrix', 'det',
@@ -119,6 +128,7 @@ function operation(node, render, options) {
     // (Integer columns still divide as integers; strToSQL's SQLite dialect casts them, PostgreSQL's does not.)
     if (op === '/' && a.type === 'number' && /^-?\d+$/.test(a.value)) return `${render(a)}.0 / ${side(b, 'right')}`;
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
+    if (NO_SQL[op]) throw new Error(`No SQL for ${NO_SQL[op]}`);
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
     if (MATRICES[op]) return `ARRAY[${matrixRows(node).map((r) => `ARRAY[${r.map(render).join(', ')}]`).join(', ')}]`;
@@ -136,6 +146,17 @@ function operation(node, render, options) {
     switch (op) {
         case '^':
             return `POWER(${render(a)}, ${render(b)})`;
+        // PostgreSQL has none of these by name; each is a line of the functions it has
+        case 'expm1':
+            return `(EXP(${render(a)}) - 1)`;
+        case 'csc':
+            return `(1.0 / SIN(${render(a)}))`;
+        case 'sec':
+            return `(1.0 / COS(${render(a)}))`;
+        case 'perm':   // n! / (n − k)!, exact for whole numbers: FACTORIAL gives NUMERIC
+            return `(FACTORIAL(${render(a)}) / FACTORIAL(${render(a)} - ${sideOf('-', b, 'right')}))`;
+        case 'comb':
+            return `(FACTORIAL(${render(a)}) / (FACTORIAL(${render(b)}) * FACTORIAL(${render(a)} - ${sideOf('-', b, 'right')})))`;
         case 'root': {
             // an odd root of a negative number is real: cbrt(-8) is -2, where POWER(-8, 1.0/3) fails
             const n = a.type === 'number' && /^\d+$/.test(a.value) ? Number(a.value) : 0;
@@ -174,10 +195,6 @@ function operation(node, render, options) {
             return a.type === 'op' && ['≡', '='].includes(a.op)
                 ? `MOD((${render(a.args[0])}) - (${render(a.args[1])}), ${render(b)}) = 0`
                 : `MOD(${render(a)}, ${render(b)})`;
-        case '∪':
-            return `UNION(${render(a)}, ${render(b)})`;
-        case '∩':
-            return `INTERSECTION(${render(a)}, ${render(b)})`;
         case '\\not':
             return 'NOT ' + (unaryNeedsBrackets(op, a) ? `(${render(a)})` : render(a));
         case '&':
@@ -218,7 +235,7 @@ function operation(node, render, options) {
 function sqliteOperation(node, render, side, list, sideOf) {
     const { op, args } = node;
     const [a, b] = args;
-    if (SQLITE_UNSUPPORTED.has(op)) throw new Error(`No SQLite SQL for '${op}'`);
+    if (SQLITE_UNSUPPORTED.has(op)) throw new Error(`No SQLite SQL for ${NO_SQL[op] ?? SQLITE_WORDS[op] ?? `'${op}'`}`);
     if (SQLITE_FUNCTIONS[op]) return args.length === 1 ? render(a) : `${SQLITE_FUNCTIONS[op]}(${list()})`;
     if (SQLITE_RECIPROCALS[op]) return `(1.0 / ${SQLITE_RECIPROCALS[op]}(${render(a)}))`;
     if (operator(op)?.group) {
@@ -311,4 +328,4 @@ function membership(node, render) {
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
 // finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [CONSTANTS, SQLITE_CONSTANTS, FUNCTIONS, INFIX, GROUPS, SQLITE_FUNCTIONS, SQLITE_RECIPROCALS, POSTGRES_NUMBER_SETS]) Object.setPrototypeOf(table, null);
+for (const table of [CONSTANTS, SQLITE_CONSTANTS, FUNCTIONS, INFIX, GROUPS, SQLITE_FUNCTIONS, SQLITE_RECIPROCALS, POSTGRES_NUMBER_SETS, NO_SQL, SQLITE_WORDS]) Object.setPrototypeOf(table, null);

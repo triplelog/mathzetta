@@ -180,3 +180,56 @@ suite('agreement: KaTeX reads the LaTeX', () => {
         eq(toLaTeX('root(3, x)'), '\\sqrt[3]{x}');
     });
 });
+
+// ---- added 2026-11-11: no output calls a function its language doesn't have ----
+import { operator, operatorNames, VARIADIC } from '../../src/operators.js';
+import { op, sym, num } from '../../src/tree.js';
+import { checkGeneratedJs, toPythonFunction } from '../../src/all.js';
+import { GLSL_HELPERS } from '../../src/render/glsl.js';
+
+suite('agreement: every output either writes what its language has, or refuses by name', () => {
+    // a node for every operator; the calculus ones with a variable and bounds, a sum with its index
+    const sample = (name) => {
+        if (['pmatrix', 'bmatrix', 'vmatrix'].includes(name)) return op(name, [op('[]', [num('1'), num('2')]), op('[]', [num('3'), num('4')])]);
+        if (name === 'det') return op(name, [op('[]', [op('[]', [num('1'), num('2')]), op('[]', [num('3'), num('4')])])]);
+        if (name === 'der') return op(name, [op('^', [sym('a'), num('2')]), sym('a')]);
+        if (name === 'int') return op(name, [op('^', [sym('a'), num('2')]), sym('a'), num('0'), num('1')]);
+        if (name === 'lim') return op(name, [op('^', [sym('a'), num('2')]), sym('a'), num('1')]);
+        if (name === '\\sumidx' || name === '\\prodidx') return op(name, [op('^', [sym('i'), num('2')]), op('=', [sym('i'), num('1')]), sym('n')]);
+        const { arity } = operator(name);
+        return op(name, ['a', 'b', 'c'].slice(0, arity === VARIADIC ? 3 : arity).map(sym));
+    };
+    const REFUSAL = /^No (JavaScript|Python|numpy|SymPy|SQL|SQLite SQL|GLSL|spreadsheet formula) for /;
+    /** The output, or null when it refuses by name; anything else thrown is a failure. */
+    const written = (write) => {
+        try { return write(); } catch (e) {
+            if (REFUSAL.test(e.message.replace(/^f(\(.*?\))?: /, ''))) return null;
+            throw e;
+        }
+    };
+    const PG = new Set(['POWER', 'SQRT', 'CBRT', 'ABS', 'FLOOR', 'CEIL', 'LN', 'LOG', 'EXP', 'SIN', 'COS', 'TAN', 'COT', 'ASIN', 'ACOS',
+        'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH', 'ATANH', 'ROUND', 'TRUNC', 'MOD', 'GREATEST', 'LEAST', 'GCD', 'FACTORIAL',
+        'RANDOM', 'PI', 'CAST', 'ARRAY', 'NOT', 'IN', 'OR', 'AND']);
+    const GLSL = new Set(['radians', 'degrees', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+        'pow', 'exp', 'log', 'exp2', 'log2', 'sqrt', 'inversesqrt', 'abs', 'sign', 'floor', 'ceil', 'trunc', 'round', 'fract', 'mod', 'min', 'max',
+        'clamp', 'mix', 'step', 'smoothstep', 'length', 'distance', 'dot', 'cross', 'normalize', 'determinant', 'inverse', 'transpose',
+        'float', 'int', 'bool', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4', ...[...GLSL_HELPERS.matchAll(/\b(mz_\w+)\s*\(/g)].map((m) => m[1])]);
+    const called = (code, lowercase) => [...code.matchAll(/(?<![\w.])([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]).filter((n) => !lowercase || n === n.toUpperCase());
+    for (const name of operatorNames()) {
+        test(name, () => {
+            const t = sample(name);
+            const js = written(() => toJavaScript(t));
+            // a sum's loop: checkGeneratedJs refuses loops by design, so it is run instead (∑ i² to 3 is 14, ∏ is 36)
+            if (js !== null && /^\\(sum|prod)idx$/.test(name)) eq(new Function('n', `return ${js};`)(3), name === '\\sumidx' ? 14 : 36);
+            // a name JavaScript lacks is refused here (x_1 is a variable)
+            else if (js !== null) checkGeneratedJs(js, { variables: /^(?:[a-z](?:_\w+)?|sum|prod|loopCount)$/ });
+            for (const flavour of [{}, { numpy: true }, { sympy: true }]) {
+                if (written(() => toPython(t, flavour)) !== null) written(() => toPythonFunction(t, flavour));   // its whitelist: every name exists
+            }
+            const sql = written(() => toSQL(t));
+            if (sql !== null) eq(called(sql, true).filter((n) => !PG.has(n)), [], sql);
+            const glsl = written(() => toGLSL(t));
+            if (glsl !== null) eq(called(glsl, false).filter((n) => !GLSL.has(n)), [], glsl);
+        });
+    }
+});

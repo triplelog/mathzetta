@@ -291,8 +291,31 @@ const NP_BARE = {
     maximum: 'max', minimum: 'min', nanmax: 'max', nanmin: 'min', nansum: 'sum', nanprod: 'prod', nanmean: 'mean',
     nanmedian: 'median', nanstd: 'stdev', mod: 'mod', fmod: 'mod', where: 'where', isin: 'isin', isclose: 'isclose',
     isfinite: 'isfinite', logical_and: 'logical_and', logical_or: 'logical_or', logical_not: 'logical_not',
-    logical_xor: 'logical_xor', prod: 'prod', sum: 'sum', trunc: 'trunc',
+    logical_xor: 'logical_xor', prod: 'prod', sum: 'sum', trunc: 'trunc', union1d: 'union', intersect1d: 'intersection',
 };
+
+/** sorted(set(A) | set(B)), sorted(set(A) & set(B)): Python's ∪ and ∩ as the writer spells them. */
+function pythonSets(text) {
+    if (!text.includes('sorted')) return text;
+    return rewriteCalls(text, /(?<![\w.])sorted\s*\(/g, (args) => {
+        if (args.length !== 1) return null;
+        const arg = args[0];
+        for (let i = 0, depth = 0; i < arg.length; i++) {   // the | or & outside every bracket
+            if ('([{'.includes(arg[i])) depth++;
+            else if (')]}'.includes(arg[i])) depth--;
+            else if (depth === 0 && (arg[i] === '|' || arg[i] === '&')) {
+                const side = (part) => {
+                    const t = part.trim();
+                    const m = /^set\s*\(/.exec(t);
+                    return m && closing(t, m[0].length - 1) === t.length - 1 ? t.slice(m[0].length, -1) : null;
+                };
+                const [a, b] = [side(arg.slice(0, i)), side(arg.slice(i + 1))];
+                return a !== null && b !== null ? `((${a}) ${arg[i] === '|' ? '∪' : '∩'} (${b}))` : null;
+            }
+        }
+        return null;
+    });
+}
 
 const NP_CONSTANTS = { inf: '∞', nan: 'NaN' };
 
@@ -322,7 +345,7 @@ const SYMPY_CALLS = {
     sqrt: 'Math.sqrt', exp: 'Math.exp', sin: 'Math.sin', cos: 'Math.cos', tan: 'Math.tan', sinh: 'Math.sinh', cosh: 'Math.cosh', tanh: 'Math.tanh',
     asin: 'Math.asin', acos: 'Math.acos', atan: 'Math.atan', asinh: 'Math.asinh', acosh: 'Math.acosh', atanh: 'Math.atanh', atan2: 'atan2',
     csc: 'csc', sec: 'sec', cot: 'cot', log: 'log', Abs: 'abs', floor: 'floor', ceiling: 'ceil', Max: 'max', Min: 'min',
-    factorial: 'factorial', binomial: 'comb', ff: 'perm', gcd: 'gcd', gcd_list: 'sympy_list_gcd', Mod: 'mod', root: 'sympy_root', real_root: 'sympy_root',
+    factorial: 'factorial', binomial: 'comb', ff: 'perm', gcd: 'gcd', gcd_list: 'sympy_list_gcd', Mod: 'mod', root: 'sympy_root', real_root: 'sympy_root', det: 'det',
     Rational: 'sympy_rational', Integer: 'sympy_value', Float: 'sympy_value', Eq: 'sympy_eq', Ne: 'sympy_ne',
     And: 'sympy_and', Or: 'sympy_or', Not: 'sympy_not', Xor: 'sympy_xor', Nand: 'sympy_nand', Nor: 'sympy_nor',
     Piecewise: 'sympy_piecewise', FiniteSet: 'sympy_set', Interval: 'sympy_interval', Contains: 'sympy_contains',
@@ -520,6 +543,7 @@ export function codeRewrites(text) {
     text = text.replace(/(?<![\w.])(\d+(?:\.\d+)?)[eE]([+-]\d+)(?![\w.])/g, '($1*10^{$2})');
     text = sql(text);
     text = prefixes(text);
+    text = pythonSets(text);
     text = calls(text);
     text = pythonConditionals(text);
     text = text.replace(/\b(?:True|TRUE)\b/g, 'true').replace(/\b(?:False|FALSE)\b/g, 'false').replace(/\b(?:None|NULL)\b/g, 'null');

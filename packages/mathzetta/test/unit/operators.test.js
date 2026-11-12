@@ -14,10 +14,21 @@ suite('operator table', () => {
     };
 
     const formats = { toLaTeX, toMathML, toJavaScript, toPython, toSQL, toText, toSpeech, toGLSL };
+    // What a language has no function for, and can't be written inline: refused with an error naming it,
+    // never written as a call to a function that doesn't exist (gcd, det, union are written inline in JavaScript).
+    const REFUSED = {
+        toJavaScript: { der: 'a derivative', int: 'an integral', lim: 'a limit' },
+        toPython: { der: 'a derivative', lim: 'a limit' },
+        toSQL: { der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
+            '∪': 'a union of sets', '∩': 'an intersection of sets', vmatrix: 'a determinant', det: 'a determinant' },
+        toGLSL: { der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
+            '∪': 'a union of sets', '∩': 'an intersection of sets', '∈': '∈ b', '∉': '∈ b' },
+    };
     for (const name of operatorNames()) {
         for (const [format, render] of Object.entries(formats)) {
             test(`${name} renders with ${format}`, () => {
-                if ((name === 'vmatrix' || name === 'det') && format === 'toSQL') return throws(() => render(sample(name)), /^No SQL for a determinant/);
+                const refused = REFUSED[format]?.[name];
+                if (refused) return throws(() => render(sample(name)), new RegExp(`^No [\\w ]+ for ${refused.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}`));
                 const out = render(sample(name));
                 if (typeof out !== 'string' || !out.length) throw new Error('empty output');
             });

@@ -62,7 +62,7 @@ suite('python: functions', () => {
     });
     test('derivatives, limits and integrals without limits are refused', () => {
         throws(() => toPythonFunction('dP/dt = r P'), /derivative can't be computed numerically/);
-        throws(() => toPythonFunction('int(x^2, x)'), /needs limits/);
+        throws(() => toPythonFunction('int(x^2, x)'), /integral with no bounds \(the SymPy flavour/);
     });
     test('the formula comment stays on one line', () => {
         eq(toPythonFunction('x + 1\nimport os').code.split('\n').length, 4);
