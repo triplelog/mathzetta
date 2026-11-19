@@ -122,6 +122,7 @@ These go to `toHTML(input, options)` and `render(el, input, options)`.
 | `derivativeBrackets` | `'['` | `'('` for d/dx (x² + 1) |
 | `scriptFractions` | `'slash'` | x^{3/2} written with a slash. `'stack'` stacks it. |
 | `cases` | `true` | `c ? a : b` drawn as a piecewise brace |
+| | | A product typed with `·` (`\cdot`) or `×` (`\times`) is drawn with that sign (MathZetta's `node.written`); other products get a sign only where one is needed. Postfix input has no such marks. |
 | `colors` | | `{ 'x^2': 'red', 5: 'blue' }` (number keys are ids) or `[[target, colour]]` |
 | `highlight` | | target(s) that get the `mv-hl` class |
 | `attributes`, `style` | | `(node) => ({…})` / `(node) => 'css'` for each node's element |
@@ -145,8 +146,8 @@ npm run build        # dist/ (a few seconds)
 
 - **`dist/`** — Inline Math with everything inside, no import map or `node_modules` needed:
   - `inlinemath.js`, `markdown.js`, `cas.js` — ES modules (shared code in `dist/chunks/`);
-  - `inlinemath.global.min.js` (136 KB, 46 KB gzipped) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
-  - `inlinemath-cas.global.min.js` (270 KB, 87 KB gzipped) — the same plus the CAS (`InlineMath.mathCAS`, `casBlocks`, `stepsHTML`);
+  - `inlinemath.global.min.js` (183 KB, 62 KB gzipped) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
+  - `inlinemath-cas.global.min.js` (323 KB, 104 KB gzipped) — the same plus the CAS (`InlineMath.mathCAS`, `casBlocks`, `stepsHTML`);
   - `inlinemath.css` and `fonts/` — put both on the page.
 
 ```html
@@ -184,32 +185,34 @@ page needs nothing else:
 
 `@0.2` follows the latest 0.2.x; `@0.2.0` pins a release.
 
-**The stylesheet is required** — the drawing is HTML laid out by `inlinemath.css` (6.9 KB, 2.1 KB
+**The stylesheet is required** — the drawing is HTML laid out by `inlinemath.css` (10.4 KB, 3.2 KB
 gzipped): without it fractions, radicals and brackets don't line up. The classic builds
 (`*.global.min.js`) carry it and add it to the page themselves (`<style id="inlinemath-css">`; a
 `<link>` to `dist/inlinemath.css` is still fine, it is only added when absent); the ES modules
 don't, so a page using them links `dist/inlinemath.css`. **The fonts are optional**: `fonts/fonts.css`
-declares Latin Modern Roman (the TeX look) in two files, regular 45 KB and italic 47 KB (woff2), each
-downloaded only when text uses it; without the link the maths is drawn in the system serif.
+declares Latin Modern Roman (the TeX look) in two files, regular 45 KB and italic 47 KB (woff2), and
+its Greek letters, which Latin Modern lacks, from New Computer Modern in the same design (10 KB each,
+`fonts/README-inlinemath-greek.txt`). Each file is downloaded only when text uses it, so a page without
+Greek never fetches those two; without the link the maths is drawn in the system serif.
 
 Every build comes **with MathZetta inside, or without it** (`*.external.*`), with or without the
 CAS (MathZetta CAS). Sizes, gzipped:
 
 | | ES module | classic `<script>` (`window.InlineMath`) |
 |---|---|---|
-| Lite (drawing only), MathZetta inside | `lite.js` 32 KB | `inlinemath-lite.global.min.js` 33 KB |
-| Lite with the calculator (`{{…}}` worked out) | `lite-calc.js` 41 KB | `inlinemath-lite-calc.global.min.js` 43 KB |
-| Lite without MathZetta | `lite.external.js` 7 KB | `inlinemath-lite.external.global.min.js` 9 KB |
-| Inline Math (+ Markdown in the classic build), MathZetta inside | `inlinemath.js` 42 KB, `markdown.js` | `inlinemath.global.min.js` 46 KB |
-| …without MathZetta | `inlinemath.external.js` **8 KB**, `markdown.external.js` | `inlinemath.external.global.min.js` 13 KB |
-| with the CAS, MathZetta inside | `cas.js` 82 KB | `inlinemath-cas.global.min.js` 87 KB |
-| with the CAS, without MathZetta | `cas.external.js` 40 KB | `inlinemath-cas.external.global.min.js` 52 KB |
+| Lite (drawing only), MathZetta inside | `lite.js` 35 KB | `inlinemath-lite.global.min.js` 38 KB |
+| Lite with the calculator (`{{…}}` worked out) | `lite-calc.js` 48 KB | `inlinemath-lite-calc.global.min.js` 52 KB |
+| Lite without MathZetta | `lite.external.js` 8 KB | `inlinemath-lite.external.global.min.js` 11 KB |
+| Inline Math (+ Markdown in the classic build), MathZetta inside | `inlinemath.js` 51 KB, `markdown.js` 55 KB | `inlinemath.global.min.js` 62 KB |
+| …without MathZetta | `inlinemath.external.js` **12 KB**, `markdown.external.js` 15 KB | `inlinemath.external.global.min.js` 21 KB |
+| with the CAS, MathZetta inside | `cas.js` 90 KB | `inlinemath-cas.global.min.js` 104 KB |
+| with the CAS, without MathZetta | `cas.external.js` 50 KB | `inlinemath-cas.external.global.min.js` 63 KB |
 
 Without MathZetta, the page loads it once itself: a classic page puts a MathZetta `<script>` first —
 `mathzetta.min.js`, or the `maths-display` flavour, since speech, text and calculate are used (for
 lite, `display`, or `maths-display` to work out `{{…}}`) — and
 the external classic build reads `window.MathZetta`; a module page maps the names with an import
-map (every name can point at the one MathZetta bundle). The fonts are 94 KB more, only if linked.
+map (every name can point at the one MathZetta bundle). The fonts are 94 KB more (and 20 KB for Greek, only where it appears), only if linked.
 
 ```html
 <script type="importmap">
@@ -324,5 +327,5 @@ playground: any input, any operation, detail level, and a live rule editor).
 ## Known rough edges
 
 - **Fonts.** The placement estimates are tuned for Latin Modern and Times-like serifs. Fonts with unusual ascent and descent will sit a little off.
-- **Accents.** `\vec` and `\hat` use font glyphs and are only approximately centred.
+- **Accents.** `\vec`, `\hat`, `\tilde`, `\dot` and the overline are placed for Latin Modern: lower over a letter with no ascender (x, u, α), and leaning right over an italic letter. Other fonts can leave them a little high or low.
 - **Unbalanced fractions.** Taller-than-usual numerators on fractions are placed from estimates. Very deep nesting can drift by a few hundredths of an em.

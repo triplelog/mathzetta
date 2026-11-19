@@ -36,7 +36,13 @@ spelling, in phases (`clean/index.js`):
    decimal and `{{~3 pi}}` for three places. A block with no answer
    (`{{1/0}}`) becomes the string "undefined"; one that can't be worked out
    (`{{x+1}}` with no value for x) is left as written. `parse(text, { scope })`
-   supplies variable values. LaTeX that uses `\text{}` for words, not names,
+   supplies variable values. In LaTeX a block can sit right inside an argument:
+   where one is expected (after `\frac`, `\sqrt`, `^`, `_`, or the `}` or `]`
+   ending an earlier one) the first of three braces is the argument's, so
+   `\frac{{{2+2}}}{4}` is `\frac{ {{2+2}} }{4}`; a block that is the whole
+   argument by itself is braced (`\frac{{2+2}}{4}` → `\frac{4}{4}`); and `\{`
+   is an escaped brace (`\{{{1+1}}, 3\}` is the set {2, 3}). Without LaTeX,
+   `{{{1,2}}}` is still a block holding the set {1, 2}. LaTeX that uses `\text{}` for words, not names,
    is rewritten before names are protected: `\begin{cases} a & \text{if } p
    \\ b & \text{otherwise} \end{cases}` → `((p) ? (a) : (b))`; and a
    function MathZetta knows stays one: `\text{round}(x, 2)`, `\operatorname{sin} x`.
@@ -164,6 +170,24 @@ the argument count is checked against the operator table.
 Four node types: `number`, `symbol`, `string`, and `op` with `args`.
 `fromPostfix` reads standard postfix and numbers each node by its token
 index (`id`); `toPostfix` writes it back.
+
+**How a product was written.** The postfix has one multiplication, `*`, but
+`a \cdot b` and `a \times b` can mean different things (a dot or a cross
+product), so the parser remembers them beside the postfix. The cleaner writes
+`\cdot` `·` `⋅` and `\times` `×` as two private-use characters
+(`DOT_TIMES`, `CROSS_TIMES` in vocabulary.js) that the tokenizer and parser
+treat exactly like `*`; `buildTree` makes each one a `*` node with
+`written: 'dot'` or `'cross'`, and `toPostfix(tree, written)` collects them by
+postfix index. `parseSteps()` returns that map as `written` (`{ 2: 'cross' }`
+for `a × b`) and puts `written` on the tree's nodes, so `parseTree()` has it
+too. `parse()` still returns plain postfix, and the stages `parseSteps` shows
+(cleaned text, tokens, raw postfix) show `*`. The maths displays use it:
+LaTeX writes `\cdot` or `\times`, MathML `⋅` or `×`, text `·` or `×` (so it
+reads back marked), Inline Math draws the sign, and speech says "dot" or
+"cross" between vectors (`\vec`, `\hat`; the `words` option renames them) and
+"times" for any other typed sign. The code outputs, `evaluate`, `calculate` and
+every postfix consumer see an ordinary product; postfix input carries no marks.
+Products written as words (`times`), with `*` or side by side carry nothing.
 
 ## 6. Rendering (`src/render/`)
 

@@ -126,11 +126,23 @@ suite('calculate: calculus, numerically', () => {
         eq(T('\\int_2^0 x dx'), '-2');
         throws(() => calculate('\\int_0^1 \\frac{1}{x} dx'), MathError);
     });
-    test('derivatives at a point', () => {
-        eq(T('der(x^3, x)', { x: 2 }), '12');
-        eq(T('der(sin(x), x)', { x: 'pi/3' }), '1/2');
-        eq(T('der(der(x^3, x), x)', { x: 1 }), '6');
-        throws(() => calculate('der(abs(x), x)', { x: 0 }), MathError);
+    test('derivatives at a point: der(f, x = a), or \\left. … \\right|_{x = a}', () => {
+        eq(T('der(x^3, x = 2)'), '12');
+        eq(T('der(sin(x), x = pi/3)'), '1/2');
+        eq(T('der(x^3, x = 1, 2)'), '6', 'the second derivative at 1');
+        eq(T('der(der(x^3, x), x = 1)'), '6');
+        eq(T('\\left.\\frac{d}{dx} x^3\\right|_{x=2}'), '12');
+        eq(T('der(x^3, x = a)', { a: 3 }), '27', 'the point can be a value from the scope');
+        eq(T('der(x^3, x = 2)', { x: 5 }), '12', "an outside x doesn't matter: the point is x's value");
+        throws(() => calculate('der(abs(x), x = 0)'), MathError);
+    });
+    test('a plain d/dx is worked out only where x varies, not where the caller fixed it', () => {
+        // { x: 2 } (or a Markdown $x = 2$) makes x a constant: d/dx x³ there is no number; der(x^3, x = 2) is
+        throws(() => calculate('der(x^3, x)', { x: 2 }), UnknownError);
+        try { calculate('der(x^3, x)', { x: 2 }); } catch (e) { eq(e.message, 'a derivative needs a point: der(f, x = a)'); }
+        eq(T('int(der(x^3, x), x, 0, 1)'), '1', 'inside ∫ … dx, x varies');
+        eq(T('\\sum_{k=1}^{3} der(x^k, x = 1)'), '6');
+        eq(T('der(der(x^3, x), x = 1)'), '6', 'the outer d/dx varies x for the inner one');
     });
     test('limits', () => {
         eq(T('\\lim_{x\\to 0}\\frac{\\sin x}{x}'), '1');

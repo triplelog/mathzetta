@@ -79,8 +79,12 @@ export function fromPostfix(tokens) {
     return stack[0];
 }
 
-/** Write a tree as standard postfix. Variadic operators get their count. */
-export function toPostfix(node) {
+/**
+ * Write a tree as standard postfix. Variadic operators get their count.
+ * @param {object} [written] filled with { postfix index: 'dot' | 'cross' } for the products that say how
+ *   they were written (node.written: a · or × in the input); the postfix itself has only `*`
+ */
+export function toPostfix(node, written) {
     const out = [];
     (function visit(n) {
         if (n.type !== 'op') {
@@ -89,6 +93,7 @@ export function toPostfix(node) {
         }
         n.args.forEach(visit);
         if (operator(n.op)?.arity === VARIADIC) out.push(String(n.args.length));
+        if (written && n.written) written[out.length] = n.written;
         out.push(n.op);
     })(node);
     return out;

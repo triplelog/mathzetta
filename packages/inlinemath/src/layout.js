@@ -65,6 +65,9 @@ const LATEX_SYMBOLS = { '\\partial': '∂', '\\nabla': '∇', '\\ell': 'ℓ', '\
 
 /** Custom functions drawn as decorations: \boxed{x} parses as boxed(x). */
 const ACCENTS = { vec: '→', hat: 'ˆ', widehat: 'ˆ', tilde: '˜', dot: '˙', ddot: '¨' };
+/** One letter as tall as an x: an accent over it sits lower. */
+const SHORT_LETTER = /^[acegmnopqrsuvwxyzαγεημνοπρστυχω]$/;
+const isShortLetter = (node) => node?.type === 'symbol' && SHORT_LETTER.test(GREEK[node.value] ?? node.value);
 const DECORATIONS = ['boxed', 'overline', 'bar', 'underline', 'cancel', ...Object.keys(ACCENTS)];
 
 export const DEFAULTS = {
@@ -319,13 +322,14 @@ class Layout {
         if (isMinusOneTimes(node)) return row(this.text('sign', MINUS), unaryNeedsBrackets('neg', b) ? this.fence(this.render(b, ctx)) : this.render(b, ctx));
         const sides = bracketedSides(node);
         if (BIG_OPERATORS.includes(a.op)) sides.left = true;   // (∑ i)·x: the sum's body would take in the x
-        const implicit = isImplicitProduct(a, b, sides);
+        // a product typed with · or × shows it (MathZetta's node.written); otherwise a sign only where one is needed
+        const implicit = !node.written && isImplicitProduct(a, b, sides);
         // "sin x · y" must keep its brackets: sin(x) y. Before another function it needn't: sin x cos x.
         const nextIsCall = startsWithCall(b);
         const left = sides.left ? this.fence(this.render(a, ctx)) : this.render(a, { ...ctx, before: implicit && !nextIsCall, leftFactor: true });
         const right = sides.right ? this.fence(this.render(b, ctx)) : this.render(b, { ...ctx, before: ctx.before });
         // A thin space before a function name: 2 sin x, x² ln x.
-        const join = !implicit ? this.bin('·') : box(this.el(nextIsCall ? 'fnspace' : 'times', ''));
+        const join = !implicit ? this.bin(node.written === 'cross' ? '×' : '·') : box(this.el(nextIsCall ? 'fnspace' : 'times', ''));
         return row(left, join, right);
     }
 
@@ -351,20 +355,24 @@ class Layout {
     custom(node, ctx) {
         const name = customName(node.op);
         const args = node.args;
-        if (DECORATIONS.includes(name) && args.length === 1) return this.decorate(name, this.render(args[0], ctx));
+        if (DECORATIONS.includes(name) && args.length === 1) return this.decorate(name, this.render(args[0], ctx), args[0]);
         // f(x), g′(x): a one-letter function is italic like a variable; sgn(x) is upright.
         const head = /^[A-Za-z]′*(⁻¹)?$/.test(name) ? this.symbol(name) : this.word(name);
         return row(head, box(this.el('callgap', '')), this.fence(this.list(args, ctx)));
     }
 
-    decorate(name, b) {
+    decorate(name, b, base) {
         switch (name) {
             case 'boxed': return box(this.el('boxed', b.html), b.h + 0.22, b.d + 0.22);
             // a drawn stroke, not a background: Windows high contrast drops backgrounds, and a cancelled term would look kept
             case 'cancel': return box(this.el('cancel', b.html + svg('cancel', `${this.p}-cancel-line`)), b.h, b.d);
             case 'underline': return box(this.el('underline', b.html), b.h, b.d + 0.12);
-            case 'overline': case 'bar': return box(this.el('over', b.html), b.h + 0.14, b.d);
-            default: return box(this.el('accent', this.el('accent-mark', ACCENTS[name]) + b.html), b.h + 0.3, b.d);
+            case 'overline': case 'bar': return box(this.el(`over${isShortLetter(base) ? ' over-low' : ''}`, b.html), b.h + 0.14, b.d);
+            default: {
+                // over a letter with no ascender (x, u, α) the mark comes down to the letter's top
+                const low = isShortLetter(base);
+                return box(this.el(`accent${low ? ' accent-low' : ''}`, this.el(`accent-mark accent-${name}`, ACCENTS[name]) + b.html), b.h + 0.3, b.d);
+            }
         }
     }
 
@@ -491,6 +499,18 @@ class Layout {
 
     /** dy/dx, d²y/dx², and d/dx [f] with the body after the fraction. */
     derivative(node, ctx) {
+        const drawn = this.leibniz(node, ctx);
+        const { by, at } = derivativeOrder(node);
+        if (!at) return drawn;
+        // at a point, der(f, x = a): a bar as tall as the derivative, the point below it (|ₓ₌₂). The x there is a
+        // copy, with no id: the variable's id stays on the one in dx; the point (x = a) keeps its own.
+        const point = node.args[1];
+        const below = this.render({ ...point, args: [{ ...by, id: undefined }, at] }, { ...ctx, level: ctx.level + 1 });
+        return this.script(this.fence(drawn, '', '|'), null, ctx, below);
+    }
+
+    /** d/dx f drawn: the fraction, and the body after it (or on top, dy/dx). */
+    leibniz(node, ctx) {
         const { n, body, by, variable } = derivativeOrder(node);
         const up = { ...ctx, level: ctx.level + 1 };
         const d = () => this.text('d', 'd');

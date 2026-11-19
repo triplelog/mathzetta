@@ -16,6 +16,8 @@
  *                        The trig spellings are generated in trigReplacements().
  */
 
+import { DOT_TIMES, CROSS_TIMES, BAR_OPEN } from '../vocabulary.js';
+
 export const WORD_REPLACEMENTS = [
     [" And ", " &  "],
     [" Or ", " ∨ "],
@@ -149,10 +151,11 @@ export const SYMBOL_REPLACEMENTS = [
     ["Math.tau", "τ"],
     ["infinity", "∞"],
     ["\\infty", "∞"],
-    ["\\cdot", "*"],
-    ["\\times", "*"],
-    ["×", "*"],
-    ["·", "*"],
+    // · and × stay told apart (vocabulary.js WRITTEN_TIMES): both are * in the postfix
+    ["\\cdot", DOT_TIMES],
+    ["\\times", CROSS_TIMES],
+    ["×", CROSS_TIMES],
+    ["·", DOT_TIMES],
     ["÷", "/"],
     ["->", "→"],
     ["\\to", "→"],
@@ -233,6 +236,7 @@ export const SYMBOL_REPLACEMENTS = [
     ["\\{", "{"],
     ["\\}", "}"],
     ["\\right\\}", "}"],
+    ["\\left.", BAR_OPEN],   // an evaluation bar opens (and \\le is not read out of it)
     ["\\left|", "|"],
     ["\\right|", "|"],
     ["\\lfloor", "⌊"],
@@ -268,7 +272,7 @@ export const SYMBOL_REPLACEMENTS = [
     ["⅞", "(7/8)"],
     ["⊕", " \\xor "],
     ["∞", "∞"],
-    ["⋅", "*"],
+    ["⋅", DOT_TIMES],
     ["−", "-"],
     ["\\wedge", "&"],
     ["∨", "∨"],

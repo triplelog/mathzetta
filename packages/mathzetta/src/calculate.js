@@ -833,10 +833,18 @@ function delegate(node, env) {
 // ---- numeric calculus -----------------------------------------------------------------------
 
 /** body as a function of one variable, in doubles; NaN where it is undefined. */
+/**
+ * The names an enclosing ∫, ∑, lim or d/dx is varying, kept on the environment beside the values. A plain
+ * d/dx x³ is worked out only where x varies like this: a value the caller fixed (`{ x: 2 }`, a Markdown
+ * `$x = 2$`) makes x a constant, and a derivative at a point is written der(f, x = 2).
+ */
+const BOUND = Symbol('bound');
+const bind = (env, name, value) => ({ ...env, [name]: value, [BOUND]: new Set([...(env[BOUND] ?? []), name]) });
+
 function asFunction(body, name, env) {
     return (t) => {
         try {
-            const r = num(calc(body, { ...env, [name]: t }));
+            const r = num(calc(body, bind(env, name, t)));
             return r;
         } catch (e) {
             if (e instanceof MathError) return NaN;
@@ -847,14 +855,26 @@ function asFunction(body, name, env) {
 
 const variableName = (node) => (node.type === 'symbol' ? node.value : null);
 
-/** d/dx f at the value x has in the scope: Ridders' extrapolation, checked from both sides. */
+/**
+ * d/dx f at a point: der(f, x = a) at a (whatever x is outside), or der(f, x) where an enclosing ∫, ∑, lim
+ * or d/dx is varying x (BOUND). Ridders' extrapolation, checked from both sides.
+ */
 function derivative(node, env) {
     const [body, by] = node.args;
-    const name = variableName(by);
-    if (!name || !Object.prototype.hasOwnProperty.call(env, name)) {
-        throw new UnknownError(`a derivative needs a value for ${name || 'its variable'}`);
+    if (by.type === 'op' && by.op === '=') {
+        const name = variableName(by.args[0]);
+        if (!name) throw new UnknownError('a derivative at a point names its variable: der(f, x = a)');
+        return slope(body, name, num(calc(by.args[1], env)), env);
     }
-    const x = num(env[name]);
+    const name = variableName(by);
+    if (!name || !env[BOUND]?.has(name)) {
+        throw new UnknownError(`a derivative needs a point: der(f, ${name || 'x'} = a)`);
+    }
+    return slope(body, name, num(env[name]), env);
+}
+
+/** The slope of body, as a function of `name`, at x. */
+function slope(body, name, x, env) {
     const f = asFunction(body, name, env);
     if (!Number.isFinite(f(x))) throw new MathError('undefined');
     const small = 1e-6 * Math.max(1, Math.abs(x));
@@ -1004,7 +1024,7 @@ function limit(args, env) {
         ({ value, error } = approach((h) => g(a + side * h * Math.max(1, Math.abs(a)))));
         // continuous from that side? Then the exact value at the point is the answer: √x at 0⁺ is 0, not 0.0000087
         try {
-            const direct = calc(f, { ...env, [name]: atValue });
+            const direct = calc(f, bind(env, name, atValue));
             if (Math.abs(num(direct) - value) <= Math.max(error, 1e-6 * Math.max(1, Math.abs(value)))) return direct;
         } catch (e) {
             if (!(e instanceof MathError)) throw e;
@@ -1020,7 +1040,7 @@ function limit(args, env) {
         } else throw new MathError('the limit does not exist');
         // Continuous here? Then the exact value at the point is the answer.
         try {
-            const direct = calc(f, { ...env, [name]: atValue });
+            const direct = calc(f, bind(env, name, atValue));
             if (Math.abs(num(direct) - value) <= 1e-6 * Math.max(1, Math.abs(value))) return direct;
         } catch (e) {
             if (!(e instanceof MathError)) throw e;
@@ -1126,7 +1146,7 @@ function series(isSum, args, env) {
     const end = whole(endValue, 'a sum');
     if (end - start + 1n > BigInt(LIMITS.terms)) throw new UnknownError('too many terms to add one by one');
     let total = rat(isSum ? 0 : 1);
-    for (let i = start; i <= end; i++) total = step(total, calc(body, { ...env, [name]: X(Q(i)) }));
+    for (let i = start; i <= end; i++) total = step(total, calc(body, bind(env, name, X(Q(i)))));
     return total;
 }
 

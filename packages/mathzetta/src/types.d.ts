@@ -10,7 +10,8 @@ export type Node =
     | { type: 'number'; value: string; id?: number }
     | { type: 'symbol'; value: string; id?: number }
     | { type: 'string'; value: string; id?: number }
-    | { type: 'op'; op: string; args: Node[]; id?: number };
+    /** written: how a `*` was typed, · (\\cdot) or × (\\times); absent for other products. The postfix has only `*`. */
+    | { type: 'op'; op: string; args: Node[]; id?: number; written?: 'dot' | 'cross' };
 
 /** Anything the outputters accept. */
 export type Input = string | Postfix | Node;
@@ -45,6 +46,8 @@ export interface ParseSteps {
     tokens?: string[];
     rawPostfix?: string[];
     postfix?: Postfix;
+    /** How each product was typed, by postfix index: { 4: 'cross' } for a × b at index 4. Also on the tree's nodes. */
+    written?: Record<number, 'dot' | 'cross'>;
     tree?: Node;
     error?: string;
 }
@@ -74,7 +77,8 @@ export function clean(expression: string, options?: Pick<ParseOptions, 'blocks' 
 export function setBlockHandler(handler: BlockHandler | null): void;
 
 export function fromPostfix(postfix: Postfix): Node;
-export function toPostfix(tree: Node): Postfix;
+/** `written`, if given, is filled with { postfix index: 'dot' | 'cross' } for the nodes that carry it. */
+export function toPostfix(tree: Node, written?: Record<number, 'dot' | 'cross'>): Postfix;
 export function validatePostfix(postfix: Postfix): boolean;
 /** A postfix array or a tree → the tree. */
 export function asTree(input: Postfix | Node): Node;

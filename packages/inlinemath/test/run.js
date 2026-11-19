@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import * as nodeFs from 'node:fs';
 import { toHTML, treeOf, select, signature, nodeAt, pathOf, numberTree, shouldAnimate } from '../src/index.js';
 import { parseTree, fromPostfix, walk } from '../src/mathzetta.js';
-import { toMathML } from 'mathzetta/mathml';   // what a page passes as { mathml } (Inline Math does not import it)
+import { toMathML } from 'mathzetta/mathml';
+import { toText } from 'mathzetta/text';   // what a page passes to view.editable   // what a page passes as { mathml } (Inline Math does not import it)
 
 let passed = 0;
 const failures = [];
@@ -76,6 +77,18 @@ test('sin²x, and sin⁻¹x on request', () => {
     assert.match(text(toHTML('arcsin(x)', { inverseTrig: 'power' })), /^sin−1x$/);
 });
 
+const { casBlocks: casBlocksAtPoint } = await import('../src/cas.js');
+test('a derivative at a point: the bar, the point below it, no id twice; the CAS works it out exactly', () => {
+    const html = toHTML('der(x^3, x = 2)');
+    assert.equal(text(html), 'ddxx3x=2');
+    assert.ok(has(html, 'vert'), 'the bar');
+    const ids = [...html.matchAll(/data-node="(\d+)"/g)].map((m) => m[1]);
+    assert.equal(ids.length, new Set(ids).size, 'the copied variable has no id');
+    assert.match(html, /aria-label="the derivative with respect to x of x cubed, at x equals 2"/);
+    assert.equal(text(toHTML('{{der(x^3 sin(x), x = 2)}}', { blocks: casBlocksAtPoint() })), '8cos2+12sin2');
+    assert.equal(text(toHTML('{{diff(x^3, x = 2, 2)}}', { blocks: casBlocksAtPoint() })), '12');
+});
+
 test('a choice of equations reads in words; other logic keeps its signs', () => {
     assert.equal(text(toHTML('x = 2 | x = 3')), 'x=2orx=3');
     assert.ok(has(toHTML('x = 2 | x = 3'), 'conj'));
@@ -88,6 +101,20 @@ test('a choice of equations reads in words; other logic keeps its signs', () => 
     assert.ok(has(toHTML('(x = 1 | x = 2) & y = 3'), 'fence'));
     assert.ok(has(toHTML('x = 1 | (x = 2 & y = 3)'), 'fence'));
     assert.ok(!has(toHTML(['x', '1', '=', 'x', '2', '=', '|', 'x', '3', '=', '|']), 'fence'));
+});
+
+test('a product typed with · or × shows its sign; one typed without shows none', () => {
+    assert.equal(text(toHTML('a \\times b')), 'a×b');
+    assert.equal(text(toHTML('a \\cdot b')), 'a·b');
+    assert.equal(text(toHTML('\\vec{u} \\times \\vec{v}')).replace('→', '').replace('→', ''), 'u×v');
+    assert.equal(text(toHTML('3 × 10^8')), '3×108');
+    assert.equal(text(toHTML('a b')), 'ab');
+    assert.equal(text(toHTML(['a', 'b', '*'])), 'ab', 'postfix carries no marks');
+    assert.match(toHTML('\\vec{u} \\times \\vec{v}'), /aria-label="vector u cross vector v"/);
+    // edit in place writes the part as text and reads it back: the sign survives
+    const tree = treeOf('u \\times v + w');
+    assert.equal(tree.args[0].written, 'cross');
+    assert.equal(text(toHTML(treeOf(toText(tree)))), 'u×v+w');
 });
 
 test('fractions in exponents use a slash', () => {
@@ -119,6 +146,20 @@ test('piecewise from ?: and decorations from \\boxed etc.', () => {
     for (const [input, cls] of [['\\boxed{x}', 'boxed'], ['\\cancel{x}', 'cancel'], ['\\overline{z}', 'over'], ['\\vec{v}', 'accent']]) {
         assert.ok(has(toHTML(input), cls), input);
     }
+    // a mark over a letter with no ascender comes down to it; each accent can be styled on its own
+    assert.ok(has(toHTML('\\hat{u}'), 'accent-low') && has(toHTML('\\hat{u}'), 'accent-hat'));
+    assert.ok(has(toHTML('\\vec{\\alpha}'), 'accent-low'), 'short Greek letters too');
+    assert.ok(!has(toHTML('\\hat{A}'), 'accent-low') && !has(toHTML('\\vec{h}'), 'accent-low') && !has(toHTML('\\hat{2}'), 'accent-low'));
+    assert.ok(has(toHTML('\\overline{z}'), 'over-low') && !has(toHTML('\\overline{A}'), 'over-low'));
+});
+
+test('fonts.css: every file it names is in fonts/, and the Greek faces cover only Greek', () => {
+    const css = readFileSync(new URL('../fonts/fonts.css', import.meta.url), 'utf8');
+    for (const [, file] of css.matchAll(/url\("([^"]+)"\)/g)) assert.ok(nodeFs.existsSync(new URL(`../fonts/${file}`, import.meta.url)), file);
+    const greek = [...css.matchAll(/@font-face \{[^}]*inlinemath-greek[^}]*\}/g)].map((m) => m[0]);
+    assert.equal(greek.length, 2, 'regular and italic');
+    for (const face of greek) assert.match(face, /unicode-range: U\+0391-03A9, U\+03B1-03C9/);
+    assert.ok(css.lastIndexOf('inlinemath-greek') > css.lastIndexOf('lmroman'), 'declared after Latin Modern, so tried first for Greek');
 });
 
 test('every delimiter kind draws', () => {
@@ -300,6 +341,19 @@ test('markdown: maths drawn inline and on its own, worked out, remembered', () =
     assert.equal(det.at(-1), '5', 'a matrix definition is remembered');
     assert.deepEqual(spoken(markdownToHTML('${{a + 1}}$', { scope: { a: 2 } })), ['3']);
     assert.deepEqual(spoken(markdownToHTML('${{solve(x^2 = 4, x)}}$', { blocks: casBlocks() })), ['x equals negative 2 or x equals 2']);
+});
+
+test('markdown: a saved variable is not put in for the variable d/dx, ∫ … dx, lim or ∑ binds', () => {
+    const t = (md) => text(markdownToHTML(md)).replace(/\s+/g, '');
+    // a fixed x is a constant: d/dx x³ is drawn with x and left unworked; the point form is worked out
+    assert.doesNotMatch(t('$x := [[1..5 = 2]]$ $\\frac{d}{dx} x^3 = {{\\frac{d}{dx} x^3}}$'), /12$/, 'd/dx x³ with x fixed: no number');
+    assert.match(t('$x := [[1..5 = 2]]$ $\\frac{d}{dx} x^3$'), /ddxx3$/, 'drawn with x, not 2');
+    assert.match(t('$a := [[1..5 = 2]]$ $der(x^3, x = a) = {{der(x^3, x = a)}}$'), /ddxx3x=2=12$/, 'der(f, x = a): the bar, the point at the slider\'s value, the slope');
+    assert.match(t('$x := [[1..5 = 2]]$ $x^2$'), /22$/, 'outside, x is still its value');
+    assert.match(t('$a := [[1..6 = 2]]$ $\\int_0^{a} x^2 dx$'), /20x2dx$/, 'a limit takes the value');
+    assert.match(t('$x := [[1..6 = 2]]$ $\\int_0^{x} x^2 dx$'), /20x2dx$/, 'the variable of integration does not');
+    assert.match(t('$k := [[1..6 = 3]]$ $\\sum_{k=1}^{4} k$'), /4k=1k$/, 'nor a sum\'s index');
+    assert.match(t('$x := [[1..5 = 2]]$ $\\lim_{x \\to 0} x$'), /limx→0x$/, 'nor a limit\'s variable');
 });
 
 test('markdown: maths that does not read is shown as written, with the reason', () => {

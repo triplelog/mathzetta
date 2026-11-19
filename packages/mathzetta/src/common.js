@@ -186,11 +186,14 @@ export function smallWhole(node, limit) {
 export const customName = (op) => op.slice(2);
 
 /**
- * d/dx applied n times: { n, body, by } for der(der(f, x), x) etc., and
- * whether the body is a plain variable, which is written dy/dx.
+ * d/dx applied n times: { n, body, by } for der(der(f, x), x) etc., `at` for a derivative at a point
+ * (der(f, x = a): the point's value, else null), and whether the body is a plain variable, written dy/dx.
  */
 export function derivativeOrder(node) {
-    const by = node.args[1];
+    // der(f, x = a): the derivative at a point, drawn with a bar |ₓ₌ₐ after it
+    const point = node.args[1].type === 'op' && node.args[1].op === '=' ? node.args[1] : null;
+    const by = point ? point.args[0] : node.args[1];
+    const at = point ? point.args[1] : null;
     // the first derivative is always this node's; more are counted while the variable is the same leaf
     // (with a compound "variable", d/d(x+1), the body must still be peeled once, or it is drawn for ever)
     let n = 1;
@@ -199,7 +202,7 @@ export function derivativeOrder(node) {
         n++;
         body = body.args[0];
     }
-    return { n, body, by, variable: body.type === 'symbol' && isShortName(body.value) };
+    return { n, body, by, at, variable: body.type === 'symbol' && isShortName(body.value) };
 }
 
 const sameLeaf = (a, b) => a.type === b.type && a.value === b.value && a.type !== 'op';

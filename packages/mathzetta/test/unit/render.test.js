@@ -12,6 +12,7 @@ import {
     toUnified,
     getMathMLIdMap,
     parse,
+    parseSteps,
     toSpeech,
     toSpeechSegments,
     toAudioSpeech,
@@ -588,5 +589,66 @@ suite('output options', () => {
     test('toSQL: string quotes and quoted identifiers', () => {
         eq(toSQL('cost + tax', { quoteIdentifiers: true }), '"cost" + "tax"');
         eq(toSQL('name = "Bob"', { stringQuote: "'" }), "name = 'Bob'");
+    });
+});
+
+suite('a product typed with · or × keeps its sign where the output can show it', () => {
+    test('LaTeX writes \\cdot and \\times as typed, even where the product would read without a sign', () => {
+        eq(toLaTeX('a \\times b'), 'a \\times b');
+        eq(toLaTeX('u \\times v \\cdot w'), 'u \\times v \\cdot w');
+        eq(toLaTeX('2 \\cdot x'), '2 \\cdot x');
+        eq(toLaTeX('3 × 10^8'), '3 \\times 10^8');
+        eq(toLaTeX('2x'), '2x', 'a product typed without a sign is unchanged');
+        eq(toLaTeX(parse('a \\times b')), 'ab', 'plain postfix has no marks: an ordinary product');
+    });
+    test('MathML: × and ⋅ as typed; invisible times otherwise', () => {
+        eq(toMathML('a \\times b').includes('<mo>×</mo>'), true);
+        eq(toMathML('a \\cdot b').includes('<mo>⋅</mo>'), true);
+        eq(toMathML('a b').includes('<mo>\u2062</mo>'), true);
+    });
+    test('text writes · and ×, and reads back with the same marks', () => {
+        eq(toText('u \\times v \\cdot w'), 'u × v · w');
+        eq(parseSteps(toText('u \\times v \\cdot w')).written, parseSteps('u \\times v \\cdot w').written);
+        eq(toText('a*b'), 'a * b');
+    });
+    test('speech: dot and cross between vectors, times for any other typed sign', () => {
+        eq(toSpeech('\\vec{u} \\times \\vec{v}'), 'vector u cross vector v');
+        eq(toAudioSpeech('\\vec{u} \\cdot \\vec{v}'), 'vector u dot vector v');
+        eq(toSpeech('\\hat{u} \\times \\vec{v}'), 'u hat cross vector v');
+        eq(toSpeech('3 \\times 10^8'), '3 times 10 to the eighth', 'numbers: times, not cross');
+        eq(toSpeech('u \\times v'), 'u times v');
+        eq(toSpeech('u v'), 'u v', 'no sign typed: none read');
+        eq(toSpeech('\\vec{u} \\times \\vec{v}', { words: { cross: 'cross product' } }), 'vector u cross product vector v');
+    });
+    test('code outputs ignore the marks: a product is a product', () => {
+        eq(toJavaScript('a \\times b'), toJavaScript('a*b'));
+        eq(toPython('a \\cdot b'), toPython('a*b'));
+        eq(toSQL('a \\times b'), toSQL('a*b'));
+    });
+});
+
+suite('a derivative at a point, der(f, x = a): the bar and the point in every display', () => {
+    test('LaTeX: \\left. … \\right|_{x=a}, and it reads back', () => {
+        eq(toLaTeX('der(x^3, x = 2)'), '\\left.\\frac{\\mathrm{d}}{\\mathrm{d}x}\\left[x^3\\right]\\right|_{x=2}');
+        eq(toLaTeX('der(y, x = 0)'), '\\left.\\frac{\\mathrm{d}y}{\\mathrm{d}x}\\right|_{x=0}');
+        for (const s of ['der(x^3, x = 2)', 'der(x^3 + 2x, x = a)', 'der(x^3, x = 2, 2)', 'der(y, x = 0)']) eq(parse(toLaTeX(s)), parse(s), s);
+    });
+    test('text writes der(f, x = a) (and der(f, x = a, n)), which reads back', () => {
+        eq(toText('der(x^3, x = 2)'), 'der(x^3, x = 2)');
+        eq(toText('der(x^3, x = a, 2)'), 'der(x^3, x = a, 2)');
+        eq(parse(toText('der(x^3, x = a, 2)')), parse('der(x^3, x = a, 2)'));
+    });
+    test('MathML: a bar with the point below it; the copied variable carries no id', () => {
+        const m = toMathML('der(x^3, x = 2)');
+        eq(m.includes('<mo stretchy="true">|</mo>'), true);
+        eq(new Set(m.match(/id="[^"]*"/g)).size, m.match(/id="[^"]*"/g).length, 'no id twice');
+    });
+    test('speech: ", at x equals a"', () => {
+        eq(toSpeech('der(x^3, x = 2)'), 'the derivative with respect to x of x cubed, at x equals 2');
+        eq(toSpeech('der(x^3, x = 2, 2)'), 'the second derivative with respect to x of x cubed, at x equals 2');
+    });
+    test('SymPy differentiates, then puts the point in; JavaScript still refuses a derivative', () => {
+        eq(toPython('der(x^3, x = 2)', { sympy: true }), 'sympy.diff(x ** 3, x).subs(x, 2)');
+        throws(() => toJavaScript('der(x^3, x = 2)'));
     });
 });

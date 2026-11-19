@@ -192,7 +192,10 @@ export function boundVariables(node) {
     (function visit(n) {
         if (n.type !== 'op') return;
         const [f, second] = n.args;
-        if (n.op === 'der') { if (second?.type === 'symbol') out.push(second.value); }
+        if (n.op === 'der') {
+            if (second?.type === 'symbol') out.push(second.value);
+            else if (second?.type === 'op' && second.op === '=' && second.args[0].type === 'symbol') out.push(second.args[0].value);   // der(f, x = a)
+        }
         else if (n.op === 'lim') {
             if (second?.type === 'op' && second.op === '→') out.push(second.args[0].value);
             else out.push(n.args.length === 2 ? firstVariable(f) || 'x' : second?.value);
@@ -285,7 +288,12 @@ const SY = {
         '∪': (parts, node, render) => `sympy.Union(${node.args.map((a) => symSet(a, render)).join(', ')})`,
         '∩': (parts, node, render) => `sympy.Intersection(${node.args.map((a) => symSet(a, render)).join(', ')})`,
         '{}': (parts) => `sympy.FiniteSet(${parts.join(', ')})`,
-        der: (parts) => `sympy.diff(${parts.join(', ')})`,
+        der: (parts, node, render) => {
+            // at a point, der(f, x = a): differentiate, then put a in for x
+            const point = node.args[1];
+            if (point.type === 'op' && point.op === '=') return `sympy.diff(${parts[0]}, ${render(point.args[0])}).subs(${render(point.args[0])}, ${render(point.args[1])})`;
+            return `sympy.diff(${parts.join(', ')})`;
+        },
         int: (parts, node, render) => {
             const [f, second, third, fourth] = node.args;
             const hasVariable = node.args.length >= 2 && isVariable(second);

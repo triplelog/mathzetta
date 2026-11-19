@@ -47,7 +47,9 @@ function print(node) {
     case '!': return { text: `${wrap(a[0], 9)}!`, prec: 6 };
     case 'abs': return { text: `|${a[0].text}|`, prec: 9 };
     case 'root': return { text: `root(${a[0].text}, ${a[1].text})`, prec: 9 };
-    case 'der': return { text: `d/d${a[1].text} (${a[0].text})`, prec: 6 };
+    case 'der':   // at a point (der(f, x = a)): d/dx (f) at x = a
+      if (node.args[1].type === 'op' && node.args[1].op === '=') return { text: `d/d${a[1].text.split(' = ')[0]} (${a[0].text}) at ${a[1].text}`, prec: 1 };
+      return { text: `d/d${a[1].text} (${a[0].text})`, prec: 6 };
     case 'int':
       return { text: a.length === 4 ? `∫ from ${a[2].text} to ${a[3].text} of ${a[0].text} d${a[1].text}` : `∫ ${a[0].text} d${a[1].text}`, prec: 1 };
     case '|': return { text: `${a[0].text} or ${a[1].text}`, prec: 0 };

@@ -33,6 +33,7 @@ export function nameOf(node) {
 // bare(): ids and where-it-came-from marks dropped; it lives in select.js so edit.js (and with it the
 // main entry, for View.editable) doesn't pull in this store
 import { bare } from './select.js';
+import { firstVariable } from './mathzetta.js';
 export { bare };
 
 /** Ids dropped (to be numbered again), `from` marks kept. */
@@ -56,6 +57,31 @@ export function unexpand(node, named) {
     return visit(node, true);
 }
 
+const NONE = new Set();
+
+/**
+ * The variable an operation binds, and which of its arguments it is bound in: d/dx (der(f, x)) and
+ * ∫ … dx (int(f, x, a, b)) in f and x but not the limits; lim(f, x → a) in f and x; ∑ and ∏
+ * (\\sumidx(f, k = 1, n), \\sumidx(f, k ∈ S)) in f and k. Null for anything else.
+ */
+function boundBy(node) {
+    const [f, second] = node.args;
+    const symbol = (n) => (n && n.type === 'symbol' ? n.value : null);
+    switch (node.op) {
+        case 'der':
+            if (second?.op === '=') return symbol(second.args[0]) && { name: symbol(second.args[0]), where: (i) => i === 0, index: 1 };   // der(f, x = a): a takes values
+            return symbol(second) && { name: symbol(second), where: (i) => i <= 1 };
+        case 'int': {
+            const name = symbol(second) ?? (node.args.length === 3 || node.args.length === 1 ? firstVariable(f) || 'x' : null);
+            return name && { name, where: (i) => i === 0 || (i === 1 && symbol(second) === name) };
+        }
+        case 'lim': return second?.op === '→' && symbol(second.args[0]) && { name: symbol(second.args[0]), where: (i) => i === 0, index: 1 };
+        case '\\sumidx': case '\\prodidx':
+            return (second?.op === '=' || second?.op === '∈') && symbol(second.args[0]) && { name: symbol(second.args[0]), where: (i) => i === 0, index: 1 };
+        default: return null;
+    }
+}
+
 /**
  * Every saved name in a tree replaced by its own tree (which may use other saved names).
  * `lookup(name)` gives a saved name's tree, or null. A name inside its own definition is left as it is.
@@ -64,10 +90,10 @@ export function unexpand(node, named) {
 export function substitute(tree, lookup) {
     let changed = false;
     const seen = new Set();
-    const visit = (node) => {
+    const visit = (node, bound = NONE) => {
         const name = nameOf(node);
         if (name !== null) {
-            if (!seen.has(name)) {
+            if (!seen.has(name) && !bound.has(name)) {
                 const value = lookup(name);
                 if (value) {
                     changed = true;
@@ -79,7 +105,17 @@ export function substitute(tree, lookup) {
             }
             return node;   // A_1 is one name: its A is not substituted
         }
-        if (node.args) return { ...node, args: node.args.map(visit) };
+        if (node.args) {
+            // d/dx, ∫ … dx, lim and ∑ bind their variable: a saved x isn't put into x³ in d/dx x³
+            const binds = boundBy(node);
+            if (!binds) return { ...node, args: node.args.map((a) => visit(a, bound)) };
+            const inside = new Set([...bound, binds.name]);
+            return { ...node, args: node.args.map((a, i) => {
+                // the index (x → a, k = 1, k ∈ S): its variable is bound, its value isn't
+                if (i === binds.index) return { ...a, args: a.args.map((c, j) => visit(c, j === 0 ? inside : bound)) };
+                return visit(a, binds.where(i) ? inside : bound);
+            }) };
+        }
         return node;
     };
     const out = visit(tree);

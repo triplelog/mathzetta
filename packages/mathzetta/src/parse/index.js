@@ -11,12 +11,16 @@
 
 import { clean as cleanText } from './clean/index.js';
 import { casesToTernary } from './clean/latex.js';
-import { isOperatorWord } from './vocabulary.js';
+import { isOperatorWord, WRITTEN_TIMES } from './vocabulary.js';
 import { restoreStrings } from './clean/strings.js';
 import { tokenize, PROTECTED } from './tokenize.js';
 import { toRawPostfix } from './parser.js';
 import { buildTree } from './build.js';
-import { toPostfix, fromPostfix } from '../tree.js';
+import { toPostfix, fromPostfix, walk } from '../tree.js';
+
+/** The cleaner's · and × (WRITTEN_TIMES) shown as the * they stand for, in the stages a caller sees. */
+const TIMES_MARKS = new RegExp(`[${Object.keys(WRITTEN_TIMES).join('')}]`, 'g');
+const plainTimes = (text) => text.replace(TIMES_MARKS, '*');
 
 /**
  * Names that must stay whole: the ones the caller lists, and the ones the
@@ -86,9 +90,15 @@ let defaultBlocks = null;
  * @returns {{ cleaned: string, stringMap: Map, steps: Array }} see clean/index.js
  */
 export const clean = (expression, options = {}) => {
+    const result = cleanMarked(expression, options);
+    return { ...result, cleaned: plainTimes(result.cleaned), steps: result.steps.map(([name, text]) => [name, plainTimes(text)]) };
+};
+
+/** The cleaner as the tokenizer needs it: · and × still told apart (WRITTEN_TIMES). */
+function cleanMarked(expression, options = {}) {
     const blocks = options.blocks === undefined ? defaultBlocks : options.blocks;
     return cleanText(expression, { evaluate: blocks ? (text) => blocks(text, options.scope) : undefined });
-};
+}
 
 /**
  * Run the whole pipeline and keep every intermediate result.
@@ -96,7 +106,9 @@ export const clean = (expression, options = {}) => {
  * stages completed.
  *
  * @param {object} [options] see parse()
- * @returns {{ original, mode, cleaned, cleanSteps, tokens, rawPostfix, tree, postfix, error }}
+ * @returns {{ original, mode, cleaned, cleanSteps, tokens, rawPostfix, tree, postfix, written, error }}
+ *   written: { postfix index: 'dot' | 'cross' } for each product typed as · (\cdot) or × (\times); the
+ *   tree's nodes carry it too (node.written). The postfix itself has only `*`.
  */
 /** The longest expression read by default: far more than maths needs, and a bound on the work. */
 export const MAX_LENGTH = 5000;
@@ -118,16 +130,22 @@ export function parseSteps(expression, options = {}) {
             .match(/(?<![\w.])[A-Za-z]{1,3}\d+(?::[A-Za-z]{1,3}\d+)?(?![\w.(])/g) ?? [])] : [];
         const { text, protectedNames } = protectNames(beforeProtecting(expression), options.names, [...(options.values ?? []), ...cells]);
         const mode = modeOf(text);
-        const { cleaned, stringMap, steps: cleanSteps } = clean(text, { blocks: options.blocks, scope: options.scope });
+        const { cleaned, stringMap, steps: cleanSteps } = cleanMarked(text, { blocks: options.blocks, scope: options.scope });
         const restore = (tokens) => restoreStrings(restoreStrings(tokens, stringMap), protectedNames);
         steps.mode = mode;
-        steps.cleaned = restore([cleaned])[0];
-        steps.cleanSteps = cleanSteps;
-        steps.tokens = tokenize(cleaned, mode);
-        steps.rawPostfix = restore(toRawPostfix(steps.tokens, mode));
-        const postfix = toPostfix(buildTree(steps.rawPostfix));
+        steps.cleaned = plainTimes(restore([cleaned])[0]);
+        steps.cleanSteps = cleanSteps.map(([name, text]) => [name, plainTimes(text)]);
+        const tokens = tokenize(cleaned, mode);
+        steps.tokens = tokens.map(plainTimes);
+        const raw = restore(toRawPostfix(tokens, mode));
+        steps.rawPostfix = raw.map(plainTimes);
+        // how each product was written (· or ×), by postfix index: the postfix has only *
+        const written = {};
+        const postfix = toPostfix(buildTree(raw), written);
         steps.postfix = postfix;
+        steps.written = written;
         steps.tree = fromPostfix(postfix);   // re-read so node ids are postfix indexes
+        if (Object.keys(written).length) walk(steps.tree, (node) => { if (written[node.id]) node.written = written[node.id]; });
     } catch (error) {
         steps.error = error instanceof RangeError ? 'Nested too deeply' : error.message;   // the call stack, on absurd nesting
     }

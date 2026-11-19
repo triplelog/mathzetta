@@ -114,6 +114,7 @@ function operation(node, render) {
             if (isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] }, render);
             const l = side(a, 'left');
             const r = side(b, 'right');
+            if (node.written) return `${l} ${node.written === 'cross' ? '\\times' : '\\cdot'} ${r}`;   // as typed: · or ×
             if (!isImplicitProduct(a, b, bracketedSides(node))) return `${l} \\cdot ${r}`;
             // \pi followed by a letter would read as one command: \pir
             return /\\[a-zA-Z]+$/.test(l) && /^[a-zA-Z]/.test(r) ? `${l} ${r}` : l + r;
@@ -178,12 +179,14 @@ function operation(node, render) {
         case 'prod':   // prod(a + b, c) is (a + b) · c
             return args.map((x, i) => (needsBrackets(TIMES, x, i ? 'right' : 'left') ? paren(render(x)) : render(x))).join(' \\cdot ');
         case 'der': {
-            // dy/dx, d²y/dx²; d/dx [x^2 + 1] gets brackets, d/dx sin x doesn't.
-            const { n, body, by, variable } = derivativeOrder(node);
+            // dy/dx, d²y/dx²; d/dx [x^2 + 1] gets brackets, d/dx sin x doesn't; at a point, a bar: \left. … \right|_{x=2}
+            const { n, body, by, at, variable } = derivativeOrder(node);
             const power = n > 1 ? `^{${n}}` : '';
-            if (variable) return `\\frac{\\mathrm{d}${power}${render(body)}}{\\mathrm{d}${render(by)}${power}}`;
             const inner = bracketOp(body) && precedenceOf(bracketOp(body)) < 100 ? `\\left[${render(body)}\\right]` : `{${render(body)}}`;
-            return `\\frac{\\mathrm{d}${power}}{\\mathrm{d}${render(by)}${power}}${inner}`;
+            const d = variable
+                ? `\\frac{\\mathrm{d}${power}${render(body)}}{\\mathrm{d}${render(by)}${power}}`
+                : `\\frac{\\mathrm{d}${power}}{\\mathrm{d}${render(by)}${power}}${inner}`;
+            return at ? `\\left.${d}\\right|_{${render(by)}=${render(at)}}` : d;
         }
         case 'int':
             return integral(args, render);

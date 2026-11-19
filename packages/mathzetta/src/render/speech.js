@@ -49,6 +49,9 @@ import { isMinusOneTimes, derivativeOrder, customName, GREEK, isUnchanged, matri
 import { operator, isCustomFunction, precedenceOf } from '../operators.js';
 import { firstVariable } from '../tree.js';
 
+/** A factor that is a vector by its look: \vec{v} or \hat{u}. */
+const isVector = (node) => node.type === 'op' && isCustomFunction(node.op) && ['vec', 'hat'].includes(customName(node.op));
+
 /** The connecting words. Override any of them with the `words` option. */
 export const WORDS = {
     plus: 'plus', minus: 'minus', times: 'times', over: 'over', negative: 'negative', plusOrMinus: 'plus or minus',
@@ -56,6 +59,8 @@ export const WORDS = {
     squared: 'squared', cubed: 'cubed', toThe: 'to the', toThePowerOf: 'to the power of', power: 'power',
     sub: 'sub', factorial: 'factorial', prime: 'prime', doublePrime: 'double prime', triplePrime: 'triple prime',
     inverse: 'inverse', mod: 'mod', percent: 'percent', degrees: 'degrees',
+    dot: 'dot', cross: 'cross', vector: 'vector', hat: 'hat',   // u · v, u × v between vectors; vector u, u hat
+    at: 'at',   // a derivative at a point: …, at x equals 2
     equals: 'equals', notEqual: 'is not equal to', lessThan: 'is less than', greaterThan: 'is greater than',
     lessOrEqual: 'is less than or equal to', greaterOrEqual: 'is greater than or equal to',
     approx: 'is approximately', congruent: 'is congruent to', approaches: 'approaches', tendsTo: 'approaches',
@@ -283,6 +288,9 @@ class Speaker {
 
         if (COMPARISONS[op]) return [...this.speak(a), me(w[COMPARISONS[op]]), ...this.speak(b)];
         if (isCustomFunction(op)) {
+            // \vec{u} is "vector u" and \hat{u} "u hat" (a letter; anything longer keeps "vec of …")
+            if (args.length === 1 && a.type === 'symbol' && customName(op) === 'vec') return [me(w.vector), ...this.speak(a)];
+            if (args.length === 1 && a.type === 'symbol' && customName(op) === 'hat') return [...this.speak(a), me(w.hat)];
             const name = this.symbol(customName(op));
             return args.length ? [me(`${name} ${w.of}`), ...this.arguments(args)] : [me(name)];
         }
@@ -449,9 +457,11 @@ class Speaker {
         // 2^x·y is not 2^{xy}: alone, the exponent needs its end before the next factor
         if (this.audio && a.type === 'op' && a.op === '^' && a.args[1].type !== 'number') left.push(...this.closer(a.args[1], 'endExponent'));
         const right = this.quantity(b);
+        // u · v and u × v between vectors (typed with \cdot or \times: MathZetta's node.written) are "dot" and "cross"
+        if (node.written && [a, b].some(isVector)) return [...left, this.seg(node, w[node.written]), ...right];
         // "2 x", "2 pi r", "x squared sine of x" read fine; "2 the square root of x",
-        // "rate time" and "x 2" don't.
-        const needsTimes = this.isCompound(a) || this.isCompound(b) || this.isWord(a) || this.isWord(b)
+        // "rate time" and "x 2" don't. A sign the writer typed (a · b, a × b) is always read.
+        const needsTimes = Boolean(node.written) || this.isCompound(a) || this.isCompound(b) || this.isWord(a) || this.isWord(b)
             || this.startsWithNumber(b) || (b.type === 'op' && b.op === '/') || this.isCall(a)
             || right[0].text.startsWith('the ');
         return needsTimes ? [...left, this.seg(node, w.times), ...right] : [...left, ...right];
@@ -522,15 +532,18 @@ class Speaker {
 
     /** "d y d x", "d squared y d x squared", "the derivative of f with respect to x". */
     derivative(node) {
-        const { n, body, by, variable } = derivativeOrder(node);
+        const { n, body, by, at, variable } = derivativeOrder(node);
         const w = this.w;
         const me = (text) => this.seg(node, text);
+        // at a point: "…, at x equals 2"
+        const point = at ? [me(`${w.comma} ${w.at}`), ...this.speak(by), me(w.equals), ...this.speak(at)] : [];
         if (variable) {
             const d = n === 1 ? w.d : `${w.d} ${n === 2 ? w.squared : n === 3 ? w.cubed : `${w.toThe} ${this.ordinal(n)}`}`;
-            return [me(d), ...this.speak(body), me(w.d), ...this.speak(by), me(n === 1 ? '' : (n === 2 ? w.squared : n === 3 ? w.cubed : `${w.toThe} ${this.ordinal(n)}`))];
+            const spoken = [me(d), ...this.speak(body), me(w.d), ...this.speak(by), me(n === 1 ? '' : (n === 2 ? w.squared : n === 3 ? w.cubed : `${w.toThe} ${this.ordinal(n)}`))];
+            return [...spoken, ...point];
         }
         const which = n === 1 ? w.derivative : n === 2 ? w.secondDerivative : w.nthDerivative(this.ordinal(n));
-        return [me(`${which} ${w.withRespectTo}`), ...this.speak(by), me(w.of), ...this.contents(body, 'endDerivative')];
+        return [me(`${which} ${w.withRespectTo}`), ...this.speak(by), me(w.of), ...this.contents(body, 'endDerivative'), ...point];
     }
 
     /** "the integral from 0 to 1 of x squared, d x". */

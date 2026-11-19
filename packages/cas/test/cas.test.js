@@ -164,6 +164,12 @@ suite('cas: systems, substitution, equivalence', () => {
     equal(cas.solveSystem(['x + y = 1', '2x + 2y = 2'], ['x', 'y']).status, 'many');
   });
   test('substitute', () => equal(cas.substitute('x^2 + y', { x: 3, y: 'z + 1' }).text, 'z + 10'));
+  test('a derivative at a point, der(f, x = a), is worked out wherever it is read', () => {
+    equal(cas.simplify('der(x^3, x = 2)', { steps: false }).text, '12');
+    equal(cas.simplify('der(x^3, x = a, 2) + 1', { steps: false }).text, '6a + 1');   // the second derivative at a
+    equal(cas.expand('der((x + 1)^3, x = y)', { steps: false }).text, '3y^2 + 6y + 3');
+    throws(() => cas.diff('x^3', 'x = 2'));   // a point is not a variable name
+  });
   test('equivalent: exactly and numerically', () => {
     deepEqual(cas.equivalent('(x + 1)^2', 'x^2 + 2x + 1'), { equal: true, how: 'exact' });
     equal(cas.equivalent('sin(2x)', '2 sin(x) cos(x)').equal, true);

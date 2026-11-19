@@ -94,6 +94,33 @@ suite('strings and {{blocks}}', () => {
         clean('{{alert(1)}}');
         eq(globalThis.__ran, false);
     });
+    test('a block right inside a LaTeX argument needs no space: the first of three braces is the argument\'s', () => {
+        for (const [braces, spaced] of [
+            ['\\frac{{{2+2}}}{4}', '\\frac{ {{2+2}} }{4}'], ['\\frac{4}{{{2+2}}}', '\\frac{4}{ {{2+2}} }'],
+            ['\\frac{{{1}}}{{{2}}}', '\\frac{ {{1}} }{ {{2}} }'], ['\\sqrt{{{8}}}', '\\sqrt{ {{8}} }'],
+            ['\\sqrt[3]{{{8}}}', '\\sqrt[3]{ {{8}} }'], ['2^{{{1+1}}}', '2^{ {{1+1}} }'], ['\\frac{{{{2+2}}}}{4}', '\\frac{ {{ {2+2} }} }{4}'],
+        ]) eq(parse(braces), parse(spaced), braces);
+        eq(parse('\\frac{{{2+2}}}{4}'), ['4', '4', '/']);
+    });
+    test('a block that is a whole argument by itself fills it: \\frac{{2+2}}{4} is \\frac{4}{4}', () => {
+        eq(parse('\\frac{{2+2}}{4}'), ['4', '4', '/']);
+        eq(parse('x^{{1+1}}'), ['x', '2', '^']);
+    });
+    test('a derivative at a point: der(f, x = a), der(f, x = a, n), and the evaluation bar after a derivative', () => {
+        eq(P('der(x^3, x = 2)'), 'x 3 ^ x 2 = der');
+        eq(P('der(x^3, x = a, 2)'), 'x 3 ^ x der x a = der', 'the nth: n − 1 plain, then one at the point');
+        eq(P('\\left.\\frac{d}{dx} x^3\\right|_{x=2}'), 'x 3 ^ x 2 = der');
+        eq(P('\\left.\\frac{d}{dx} x^3\\right|_2'), 'x 3 ^ x 2 = der', 'a bare point is the variable\'s');
+        eq(P('\\left.\\frac{dy}{dx}\\right|_{x=0}'), 'y x 0 = der');
+        eq(P('\\left.\\frac{d}{dx}(x^2+1)\\right|_{x=a} + 1'), 'x 2 ^ 1 + x a = der 1 +');
+        throws(() => parse('\\left. x^2 \\right|_0^1'));   // a bar after anything else is refused, by name
+        eq(P('x \\le 3'), 'x 3 ≤', '\\le is still ≤');
+    });
+    test('an escaped \\{ is a brace, not the start of a block', () => eq(parse('\\{{{1+1}}, 3\\}'), ['2', '3', '2', '{}']));
+    test('without LaTeX, three braces still open the block first: {{{1,2}}} is a block holding the set {1, 2}', () => {
+        eq(parse('{{{1,2}}}'), ['1', '2', '2', '{}']);
+        eq(parse('{1,2}{{3}}'), ['1', '2', '2', '{}', '3', '*']);
+    });
 });
 
 suite('pipeline', () => {
@@ -440,5 +467,46 @@ suite('{{…}} blocks: the hook', () => {
             setBlockHandler(calculateBlock);
         }
         eq(parse('x = {{1/3 + 1/6}}'), ['x', '1', '2', '/', '=']);
+    });
+});
+
+suite('how a product was written: · and × beside the postfix', () => {
+    const W = (s) => parseSteps(s).written;
+    const POSTFIX = (s) => parse(s).join(' ');
+    test('· (\\cdot, ⋅) is dot and × (\\times) is cross, at the * they wrote', () => {
+        eq(W('a \\cdot b'), { 2: 'dot' });
+        eq(W('a·b'), { 2: 'dot' });
+        eq(W('x⋅y'), { 2: 'dot' });
+        eq(W('a \\times b'), { 2: 'cross' });
+        eq(W('a×b'), { 2: 'cross' });
+        eq(W('u \\times v \\cdot w'), { 2: 'cross', 4: 'dot' });
+        eq(W('\\vec{u} \\times \\vec{v}'), { 6: 'cross' });
+    });
+    test('the postfix is exactly what it was: only *', () => {
+        for (const [marked, plain] of [['a \\cdot b', 'a*b'], ['2 \\times -3', '2*-3'], ['3 × 10^8', '3*10^8'], ['a \\times (b + c)', 'a*(b+c)'],
+            ['\\frac{a \\cdot b}{c}', '(a*b)/c'], ['\\sin x \\cdot \\cos x', 'sin(x)*cos(x)'], ['-a \\times b^2', '-a*b^2'], ['a \\cdot b \\cdot c', 'a*b*c']]) {
+            eq(POSTFIX(marked), POSTFIX(plain), marked);
+        }
+    });
+    test('products written any other way carry nothing', () => {
+        for (const s of ['a*b', '2x', 'a b', 'sin x cos x', '2 times 3', 'a multiplied by b']) eq(W(s), {}, s);
+    });
+    test('parseTree-style trees carry it on the node; parse() is a plain array', () => {
+        const { tree } = parseSteps('a \\times b + c \\cdot d');
+        eq(tree.args[0].written, 'cross');
+        eq(tree.args[1].written, 'dot');
+        eq(tree.written, undefined);
+        eq(Object.keys(parse('a \\times b')), ['0', '1', '2']);
+    });
+    test('the stages a caller sees show *, never the marks', () => {
+        const steps = parseSteps('a \\times b \\cdot c');
+        const seen = [steps.cleaned, ...steps.cleanSteps.map(([, t]) => t), ...steps.tokens, ...steps.rawPostfix, clean('a \\cdot b').cleaned].join(' ');
+        eq(/[-]/.test(seen), false);
+        eq(steps.cleaned.includes('*'), true);
+    });
+    test('toPostfix fills `written` by postfix index', () => {
+        const written = {};
+        eq(toPostfix({ type: 'op', op: '*', written: 'cross', args: [{ type: 'symbol', value: 'a' }, { type: 'symbol', value: 'b' }] }, written), ['a', 'b', '*']);
+        eq(written, { 2: 'cross' });
     });
 });

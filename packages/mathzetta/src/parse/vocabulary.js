@@ -11,6 +11,19 @@
 
 const FUNCTION = 100;
 
+/**
+ * How a product was written, kept beside the postfix (which has only `*`): the cleaner writes
+ * \cdot · ⋅ as DOT_TIMES and \times × as CROSS_TIMES, the parser treats both exactly like `*`,
+ * and buildTree() makes them `*` nodes with `written: 'dot'` or `'cross'` (parseSteps' `written`).
+ * Private-use characters, so nothing typed is mistaken for them.
+ */
+export const DOT_TIMES = '\uE0B7';
+export const CROSS_TIMES = '\uE0D7';
+export const WRITTEN_TIMES = { [DOT_TIMES]: 'dot', [CROSS_TIMES]: 'cross' };
+
+/** \left. in the cleaned text: where an evaluation bar \left. … \right|_{x = a} opens (clean/index.js reads it). */
+export const BAR_OPEN = '\uE0A6';
+
 export const PARSE_PRECEDENCE = {
     // functions
     'ln': FUNCTION, 'log': FUNCTION, 'loglog': FUNCTION, 'logloglog': FUNCTION,
@@ -32,6 +45,7 @@ export const PARSE_PRECEDENCE = {
     '\\not': 85,
     '^': 80,
     '*': 70, '/': 70, 'frac': 70,
+    [DOT_TIMES]: 70, [CROSS_TIMES]: 70,   // · and ×, read as * but remembered (WRITTEN_TIMES)
     'mod': 45,      // see parser.js: takes all of its left side, one factor on the right
     '+': 50, '-': 50, '±': 50,
     '→': 38,

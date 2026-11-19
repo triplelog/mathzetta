@@ -100,20 +100,31 @@ export function casBlocks(options = {}) {
     const calculus = head === 'der' || head === 'int';
     if (!symbolic && !calculus) return calculateBlock(text, scope);
     const node = cas.node(tokens);
+    // the CAS works a derivative at a point out as it reads it (der(f, x = a)): what arrives is the answer's expression
+    const worked = calculus && node.op !== head;
     const args = symbolic ? node.args : [node];
     const word = (n) => (n ? n.s : undefined);
+    // d/dx exactly; at a point (x = a, as der(f, x = a) and diff(f, x = a) write it), then a put in for x
+    const derivative = (f, by, order) => {
+      if (!(by && by.op === '=')) return cas.diff(f, word(by), { ...how, order });
+      const name = by.args[0].s;
+      const d = cas.diff(f, name, { ...how, order });
+      const at = cas.substitute(d.result, { [name]: by.args[1].s }, how);
+      return { ...at, steps: [...(d.steps ?? []), ...(at.steps ?? [])] };
+    };
     let r;
     try {
-      switch (symbolic ? name : head === 'der' ? 'derivative' : 'antiderivative') {
+      switch (worked ? 'simplify-read' : symbolic ? name : head === 'der' ? 'derivative' : 'antiderivative') {
+        case 'simplify-read': r = cas.simplify(node, how); break;
         case 'simplify': r = cas.simplify(args[0], how); break;
         case 'expand': r = cas.expand(args[0], how); break;
         case 'factor': r = cas.factor(args[0], how); break;
         case 'cancel': r = cas.cancel(args[0], how); break;
-        case 'diff': r = cas.diff(args[0], word(args[1]), { ...how, order: args[2] ? Number(args[2].s) : 1 }); break;
+        case 'diff': r = derivative(args[0], args[1], args[2] ? Number(args[2].s) : 1); break;
         case 'integrate': r = cas.integrate(args[0], word(args[1]), { ...how, ...(args[3] ? { from: args[2].s, to: args[3].s } : {}) }); break;
         case 'solve': r = cas.solve(args[0], word(args[1]), how); break;
         case 'approx': r = cas.approximate(args[0], { ...how, digits: args[1] ? Number(args[1].s) : 15 }); break;
-        case 'derivative': r = cas.diff(node.args[0], node.args[1].s, how); break;
+        case 'derivative': r = derivative(node.args[0], node.args[1], 1); break;
         default: r = cas.integrate(node, undefined, how); break;
       }
     } catch (error) {

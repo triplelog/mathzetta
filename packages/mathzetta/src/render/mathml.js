@@ -98,7 +98,8 @@ function operation(node) {
             return el('mrow', node, side(a, 'left') + mo(MINUS) + side(b, 'right'));
         case '*':
             if (isMinusOneTimes(node)) return operation({ ...node, op: 'neg', args: [b] });
-            return el('mrow', node, side(a, 'left') + mo(isImplicitProduct(a, b, bracketedSides(node)) ? '\u2062' : '⋅') + side(b, 'right'));
+            // as typed, · or ×; otherwise invisible times where the product reads without a sign
+            return el('mrow', node, side(a, 'left') + mo(node.written === 'cross' ? '×' : node.written || !isImplicitProduct(a, b, bracketedSides(node)) ? '⋅' : '\u2062') + side(b, 'right'));
         case '/':
             return el('mfrac', node, render(a) + render(b));
         case '^': {
@@ -150,13 +151,16 @@ function operation(node) {
         case 'prod':
             return el('mrow', node, args.map((x, i) => (needsBrackets({ op: '*' }, x, i ? 'right' : 'left') ? fenced(render(x)) : render(x))).join(mo('⋅')));
         case 'der': {
-            const { n, body, by, variable } = derivativeOrder(node);
+            const { n, body, by, at, variable } = derivativeOrder(node);
             const d = n > 1 ? `<msup>${mi('d')}<mn>${n}</mn></msup>` : mi('d');
             const dx = row(mi('d') + (n > 1 ? `<msup>${render(by)}<mn>${n}</mn></msup>` : render(by)));
-            if (variable) return el('mfrac', node, row(d + render(body)) + dx);
             // d/dx [x² + 1] gets brackets; d/dx sin x doesn't — the same rule as LaTeX
             const compound = bracketOp(body) && precedenceOf(bracketOp(body)) < 100;
-            return el('mrow', node, `<mfrac>${d}${dx}</mfrac>` + (compound ? row(mo('[') + render(body) + mo(']')) : render(body)));
+            const drawn = variable ? `<mfrac>${row(d + render(body))}${dx}</mfrac>` : `<mfrac>${d}${dx}</mfrac>` + (compound ? row(mo('[') + render(body) + mo(']')) : render(body));
+            // at a point: a bar after it, the point below the bar (x = 2)
+            // the variable below the bar is a copy: the id stays on the one in dx
+            if (at) return el('msub', node, row(drawn + '<mo stretchy="true">|</mo>') + row(render(by).replace(/ id="[^"]*"/g, '') + mo('=') + render(at)));
+            return variable ? el('mfrac', node, row(d + render(body)) + dx) : el('mrow', node, drawn);
         }
         // Big operators are drawn display-size, as they would be on their own line.
         case 'int':

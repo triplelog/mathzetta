@@ -91,6 +91,10 @@ class CAS {
 
   /** A string (postfix, or what `read` reads), tokens or a node → a node. */
   node(input) {
+    return this.atPoints(this.read_(input));
+  }
+
+  read_(input) {
     if (input && typeof input === 'object' && !Array.isArray(input) && input.type) return input;
     if (Array.isArray(input)) return fromPostfix(input);
     if (typeof input !== 'string') throw new CasError('expected an expression');
@@ -99,6 +103,22 @@ class CAS {
       return Array.isArray(r) ? fromPostfix(r) : typeof r === 'string' ? parse(r) : r;
     }
     return parse(input);
+  }
+
+  /**
+   * A derivative at a point, der(f, x = a) (MathZetta's `f x a = der`), worked out as it is read: d/dx f,
+   * then a put in for x. Every method then meets an ordinary expression (the derivative rules' variable is
+   * a name, never a point).
+   */
+  atPoints(node) {
+    if (!node || !isOp(node) || !node.s.includes('= der')) return node;
+    const args = node.args.map((a) => this.atPoints(a));
+    const [f, point] = args;
+    if (node.op === 'der' && isOp(point) && point.op === '=' && point.args[0].type === 'sym') {
+      const x = point.args[0].token;
+      return this.substitute(this.diff(f, x).result, { [x]: point.args[1].s }).result;
+    }
+    return op(node.op, args);
   }
 
   /** A step of the CAS's own (not a rule's), worded by MESSAGES. */
@@ -117,6 +137,9 @@ class CAS {
 
   /** The variable: the one given, or the only unknown, or x. */
   variable(node, v) {
+    if (v && !/^\\?[A-Za-z\u0370-\u03FF][A-Za-z0-9_\u0370-\u03FF′]*$/.test(v)) {
+      throw new CasError(`"${v}" is not a variable name; for a derivative at a point write der(f, x = a)`);
+    }
     if (v) return v;
     const free = [...freeSymbols(node)];
     return free.length === 1 ? free[0] : free.includes('x') ? 'x' : free[0] ?? 'x';

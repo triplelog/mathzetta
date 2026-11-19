@@ -19,7 +19,7 @@
  */
 
 import { operator, isCustomFunction, VARIADIC } from '../operators.js';
-import { PARSE_PRECEDENCE } from './vocabulary.js';
+import { PARSE_PRECEDENCE, WRITTEN_TIMES } from './vocabulary.js';
 import { EMPTY_LIST } from './parser.js';
 import { leaf, op, num, sym } from '../tree.js';
 
@@ -29,6 +29,7 @@ const GROUPS = new Set(['()', '[]', '{}', '(]', '[)']);
 const RENAMES = {
     'pow': '^', 'sqrtpow': 'root', '\\binom': 'comb', '\\comb': 'comb', '\\perm': 'perm',
     'frac': '/', '==': '=', '!==': '≠=',
+    ...Object.fromEntries(Object.keys(WRITTEN_TIMES).map((t) => [t, '*'])),   // · and ×: a * that remembers how it was written
 };
 
 /**
@@ -95,7 +96,9 @@ export function buildTree(raw) {
             }
             args = stack.splice(stack.length - count, count).map((e) => node(e, token));
         }
-        stack.push(normalize(name, args));
+        const built = normalize(name, args);
+        if (WRITTEN_TIMES[token] && built.op === '*') built.written = WRITTEN_TIMES[token];
+        stack.push(built);
     });
 
     if (stack.length !== 1) {
@@ -163,14 +166,19 @@ function oneSided(args) {
     return args;
 }
 
-/** der(f, x, n) for a whole number n is d/dx applied n times. */
+/**
+ * der(f, x, n) for a whole number n is d/dx applied n times; der(f, x = a, n) is the nth derivative at a:
+ * d/dx applied n − 1 times, then once more at the point.
+ */
 function nthDerivative([f, x, n]) {
     const times = n.type === 'number' ? Number(n.value) : NaN;
     if (!Number.isInteger(times) || times < 1 || times > 20) {
         throw new Error('der(f, x, n) needs n to be a whole number from 1 to 20');
     }
+    const at = x.type === 'op' && x.op === '=' ? x : null;
+    const by = at ? at.args[0] : x;
     let result = f;
-    for (let i = 0; i < times; i++) result = op('der', [result, x]);
+    for (let i = 0; i < times; i++) result = op('der', [result, at && i === times - 1 ? at : by]);
     return result;
 }
 

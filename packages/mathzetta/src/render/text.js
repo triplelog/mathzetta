@@ -45,6 +45,8 @@ function operation(node, render) {
         const base = side(a, 'left');
         return `${base.startsWith('-') ? `(${base})` : base}^${side(b, 'right')}`;
     }
+    // a product typed with · or × keeps it, so the text reads back the same way (parseSteps' written)
+    if (op === '*' && node.written) return `${side(a, 'left')} ${node.written === 'cross' ? '×' : '·'} ${side(b, 'right')}`;
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
     if (MATRICES[op]) return `${op}(${matrixRows(node).map((r) => `[${r.map(render).join(', ')}]`).join(', ')})`;
     if (GROUPS[op]) return GROUPS[op][0] + list() + GROUPS[op][1];
@@ -75,7 +77,9 @@ function operation(node, render) {
         case 'sum': return args.map((x, i) => (needsParens('+', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' + ');
         case 'prod': return args.map((x, i) => (needsParens('*', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' * ');
         case 'der': {
-            const { n, body, by, variable } = derivativeOrder(node);
+            const { n, body, by, at, variable } = derivativeOrder(node);
+            // at a point: der(f, x = 2), and der(f, x = 2, n) for the nth derivative (both read back)
+            if (at) return `der(${render(body)}, ${render(by)} = ${render(at)}${n > 1 ? `, ${n}` : ''})`;
             const power = n > 1 ? `^${n}` : '';
             return variable
                 ? `d${power}${render(body)}/d${render(by)}${power}`
