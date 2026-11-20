@@ -312,3 +312,28 @@ suite('review before 1.2, second pass: the checkers and the outputs', () => {
         eq(typeof out.error, 'string');
     });
 });
+
+suite('review before 1.2, third pass: big roots and sums past 2^53', () => {
+    const near = (a, b) => Math.abs(a / b - 1) < 1e-9;
+    test('a root of a number past the largest double has a value (it was ∞, and its reciprocal NaN)', () => {
+        eq(near(calculate('root(12, 3^2000 + 2)').value, 3 ** (2000 / 12)), true);
+        eq(near(calculate('1 / root(12, 3^2000 + 2)').value, 3 ** (-2000 / 12)), true);
+        eq(near(calculate('1/root(12, 3^100+2)').value, 3 ** (-100 / 12)), true);     // exact: ¹²√(…)/(3¹⁰⁰+2), huge over huge
+        eq(near(calculate('-1/root(12, 3^100+2)').value, -(3 ** (-100 / 12))), true);
+        eq(near(calculate('pi*root(3,10^400)').value, Math.PI * 10 ** (400 / 3)), true);
+    });
+    test('…and small roots are as they were, exactly', () => {
+        eq(calculate('1/root(3,2)').text, 'root(3, 4)/2');
+        eq(calculate('1/root(12,5)').text, 'root(12, 48828125)/5');
+        eq(calculate('sqrt(2)').value, Math.SQRT2);
+        eq(calculate('1/sqrt(2)').text, calculate('sqrt(2)/2').text);
+    });
+    test('evaluate: a sum whose index is past 2^53 is refused at once (i++ stood still there)', () => {
+        const t = Date.now();
+        throws(() => evaluate('\\sum_{n=10^{20}}^{10^{20}} n'), /over that range/);
+        throws(() => evaluate('\\prod_{n=-10^{17}}^{5} n'), /over that range/);
+        eq(Date.now() - t < 50, true);
+        eq(evaluate('\\sum_{n=1}^{10} n'), 55);
+        eq(evaluate('\\sum_{n=-3}^{3} n^2'), 28);
+    });
+});

@@ -83,7 +83,7 @@ const external = await rollup({
     external: (id) => id.startsWith('mathzetta'),
     onwarn: quiet,
 });
-await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate with an import map'), plugins: [terser({ format: { comments: /MIT license/ } })] });
+await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate (and mathzetta/text, for cas.external.js) with an import map'), plugins: [terser({ format: { comments: /MIT license/ } })] });
 await external.close();
 
 // classic <script> builds

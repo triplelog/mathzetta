@@ -35,6 +35,8 @@ export interface ParseOptions {
     blocks?: BlockHandler | null;
     /** Variable values passed to `blocks`: parse('y = {{a/b}}', { scope: { a: 1, b: 3 } }). */
     scope?: Record<string, unknown>;
+    /** The longest text read, in characters (default 5000); longer input is refused. */
+    maxLength?: number;
 }
 
 export interface ParseSteps {
@@ -117,7 +119,7 @@ export function isVariable(node: Node): boolean;
 export function firstLeaf(node: Node): string;
 export function smallWhole(node: Node, limit: number): number;
 export function customName(op: string): string;
-export function derivativeOrder(node: Node): { n: number; body: Node; by: Node; variable: boolean };
+export function derivativeOrder(node: Node): { n: number; body: Node; by: Node; /** The point of der(f, x = a), else null. */ at: Node | null; variable: boolean };
 /** The matrix operators (pmatrix, bmatrix, vmatrix) and the brackets each is written with. */
 export const MATRICES: { pmatrix: [string, string]; bmatrix: [string, string]; vmatrix: [string, string] };
 /** A matrix's rows (arrays of entry nodes): a pmatrix/bmatrix/vmatrix node, or a list of equally long lists; else null. */
@@ -304,7 +306,7 @@ export const GEOMETRY: string[];
 export const PLACES: string[];
 export const REACH: { square: number; line: number };
 /** A filter expression's tree with its picture reads made explicit (mask(px, py), luma(mask), zoom(…)); shared by the GPU and CPU filter runners. */
-export function filterPictureCalls(node: Node, pictures: Set<string>): Node;
+export function filterPictureCalls(node: Node, pictures: Set<string>, options?: { whole?: boolean }): Node;
 
 // ---- evaluation ------------------------------------------------------------------
 

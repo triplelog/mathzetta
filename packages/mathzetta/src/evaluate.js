@@ -201,7 +201,8 @@ function value(node, scope) {
         const name = named ? args[1].args[0].value : firstVariable(body);
         if (!name) throw new Error(`Can't evaluate '${op}' without an index`);
         const lo = value(from, scope), hi = value(to, scope);
-        if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo > 1e6) throw new Error(`Can't evaluate '${op}' over that range`);
+        // past 2⁵³ a double has no next whole number: i++ would stand still until the step budget ran out
+        if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo > 1e6 || Math.abs(lo) > Number.MAX_SAFE_INTEGER || Math.abs(hi) > Number.MAX_SAFE_INTEGER) throw new Error(`Can't evaluate '${op}' over that range`);
         let acc = op === '\\sumidx' ? 0 : 1;
         for (let i = lo; i <= hi; i++) {
             const v = value(body, { ...scope, [name]: i });

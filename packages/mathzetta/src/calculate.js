@@ -163,13 +163,33 @@ function sameRoot(a, b) {
 const equalX = (a, b) => qcmp(a.c, b.c) === 0 && a.pi === b.pi && a.e === b.e && sameRoot(a.root, b.root);
 
 /** A double, for anything numeric. */
+/** log₂ of a positive whole number of any size (its top 60 bits, and how far they were shifted). */
+function log2Big(b) {
+    const shift = Math.max(0, bitLength(b) - 60);
+    return shift + Math.log2(Number(b >> BigInt(shift)));
+}
+/** ⁿ√r as a double, for an r past the largest double too (¹²√(3²⁰⁰⁰+2) is about 10⁷⁹, not ∞). */
+function bigRoot(r, n) {
+    const direct = Number(r);
+    return Number.isFinite(direct) ? direct ** (1 / n) : 2 ** (log2Big(r) / n);
+}
+
 function num(v) {
     if (typeof v === 'number') return v;
     if (isX(v)) {
         let x = qToFloat(v.c);
         if (v.pi) x *= Math.PI ** v.pi;
         if (v.e) x *= Math.E ** v.e;
-        if (v.root) x *= qToFloat(Q(v.root.r)) ** (1 / v.root.n);
+        if (v.root) {
+            const root = bigRoot(v.root.r, v.root.n);
+            // 1/¹²√(3¹⁰⁰+2) is ¹²√(…)/(3¹⁰⁰+2): a product of a huge and a tiny double, worked out by its size instead
+            if (v.c.n !== 0n && (x === 0 || !Number.isFinite(x) || !Number.isFinite(root))) {
+                const size = log2Big(v.c.n < 0n ? -v.c.n : v.c.n) - log2Big(v.c.d) + log2Big(v.root.r) / v.root.n
+                    + v.pi * Math.log2(Math.PI) + v.e * Math.LOG2E;
+                return (v.c.n < 0n ? -1 : 1) * 2 ** size;
+            }
+            x *= root;
+        }
         return x;
     }
     if (typeof v === 'boolean') return v ? 1 : 0;
@@ -291,6 +311,7 @@ function invX(a) {
     const base = X(qdiv(Q1, a.c), -a.pi, -a.e);
     if (!a.root) return base;
     const { n, r } = a.root;   // 1/ⁿ√r = ⁿ√(rⁿ⁻¹) / r
+    if (bitLength(r) * (n - 1) > 4000) return null;   // the radicand's limit, as in mulX: a number is the answer
     return mulX(base, withRoot(Q(1n, r), n, r ** BigInt(n - 1)));
 }
 

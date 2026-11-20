@@ -70,6 +70,10 @@ These change what an existing call returns:
     `0*20000!` ran for half a minute (and so did `parse` on a `{{…}}` block holding it), `identity(100)^(2^300)`
     for 16 seconds. `evaluate` charges matrix products too.
 - `strToFunction` answers `{ success: false }` for a limit, derivative or integral instead of throwing.
+- `calculate`: a root of a number past the largest double has its value (`root(12, 3^2000 + 2)` was ∞, and its
+  reciprocal NaN); the reciprocal of a root with a large radicand is a number instead of 75 ms of exact work.
+- `evaluate`: a sum or product whose index is past 2⁵³ is refused at once (it spun until the step budget ran out).
+- Types: `derivativeOrder` returns `at`, `filterPictureCalls` takes `{ whole }`, `ParseOptions` has `maxLength`.
 - Output size: round, odd roots and mod write an expression once (a JavaScript helper, or a Python
   `lambda`), so nesting no longer doubles the code at each level, and `x mod random()` draws one number.
 - One-argument `max`/`min` keep their brackets in Python, SQLite, Excel and GLSL: `max(a + b) * 2` was `a + b * 2`.
