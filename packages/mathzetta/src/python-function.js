@@ -13,7 +13,7 @@
  *     # mathzetta: growth(P, r, K) = r P (1 - P/K)
  *
  * The program's author fixes the signature (it is how the program calls the
- * function); whoever customises the model writes only the formula.
+ * function); whoever customizes the model writes only the formula.
  * fillPythonTemplate swaps each slot for its `def`.
  *
  * A slot can be a formula over a table's columns, for a chart or a model fed
@@ -42,7 +42,7 @@ import { UnsafeCodeError } from './safe.js';
 import { toLatex } from './render/latex.js';
 import { replaceColumnNames, columnIndexOf } from './columns.js';
 
-/** The members each module may be used for: what render/code.js writes, and a few more maths functions. */
+/** The members each module may be used for: what render/code.js writes, and a few more math functions. */
 const MEMBERS = {
     math: new Set(['sqrt', 'floor', 'ceil', 'trunc', 'log', 'log2', 'log10', 'exp', 'expm1', 'pow', 'hypot', 'fabs',
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'asin', 'acos', 'atan', 'asinh', 'acosh', 'atanh', 'atan2',
@@ -77,6 +77,14 @@ const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float', 'f
 const KEYWORDS = new Set(['for', 'in', 'if', 'else', 'and', 'or', 'not', 'lambda', 'True', 'False', 'None']);
 const PUNCT = ['**', '==', '!=', '<=', '>=', '(', ')', '[', ']', '{', '}', ',', ':', '.', '+', '-', '*', '/', '%', '<', '>', '|', '&'];   // | and &: set union and intersection
 const NAME = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*/u;
+/**
+ * Python's own functions. A lambda or a generator may not bind one of these names: the scan takes a bound name as
+ * bound everywhere, so `(lambda exit: 0)(0)` would let a bare `exit` through to be handed to something that calls it.
+ */
+const BUILTINS = new Set(('abs aiter all anext any ascii bin bool breakpoint bytearray bytes callable chr classmethod compile complex copyright '
+    + 'credits delattr dict dir divmod enumerate eval exec exit filter float format frozenset getattr globals hasattr hash help hex id input int '
+    + 'isinstance issubclass iter len license list locals map max memoryview min next object oct open ord pow print property quit range repr '
+    + 'reversed round set setattr slice sorted staticmethod str sum super tuple type vars zip').split(' '));
 
 /**
  * Read generated Python, refusing anything off the whitelist.
@@ -124,11 +132,25 @@ function scanPython(code, variables, functions) {
         }
     });
 
+    // SymPy reads a string as code (sympify evaluates it), so its output has none but a limit's side, "+" or "-"
+    if (tokens.some((t) => t.type === 'id' && t.value === 'sympy')) {
+        const text = tokens.find((t) => t.type === 'str' && t.value !== '"+"' && t.value !== '"-"');
+        if (text) fail(`the string ${text.value} in SymPy code`);
+    }
+
     // Names a generator or lambda binds: sum(i ** 2 for i in …), lambda x: …
     const bound = new Set();
     tokens.forEach((t, i) => {
         if (t.type === 'id' && (t.value === 'for' || t.value === 'lambda') && tokens[i + 1]?.type === 'id') bound.add(tokens[i + 1].value);
+        // lambda a, b: … binds every name before the colon
+        if (t.type === 'id' && t.value === 'lambda') {
+            for (let j = i + 1; tokens[j]?.type === 'id' && (tokens[j + 1]?.type === 'p' && tokens[j + 1].value === ','); j += 2) {
+                if (tokens[j + 2]?.type === 'id') bound.add(tokens[j + 2].value);
+            }
+        }
     });
+
+    for (const name of bound) if (BUILTINS.has(name)) fail(`"${name}" as a bound name`);
 
     const free = [];
     const modules = new Set();
@@ -140,6 +162,8 @@ function scanPython(code, variables, functions) {
             const after = next?.type === 'id' ? next.value : '';
             const ok = prev?.owner ? MEMBERS[prev.owner].has(after) : isP(prev, ')') && after === 'is_integer';
             if (!ok) fail(after ? `.${after}` : 'a "." here');
+            // sympy.S is the table of sets (sympy.S.Reals); called, it is sympify, which evaluates text
+            if (prev.owner === 'sympy' && after === 'S' && !isP(tokens[i + 2], '.')) fail('sympy.S without a set');
             next.owner = prev?.owner && MEMBERS[`${prev.owner}.${after}`] ? `${prev.owner}.${after}` : null;
             next.member = true;
             if (IMPORTS[next.owner]) modules.add(next.owner);
@@ -200,7 +224,7 @@ function definition(tree) {
 
 /**
  * `f(rate, dt) =` or `y =` at the start of formula text. It is split off before
- * parsing: as maths, `f(x) = x > 0 ? 1 : 0` would read (f(x) = x > 0) ? 1 : 0,
+ * parsing: as math, `f(x) = x > 0 ? 1 : 0` would read (f(x) = x > 0) ? 1 : 0,
  * and `rate, dt` could be split into letters.
  */
 const DEFINED = /^\s*([\p{L}_][\p{L}\p{N}_]*)\s*(?:\(([^()]*)\))?\s*=(?!=)/u;
@@ -322,7 +346,7 @@ function bodyLines(expr, { numpy, sympy, bound = [], errors, params, columns, si
  * @param {string} [options.table] the parameter holding the table (default 'data')
  * @returns {{ code: string, name: string, params: string[], imports: string[], formula: string|null, latex: string|null, tree: object }}
  *   code is the `def`, ending in a newline; imports are lines such as 'import math';
- *   formula is the text on one line, latex the maths (for labels), tree the formula with
+ *   formula is the text on one line, latex the math (for labels), tree the formula with
  *   columns under their own names (to draw it, e.g. with Inline Math)
  */
 export function toPythonFunction(input, options = {}) {
@@ -371,7 +395,7 @@ export function toPythonFunction(input, options = {}) {
         if (!sympy && n.type === 'op' && SYMBOLIC[n.op]) throw new Error(`${signature()}: ${SYMBOLIC[n.op]} can't be computed numerically (sympy: true can)`);
     });
 
-    // Columns: the maths (for latex) under their own names, the code under Python ones.
+    // Columns: the math (for latex) under their own names, the code under Python ones.
     const columnNodes = [];
     if (header) walk(tree, (n) => {
         const index = n.type === 'symbol' ? columnIndexOf(n.value, header) : -1;

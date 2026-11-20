@@ -1,11 +1,11 @@
 /**
- * Tree → plain text with maths symbols: `x^2 + 3 * x`, `√(x)`, `∫ x dx`; limits, definite integrals and sums
+ * Tree → plain text with math symbols: `x^2 + 3 * x`, `√(x)`, `∫ x dx`; limits, definite integrals and sums
  * as the calls MathZetta reads back: `int(x, x, 0, 1)`, `lim(2 * x + 1, x → 3)`, `sum(i^2, i = 1, n)`.
  * Meant for people to read, not for any program to parse.
  */
 
 import { needsParens, isCustomFunction } from '../operators.js';
-import { GREEK, bracketOp, unaryNeedsBrackets, isMinusOneTimes, isVariable, firstLeaf, customName, derivativeOrder, guardLength, MATRICES, matrixRows } from '../common.js';
+import { GREEK, bracketOp, unaryNeedsBrackets, isMinusOneTimes, isVariable, firstLeaf, customName, derivativeOrder, guardLength, MATRICES, matrixRows, conditionNeedsBrackets } from '../common.js';
 import { firstVariable } from '../tree.js';
 
 export function toPlainText(node) {
@@ -72,7 +72,7 @@ function operation(node, render) {
         case 'perm': return `perm(${render(a)}, ${render(b)})`;   // nPk and C(n, k) would read back as products
         case 'comb': return `comb(${render(a)}, ${render(b)})`;
         case '_': return `${render(a)}_${render(b)}`;
-        case '?:': return `${render(a)} ? ${render(b)} : ${render(args[2])}`;
+        case '?:': return `${conditionNeedsBrackets(a) ? `(${render(a)})` : render(a)} ? ${render(b)} : ${render(args[2])}`;   // (y = x > 0) ? …: see conditionNeedsBrackets
         // each term bracketed as + and * would bracket it: prod(a + b, c) is (a + b) * c
         case 'sum': return args.map((x, i) => (needsParens('+', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' + ');
         case 'prod': return args.map((x, i) => (needsParens('*', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' * ');

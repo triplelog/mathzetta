@@ -55,7 +55,7 @@ suite('operator table', () => {
         });
     }
 
-    // Spreadsheets have no symbolic maths, ±, sets to combine, or an index into a list: toExcel says so.
+    // Spreadsheets have no symbolic math, ±, sets to combine, or an index into a list: toExcel says so.
     const EXCEL_UNSUPPORTED = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '→',
         'pmatrix', 'bmatrix', 'vmatrix']);   // matrices: of numbers only (the sample's entries are letters)
     for (const name of operatorNames()) {

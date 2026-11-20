@@ -14,6 +14,11 @@ export const JS_HELPERS = {
     // sets as lists, a number being a list of one, as evaluate() takes them
     union: '((a, b) => [...new Set([].concat(a, b))])',
     intersection: '((a, b) => [].concat(a).filter((x) => [].concat(b).includes(x)))',
+    // round, mod and odd roots of an expression: written inline for a name or a number (x < 0 ? … x … : … x …), but an
+    // expression goes through one of these so it is written (and worked out) once — inline, nesting would double it each level
+    round: '((x, d) => { const p = Math.pow(10, d); return (x < 0 ? -Math.round(-x * p) : Math.round(x * p)) / p; })',
+    mod: '((a, n) => ((a % n) + n) % n)',
+    root: '((n, x) => (x < 0 ? -Math.pow(-x, 1 / n) : Math.pow(x, 1 / n)))',
 };
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`

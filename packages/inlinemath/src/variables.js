@@ -1,5 +1,5 @@
 /**
- * Saved variables for '@mathzetta/inlinemath/markdown': `$A := 2+2$` saves A, and A in any maths
+ * Saved variables for '@mathzetta/inlinemath/markdown': `$A := 2+2$` saves A, and A in any math
  * after it is drawn as 2 + 2 (and `{{A}}` is 4). A store holds them for a whole page, so every
  * part drawn with renderMarkdownInto sees the others' variables, and an input bound to a variable
  * (`$A := [[2+2]]$`, a textbox) redraws everything that uses it.

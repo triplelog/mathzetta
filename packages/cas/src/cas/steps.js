@@ -23,7 +23,7 @@ export const DETAIL = {
 
 const matches = (step, list) => list === 'all' || list === '*' || (Array.isArray(list) && list.some((x) => x === step.id || step.tags?.includes(x)));
 
-/** Normalise the `steps` option. */
+/** Normalize the `steps` option. */
 export function stepOptions(option) {
   if (option === false) return null;
   if (option === undefined || option === true) return { show: 'all', hide: DETAIL.normal, explain: true };

@@ -96,7 +96,7 @@ export function unaryNeedsBrackets(parentOp, child) {
 }
 
 /**
- * Should `a * b` be written without a sign, as maths is typeset: 2x, xy,
+ * Should `a * b` be written without a sign, as math is typeset: 2x, xy,
  * 3\sin x, x^2y, \frac{1}{2}x, (x+1)(x-2), 2\sec^2 x? Yes, unless the dot is
  * needed to keep things apart: a digit or sign starting the right side
  * (x · 2, 2 · 3^x, 2 · -3), a multi-letter name (speed · time), a fraction
@@ -227,9 +227,23 @@ export function piecewise(node) {
     return branches;
 }
 
+const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '===', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor', '∈', '∉', '≈', '≡']);
+const isTrueOrFalse = (n) => (n.type === 'op' && TRUE_OR_FALSE.has(n.op)) || (n.type === 'symbol' && (n.value === 'true' || n.value === 'false'));
+
+/**
+ * Must the condition of a ?: be written in brackets? Yes when it holds an `=` comparing something with a
+ * true/false value (y = (x > 0)): unbracketed, y = x > 0 ? 1 : 2 is read as the definition y = (x > 0 ? 1 : 2)
+ * (parser.js, equals()). Brackets more often than strictly needed (inside a call), which reads back the same.
+ */
+export function conditionNeedsBrackets(node) {
+    if (node.type !== 'op') return false;
+    if (node.op === '=' && isTrueOrFalse(node.args[1])) return true;
+    return node.args.some(conditionNeedsBrackets);
+}
+
 const ORDERING = new Set(['<', '>', '≤', '≥', '=', '≠']);
 /**
- * A chain of comparisons, 3 < x < 7, read as maths: (3 < x) and (x < 7). The postfix keeps the
+ * A chain of comparisons, 3 < x < 7, read as math: (3 < x) and (x < 7). The postfix keeps the
  * chain as written (3 x < 7 <, so displays show 3 < x < 7); languages that would read it as
  * (3 < x) < 7 — JavaScript, SQL, spreadsheets, GLSL, evaluate() — get the links joined with `&`.
  * Returns the `&` tree, or null when the node isn't a chain.

@@ -1,31 +1,31 @@
 /**
- * '@mathzetta/inlinemath/markdown' — Markdown with maths in it.
+ * '@mathzetta/inlinemath/markdown' — Markdown with math in it.
  *
  *   import { markdownToHTML } from '@mathzetta/inlinemath/markdown';
  *   el.innerHTML = markdownToHTML('The area is $\\pi r^2$, so for $r = 3$ it is ${{pi r^2}}$.');
  *
- * Maths: $…$ inline, $$…$$ (or a ```math fence) on its own, \(…\) and \[…\] too.
+ * Math: $…$ inline, $$…$$ (or a ```math fence) on its own, \(…\) and \[…\] too.
  * Each is read by MathZetta (LaTeX, plain text or code all work) and drawn by
  * Inline Math; {{…}} inside is worked out first (MathZetta's calculator, or the CAS:
  * { blocks: casBlocks() } from '@mathzetta/inlinemath/cas'). A definition such as $r = 3$ is
  * remembered, as a number, for the {{…}} after it ({ define: false } turns that off).
  *
  * Saved variables: $A := 2+2$ saves A (and draws A ≔ 2 + 2); $_A := 2+2$ saves it without drawing.
- * After it, A in any maths is drawn as its expression and {{A}} is its value: $A = {{A}}$ draws
+ * After it, A in any math is drawn as its expression and {{A}} is its value: $A = {{A}}$ draws
  * 2 + 2 = 4. $A := [[2+2]]$ is a textbox that sets A, [[2+2 | x^2]] a dropdown, [[1..10]] a slider
  * ([[0..1 step 0.1 = 0.5]]). renderMarkdownInto keeps every part of a page in one store
  * (`variables`), so a variable saved in one part is used in the others, and changing an input
  * redraws everything that uses it.
  *
- * A $ is maths only when it looks like it (Pandoc's rule): the opening $ is not
+ * A $ is math only when it looks like it (Pandoc's rule): the opening $ is not
  * followed by a space, the closing $ is not after a space or before a digit, so
  * "$5 and $10" stays text. \$ is a dollar sign. Code spans and fences are left alone.
- * Maths that doesn't read is shown as written, marked, with the reason as its title.
+ * Math that doesn't read is shown as written, marked, with the reason as its title.
  *
  * The Markdown is a small built-in renderer (headings, emphasis, links, images,
  * lists, quotes, code, tables, rules). Raw HTML is shown as text unless { html: true }.
  * { render: (markdown) => html } uses another renderer (marked, markdown-it …):
- * the maths is taken out first and put back into its output.
+ * the math is taken out first and put back into its output.
  */
 
 import { toHTML, treeOf } from './html.js';
@@ -37,7 +37,7 @@ import { openEditor, replaceAt } from './edit.js';
 
 export { createVariables, variables, Variables } from './variables.js';
 
-// ---- finding the maths --------------------------------------------------------------------
+// ---- finding the math --------------------------------------------------------------------
 
 const OPEN = '';
 const CLOSE = '';
@@ -45,7 +45,7 @@ const placeholder = (n) => `${OPEN}${n}${CLOSE}`;
 const PLACEHOLDER = new RegExp(`${OPEN}(\\d+)${CLOSE}`, 'g');
 
 /**
- * The maths in a Markdown text, and the text with each piece replaced by a
+ * The math in a Markdown text, and the text with each piece replaced by a
  * placeholder (private-use characters, which no Markdown renderer touches).
  * @returns {{ text: string, math: Array<{ source, display, raw, start, end }> }} (start, end: where the raw text is)
  */
@@ -56,8 +56,9 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
   // the private-use characters placeholders are made of: typed ones become U+FFFD (same length, so start and end still fit)
   const s = String(markdown).replace(/[\uE000-\uE003]/g, '\uFFFD');
   const atLineStart = (k) => k === 0 || s[k - 1] === '\n';
-  const code = indentedCode(s);   // start → end of each indented code block: maths there is code too
-  let noCloser = -1;   // no $ closes inline maths before this index (it doesn't depend on where the maths opened)
+  const code = indentedCode(s);   // start → end of each indented code block: math there is code too
+  let noCloser = -1;   // no $ closes inline math before this index (it doesn't depend on where the math opened)
+  const never = new Set();   // \) or \] found nowhere ahead: looked for once, not at every \( that follows
   const keep = (source, display, raw) => {
     math.push({ source, display, raw, start: i, end: i + raw.length });
     return placeholder(math.length - 1);
@@ -68,7 +69,7 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
       i = code.get(i);
       continue;
     }
-    // a fenced code block: copied as is, except ```math, which is display maths
+    // a fenced code block: copied as is, except ```math, which is display math
     if (atLineStart(i)) {
       const fence = /^( {0,3})(`{3,}|~{3,})([^\n]*)\n?/.exec(s.slice(i));
       if (fence) {
@@ -103,7 +104,8 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
       const two = s.slice(i, i + 2);
       const closer = two === '\\[' ? '\\]' : two === '\\(' ? '\\)' : null;
       if (closer && delimiters.includes(two)) {
-        const end = s.indexOf(closer, i + 2);
+        const end = never.has(closer) ? -1 : s.indexOf(closer, i + 2);
+        if (end < 0) never.add(closer);
         if (end > -1) {
           out += keep(s.slice(i + 2, end), two === '\\[', s.slice(i, end + 2));
           i = end + 2;
@@ -139,14 +141,14 @@ export function extractMath(markdown, { delimiters = ['$$', '$', '\\[', '\\('] }
 }
 
 /**
- * The $ that closes inline maths opened before `from`: not after a space, not before a digit, within the paragraph.
+ * The $ that closes inline math opened before `from`: not after a space, not before a digit, within the paragraph.
  * @returns {{ end: number, stop: number }} end -1 if none; stop: where the search ended (code, a blank line, the end)
  */
 function closingDollar(s, from) {
   for (let j = from; j < s.length; j++) {
     const c = s[j];
     if (c === '\\') { j++; continue; }
-    if (c === '`') return { end: -1, stop: j };   // maths doesn't run into code
+    if (c === '`') return { end: -1, stop: j };   // math doesn't run into code
     if (c === '\n' && /^\n[ \t]*\n/.test(s.slice(j, j + 64))) return { end: -1, stop: j };
     if (c === '$' && !/\s/.test(s[j - 1]) && !/\d/.test(s[j + 1] ?? '') && s[j + 1] !== '$') return { end: j, stop: j };
   }
@@ -179,7 +181,7 @@ function indentedCode(s) {
   return blocks;
 }
 
-// ---- drawing the maths --------------------------------------------------------------------
+// ---- drawing the math --------------------------------------------------------------------
 
 const escape = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -187,7 +189,7 @@ const escape = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').rep
 const DEFINITION = /^\s*([A-Za-z\u0370-\u03ff](?:_\{?\w+\}?)?)\s*=\s*([^=<>≤≥]+)$/;
 
 /**
- * Maths that saves a variable: `A := 2+2` (drawn), `_A := 2+2` or `_A = 2+2` (not drawn),
+ * Math that saves a variable: `A := 2+2` (drawn), `_A := 2+2` or `_A = 2+2` (not drawn),
  * `A := [[…]]` (an input). Else null; `{ error }` for a `$_…$` that saves nothing.
  */
 function savingOf(source) {
@@ -238,7 +240,7 @@ function controlHTML(def, text) {
 }
 
 /**
- * Every piece of maths drawn, in reading order: a variable is known to the maths after it, and
+ * Every piece of math drawn, in reading order: a variable is known to the math after it, and
  * the variables already in `store` (the other parts of the page) to all of it.
  */
 function drawAll(markdown, options, store, owner) {
@@ -395,10 +397,10 @@ function inline(text, options, sourceOf, parts = []) {
     parts.push(html);
     return `\uE002${parts.length - 1}\uE003`;
   };
-  // an attribute or address: what was held there as its text (a\_b is a_b), maths as typed — then escaped once
+  // an attribute or address: what was held there as its text (a\_b is a_b), math as typed — then escaped once
   const plain = (s) => unescape(sourceOf(s).replace(HELD, (_, n) => (parts[Number(n)] ?? '').replace(/<[^>]*>/g, '')));
   let t = text;
-  // code spans (maths placeholders inside are written back as their source)
+  // code spans (math placeholders inside are written back as their source)
   t = t.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, run, code) => hold(`<code>${escape(sourceOf(code.trim()))}</code>`));
   // backslash escapes
   t = t.replace(/\\([\\`*_{}[\]()#+\-.!|~$<>"'])/g, (_, ch) => hold(escape(ch)));
@@ -406,11 +408,11 @@ function inline(text, options, sourceOf, parts = []) {
   t = t.replace(/<((?:https?:\/\/|mailto:)[^\s>]+)>/g, (_, url) => hold(`<a href="${safeUrl(url)}">${escape(url)}</a>`));
   // raw HTML (only with { html: true })
   if (options.html) t = t.replace(/<\/?[A-Za-z][^>]*>/g, (tag) => hold(tag));
-  // images and links
+  // images and links (a label holds no bracket of its own: a run of [[[[… was read again from every one of them)
   // an address may hold balanced brackets: wiki/Function_(mathematics)
-  t = t.replace(/!\[([^\]]*)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, alt, url, title) =>
+  t = t.replace(/!\[([^\[\]]*)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, alt, url, title) =>
     hold(`<img src="${safeUrl(plain(url))}" alt="${escape(plain(alt))}"${title ? ` title="${escape(plain(title))}"` : ''}>`));
-  t = t.replace(/\[([^\]]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, label, url, title) =>
+  t = t.replace(/\[([^\[\]]+)\]\(\s*((?:[^\s()]|\([^\s()]*\))+)(?:\s+"([^"]*)")?\s*\)/g, (_, label, url, title) =>
     hold(`<a href="${safeUrl(plain(url))}"${title ? ` title="${escape(plain(title))}"` : ''}>${inline(label, options, sourceOf, parts)}</a>`));
   // escaped as text, except an entity reference written as one: &copy; &mdash; &#8212;
   t = t.replace(/&(?!#\d{1,7};|#x[0-9a-f]{1,6};|[a-z][a-z0-9]{1,31};)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -437,11 +439,28 @@ const TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 const interrupts = (line) => BLOCK_START.test(line) && !/^ {0,3}[-=]+\s*$/.test(line)
     && !/^ {0,3}(?!1[.)])\d{1,9}[.)]\s/.test(line);
 
+const MAX_NESTING = 100;
+
+/**
+ * A heading's text: without the spaces around it and a closing run of #s set off by a space (`# Title ##`).
+ * By hand: one pattern for all of it (\s+ … \s*#*\s*$) tried every split of a long run of spaces, cubic in its length.
+ */
+function headingText(rest) {
+  const text = rest.trim();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '#') end--;
+  if (end === text.length) return text;
+  if (end === 0) return '';                                   // only #s
+  return /[ \t]/.test(text[end - 1]) ? text.slice(0, end).trimEnd() : text;   // a# and \# keep theirs
+}
+
 /** Block Markdown → HTML. */
-function blocks(lines, options, sourceOf) {
+function blocks(lines, options, sourceOf, depth = 0) {
   const out = [];
   let i = 0;
   const para = (text) => inline(text, options, sourceOf);
+  // quotes in quotes, lists in lists: past any depth a person writes, the rest is a paragraph (a line of 2,500 >s overflowed the stack)
+  if (depth > MAX_NESTING) return `<p>${para(lines.join('\n'))}</p>`;
   while (i < lines.length) {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
@@ -457,9 +476,9 @@ function blocks(lines, options, sourceOf) {
       continue;
     }
     // ATX heading
-    const h = /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line);
+    const h = /^ {0,3}(#{1,6})[ \t]+/.exec(line);
     if (h) {
-      out.push(`<h${h[1].length}>${para(h[2])}</h${h[1].length}>`);
+      out.push(`<h${h[1].length}>${para(headingText(line.slice(h[0].length)))}</h${h[1].length}>`);
       i++;
       continue;
     }
@@ -476,7 +495,7 @@ function blocks(lines, options, sourceOf) {
         body.push(lines[i].replace(/^ {0,3}> ?/, ''));
         i++;
       }
-      out.push(`<blockquote>\n${blocks(body, options, sourceOf)}\n</blockquote>`);
+      out.push(`<blockquote>\n${blocks(body, options, sourceOf, depth + 1)}\n</blockquote>`);
       continue;
     }
     // list
@@ -516,7 +535,7 @@ function blocks(lines, options, sourceOf) {
       }
       const tag = ordered ? 'ol' : 'ul';
       const html = items.map((body) => {
-        let inner = blocks(body, options, sourceOf);
+        let inner = blocks(body, options, sourceOf, depth + 1);
         if (!loose) inner = inner.replace(/^<p>([\s\S]*?)<\/p>/, '$1').replace(/\n<p>([\s\S]*?)<\/p>/g, '\n$1');
         return `<li>${inner}</li>`;
       });
@@ -569,12 +588,12 @@ export function renderMarkdown(markdown, options = {}, sourceOf = (t) => t) {
 
 // ---- together ---------------------------------------------------------------------------
 
-/** The Markdown around the drawn maths. */
+/** The Markdown around the drawn math. */
 function assemble({ text, math, drawn }, options) {
     const sourceOf = (t) => t.replace(PLACEHOLDER, (_, n) => math[Number(n)]?.raw ?? '');
     const html = options.render ? options.render(text) : renderMarkdown(text, options, sourceOf);
     return html
-        // display maths alone in a paragraph is a block of its own
+        // display math alone in a paragraph is a block of its own
         .replace(new RegExp(`<p>\\s*${OPEN}(\\d+)${CLOSE}\\s*</p>`, 'g'), (whole, n) => (math[Number(n)].display && drawn[Number(n)] ? `<div class="mv-md-block">${drawn[Number(n)]}</div>` : whole))
         .replace(PLACEHOLDER, (_, n) => drawn[Number(n)] ?? '')
         // a paragraph that only saved variables ($_A := 2+2$) leaves nothing behind
@@ -582,17 +601,17 @@ function assemble({ text, math, drawn }, options) {
 }
 
 /**
- * Markdown with maths → HTML.
+ * Markdown with math → HTML.
  * @param {string} markdown
  * @param {object} [options]
  * @param {object} [options.math] options for each drawing (toHTML's: fnParens, colors …)
  * @param {Function} [options.blocks] the {{…}} handler (default the calculator; casBlocks() for the CAS)
  * @param {object} [options.scope] values for {{…}}: { r: 3 }
  * @param {boolean} [options.define] remember $r = 3$ for later {{…}} (default true)
- * @param {object} [options.variables] a store (createVariables()) whose variables the maths may use
+ * @param {object} [options.variables] a store (createVariables()) whose variables the math may use
  * @param {boolean} [options.html] let raw HTML through (default false: it is shown as text)
  * @param {(markdown: string) => string} [options.render] another Markdown renderer
- * @param {string[]} [options.delimiters] which of '$$', '$', '\\[', '\\(' mark maths (default all)
+ * @param {string[]} [options.delimiters] which of '$$', '$', '\\[', '\\(' mark math (default all)
  */
 export function markdownToHTML(markdown, options = {}) {
     return assemble(drawAll(markdown, options, options.variables || null), options);
@@ -607,11 +626,11 @@ function sweep() {
 }
 
 /**
- * Draw Markdown with maths into an element, live: its variables join the page's store
- * (options.variables, default `variables`; false for none), its inputs set them, and its maths is
+ * Draw Markdown with math into an element, live: its variables join the page's store
+ * (options.variables, default `variables`; false for none), its inputs set them, and its math is
  * drawn again whenever a variable it can see changes. Drawing into the element again replaces it all.
  * Double-clicking a part drawn from a textbox variable edits it ({ editable: { toText } }, toText
- * from 'mathzetta/text'); any other part fires 'inlinemath:select' with where its maths is in the
+ * from 'mathzetta/text'); any other part fires 'inlinemath:select' with where its math is in the
  * Markdown ({ index, start, end, raw }).
  */
 export function renderMarkdownInto(element, markdown, options = {}) {
@@ -662,7 +681,7 @@ export function renderMarkdownInto(element, markdown, options = {}) {
     };
     // double-click a part: a part that came from a textbox variable is edited there (in place,
     // with options.editable = { toText }; else the textbox is focused); anything else tells the
-    // page where that maths is in the Markdown, as an 'inlinemath:select' event
+    // page where that math is in the Markdown, as an 'inlinemath:select' event
     const onDoubleClick = (event) => {
         const part = event.target.closest?.('[data-node]');
         const piece = part && part.closest('[data-mv-md]');

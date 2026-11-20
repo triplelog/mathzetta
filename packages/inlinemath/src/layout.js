@@ -4,7 +4,7 @@
  * Every rendered piece is a box { html, h, d }: its markup, and how far it
  * reaches above (h) and below (d) the baseline, in em of the surrounding
  * text. Nothing is measured in a browser; the estimates place fractions on
- * the maths axis, raise exponents above tall bases and size the integral
+ * the math axis, raise exponents above tall bases and size the integral
  * sign, so the same string is right in Node, in a video frame or on a page.
  * Delimiters, the radical's bar and borders stretch by themselves with CSS.
  *
@@ -28,7 +28,7 @@ import { svg } from './glyphs.js';
 // Metrics, in em. They match inlinemath.css; change both together.
 const LH = 0.8;        // a line of text: height above the baseline (line-height 1)
 const LD = 0.2;        //   and depth below it
-const AXIS = 0.25;     // the maths axis: fraction bars and big operators centre here
+const AXIS = 0.25;     // the math axis: fraction bars and big operators center here
 const RULE = 0.06;     // fraction bar, radical bar
 const GAP = 0.1;       // between a fraction bar and its numerator or denominator
 const SCRIPT = 0.7;    // exponent and subscript size; deeper scripts use SCRIPT2
@@ -172,11 +172,11 @@ class Layout {
         if (node.type === 'op') attrs += ` data-op="${escape(node.op)}"`;
         const extra = this.o.attributes ? this.o.attributes(node) || {} : {};
         for (const [k, v] of Object.entries(extra)) {
-            if (k !== 'class' && k !== 'style') attrs += ` ${k}="${escape(v)}"`;
+            if (k !== 'class' && k !== 'style' && /^[A-Za-z_:][\w:.-]*$/.test(k)) attrs += ` ${k}="${escape(v)}"`;   // a name is a name: nothing that could close the tag
         }
         const style = [extra.style, this.o.style && this.o.style(node)].filter(Boolean).join(';');
         const all = b.leaf ? ['n', ...kinds, b.leaf.kind] : ['n', ...kinds];
-        const cls = all.map((k) => `${this.p}-${k}`).concat(extra.class ? [extra.class] : []).join(' ');
+        const cls = all.map((k) => `${this.p}-${k}`).concat(extra.class ? [escape(extra.class)] : []).join(' ');
         const content = b.leaf ? b.leaf.content : b.html;
         return { html: `<span class="${cls}"${style ? ` style="${escape(style)}"` : ''}${attrs}>${content}</span>`, h: b.h, d: b.d };
     }
@@ -364,7 +364,7 @@ class Layout {
     decorate(name, b, base) {
         switch (name) {
             case 'boxed': return box(this.el('boxed', b.html), b.h + 0.22, b.d + 0.22);
-            // a drawn stroke, not a background: Windows high contrast drops backgrounds, and a cancelled term would look kept
+            // a drawn stroke, not a background: Windows high contrast drops backgrounds, and a canceled term would look kept
             case 'cancel': return box(this.el('cancel', b.html + svg('cancel', `${this.p}-cancel-line`)), b.h, b.d);
             case 'underline': return box(this.el('underline', b.html), b.h, b.d + 0.12);
             case 'overline': case 'bar': return box(this.el(`over${isShortLetter(base) ? ' over-low' : ''}`, b.html), b.h + 0.14, b.d);
@@ -396,7 +396,7 @@ class Layout {
         return this.stack(this.render(a, inner), this.render(b, inner), true, k);
     }
 
-    /** One box over another, centred on the axis; with a bar for fractions, without for binomials. */
+    /** One box over another, centered on the axis; with a bar for fractions, without for binomials. */
     stack(num, den, bar = true, k = 1) {
         const scale = (b) => (k === 1 ? b.html : this.el('scaled', b.html, `font-size:${em(k)}`));
         const t = bar ? RULE : 0;
@@ -546,7 +546,7 @@ class Layout {
         return row(this.bigSign('int', body, lo, hi, ctx), body, dx);
     }
 
-    /** The ∫ sign, centred on the axis and at least as tall as the integrand, with limits beside it. */
+    /** The ∫ sign, centered on the axis and at least as tall as the integrand, with limits beside it. */
     bigSign(name, body, lo, hi, ctx) {
         const small = !this.o.display || ctx.level > 0;
         const half = Math.max(small ? 0.6 : 0.95, Math.max(body.h - AXIS, body.d + AXIS) + 0.12);
@@ -627,7 +627,7 @@ class Layout {
     }
 
     /**
-     * A matrix: a grid of entries, centred on the maths axis, in brackets as tall as it is. Each
+     * A matrix: a grid of entries, centered on the math axis, in brackets as tall as it is. Each
      * row that is a list in the tree is an element of its own (display: contents), so a row can
      * be pointed at like any part.
      */

@@ -31,7 +31,7 @@ export function treeOf(input, options = {}) {
 /**
  * @param {string|string[]|object} input
  * @param {object} [options] layout options (see DEFAULTS in layout.js) plus:
- * @param {object|Array} [options.colors]    { 'x^2': 'red', 3: '#06c' } or [[target, colour], …]
+ * @param {object|Array} [options.colors]    { 'x^2': 'red', 3: '#06c' } or [[target, color], …]
  * @param {*} [options.highlight]            target(s) to mark with the mv-hl class
  * @param {object} [options.scope]           variable values for `{{...}}` blocks
  * @returns {string}
@@ -45,9 +45,9 @@ export function toHTML(input, options = {}) {
 export function layoutOptions(tree, options) {
     const { colors, highlight, scope, blocks, ...rest } = options;
     const styles = new Map();
-    for (const [target, colour] of pairs(colors)) {
-        if (!isColour(colour)) continue;   // one CSS colour value, nothing more: no `;`, no url(…)
-        for (const n of select(tree, target)) styles.set(n, `color:${colour}`);
+    for (const [target, color] of pairs(colors)) {
+        if (!isColor(color)) continue;   // one CSS color value, nothing more: no `;`, no url(…)
+        for (const n of select(tree, target)) styles.set(n, `color:${color}`);
     }
     const marked = new Set(highlight === undefined ? [] : select(tree, highlight));
     if (!styles.size && !marked.size) return rest;
@@ -63,9 +63,9 @@ export function layoutOptions(tree, options) {
     };
 }
 
-/** { 'x^2': 'red', 3: 'blue' } or [[target, colour]] → [[target, colour]]; numeric keys become ids. */
-/** A colour a style attribute can hold on its own: red, #06c, rgb(0 102 204 / 50%), var(--accent). */
-function isColour(value) {
+/** { 'x^2': 'red', 3: 'blue' } or [[target, color]] → [[target, color]]; numeric keys become ids. */
+/** A color a style attribute can hold on its own: red, #06c, rgb(0 102 204 / 50%), var(--accent). */
+function isColor(value) {
     return typeof value === 'string' && /^[#\w\s.,%()/+-]+$/.test(value) && !/url\s*\(|expression/i.test(value);
 }
 

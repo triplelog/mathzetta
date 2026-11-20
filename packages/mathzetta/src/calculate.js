@@ -19,7 +19,7 @@
  * reported exactly (∑ 1/n² = π²/6).
  *
  * Two kinds of failure are told apart:
- *   MathError     the maths has no answer: 1/0, √−1, 0^0, a divergent integral
+ *   MathError     the math has no answer: 1/0, √−1, 0^0, a divergent integral
  *   UnknownError  it can't be worked out: an unset variable, an indefinite integral
  * `{{...}}` shows the first as "undefined" and leaves the second as written.
  *
@@ -46,6 +46,13 @@ const LIMITS = {
 
 // the work of the calculate() call in progress: every calc() is a step (nested calls share it)
 let steps = 0;
+/** Work that isn't a node: a factorial's multiplications, a matrix product's entries. */
+function charge(work) {
+    steps += work;
+    if (steps > LIMITS.steps) throw new UnknownError('too much to work out');
+}
+/** Multiplying `count` numbers into one of `bits` bits costs about count × its length in words. */
+const chargeProduct = (count, bits) => charge((Number(count) * (bits / 64)) / 128);
 let depth = 0;
 
 // ---- rationals ------------------------------------------------------------------------
@@ -84,6 +91,7 @@ const qcmp = (a, b) => { const x = a.n * b.d - b.n * a.d; return x < 0n ? -1 : x
 const qfloor = (a) => { const f = a.n / a.d; return a.n < 0n && f * a.d !== a.n ? f - 1n : f; };
 
 function qToFloat(q) {
+    if (q.n < 0n) return -qToFloat(qneg(q));   // >> rounds a negative BigInt down: -1 >> 5n is -1, not 0
     const ln = bitLength(q.n);
     const ld = bitLength(q.d);
     if (ln < 1000 && ld < 1000) return Number(q.n) / Number(q.d);
@@ -169,7 +177,7 @@ function num(v) {
 }
 
 /**
- * A double result. NaN means the maths has no answer; ±∞ from finite
+ * A double result. NaN means the math has no answer; ±∞ from finite
  * inputs means a number too big for a double, which is left as written.
  */
 function checked(x, ...inputs) {
@@ -520,6 +528,7 @@ function factorial(v) {
     if (n !== null) {
         if (n < 0n) throw new MathError('factorial of a negative number');
         if (n > BigInt(LIMITS.factorial)) throw new UnknownError('too large to calculate');
+        chargeProduct(n, Number(n) * Math.log2(Number(n) + 1));   // ∑ 0·20000! a thousand times is a thousand factorials
         let r = 1n;
         for (let i = 2n; i <= n; i++) r *= i;
         return X(Q(r));
@@ -543,6 +552,7 @@ function perm(nv, kv) {
     const k = whole(kv, 'permutations');
     if (k < 0n || k > n) throw new MathError('undefined');
     if (k > BigInt(LIMITS.terms) || tooBig(n, k)) throw new UnknownError('too large to calculate');
+    chargeProduct(k, Number(k) * bitLength(n));
     let r = 1n;
     for (let i = n - k + 1n; i <= n; i++) r *= i;
     return X(Q(r));
@@ -554,6 +564,7 @@ function comb(nv, kv) {
     if (k < 0n || k > n) throw new MathError('undefined');
     if (n - k < k) k = n - k;
     if (k > BigInt(LIMITS.terms) || tooBig(n, k)) throw new UnknownError('too large to calculate');
+    chargeProduct(2n * k, Number(k) * bitLength(n));
     let r = 1n;
     for (let i = 1n; i <= k; i++) r = (r * (n - k + i)) / i;
     return X(Q(r));
@@ -644,6 +655,7 @@ const isMatrix = (v) => isMatrixValue(v) && (MATRIX_KINDS.has(v.group) || (v.gro
 const isVector = (v) => isVectorValue(v) && !isMatrix(v) && v.group !== 'pm';
 const M = matrixArithmetic({
     add, sub, mul, div,
+    charge,
     isZero: (x) => (isX(x) ? x.c.n === 0n : Math.abs(num(x)) < 1e-12),
     zero: () => rat(0), one: () => rat(1),
     size: (x) => Math.abs(num(x)),
@@ -1206,7 +1218,7 @@ function infiniteSum(term, n0) {
 function recognize(y, error = 0) {
     if (!Number.isFinite(y)) return y;
     const tol = Math.max(1e-10, 4 * error) * Math.max(1, Math.abs(y));
-    if (tol > 1e-6 * Math.max(1, Math.abs(y))) return y;
+    if (tol > 1e-6 * Math.max(1, Math.abs(y))) return knownDigits(y, error);
     // 0 only within the answer's own error: ∫₀^0.00001 x dx is 5·10⁻¹¹, not 0
     if (Math.abs(y) <= Math.max(4 * error, 1e-15)) return rat(0);
     if (Math.abs(y) < 1e-10) return y;
@@ -1220,6 +1232,16 @@ function recognize(y, error = 0) {
         if (f && Math.abs(Number(f.n) / Number(f.d) - ratio) * num(base) <= tol) return mulX(X(f), base);
     }
     return y;
+}
+
+/**
+ * A numeric answer to the digits its error leaves: ∫|x| over [-1, 2] by quadrature is 2.49999985 ± 9·10⁻⁷, which is
+ * 2.5 to the six digits that are known, not 2.49999985339 shown as if all were.
+ */
+function knownDigits(y, error) {
+    if (!(error > 0) || y === 0) return y;
+    const digits = Math.floor(-Math.log10(error / Math.abs(y)));
+    return digits >= 15 ? y : Number(y.toPrecision(Math.max(1, digits)));
 }
 
 /** The closest fraction with denominator ≤ maxDen (continued fractions). */

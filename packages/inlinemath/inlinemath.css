@@ -1,5 +1,5 @@
 /*
- * Inline Math stylesheet. Everything is under .mv; colours are left to the page.
+ * Inline Math stylesheet. Everything is under .mv; colors are left to the page.
  *
  * The numbers marked "metric" must match the constants at the top of
  * src/layout.js (line-height 1, bar 0.06em, gap 0.1em); everything else can
@@ -10,7 +10,7 @@
  *   .mv-var .mv-num .mv-word   variables, numbers, function names
  *   .mv-op-frac .mv-op-pow …   a kind of operation
  *   .mv-hl                     the class highlight() adds
- *   --mv-hl                    highlight colour
+ *   --mv-hl                    highlight color
  */
 
 .mv {
@@ -115,7 +115,7 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-accent-mark { position: absolute; top: -0.27em; left: 0; right: 0; text-align: center; font-size: 0.7em; line-height: 0.6; }   /* metric: measured over F, h, A */
 /* ˆ ˜ ˙ ¨ are spacing marks that sit high in their em: full size, pulled down onto the letter */
 .mv-accent-hat, .mv-accent-widehat, .mv-accent-tilde, .mv-accent-dot, .mv-accent-ddot { font-size: 1em; line-height: 1; top: 0.02em; }
-/* over an italic letter the mark leans with it, right of the box's centre */
+/* over an italic letter the mark leans with it, right of the box's center */
 .mv-accent:has(> .mv-var) > .mv-accent-mark { transform: translateX(0.1em); }
 /* a letter with no ascender (x, u, α; layout.js adds -low): the mark comes down to its top */
 .mv-accent-low > .mv-accent-mark { top: 0.08em; }
@@ -123,7 +123,7 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 
 /* ---- interaction -------------------------------------------------------------- */
 .mv-hl { background: var(--mv-hl, rgba(255, 200, 0, 0.35)); box-shadow: 0 0 0 0.08em var(--mv-hl, rgba(255, 200, 0, 0.35)); }
-/* Windows high contrast (and other forced colours) drops backgrounds and shadows: outline a highlight instead */
+/* Windows high contrast (and other forced colors) drops backgrounds and shadows: outline a highlight instead */
 @media (forced-colors: active) {
   .mv-hl { outline: 0.08em solid Highlight; outline-offset: 0.04em; }
 }
@@ -153,7 +153,7 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-step-arrow { color: #888; }
 .mv-step-why { margin: 0.1em 0 0; font-size: 0.9em; color: #444; }
 
-/* ---- Markdown with maths (markdownToHTML from '@mathzetta/inlinemath/markdown') ------------------- */
+/* ---- Markdown with math (markdownToHTML from '@mathzetta/inlinemath/markdown') ------------------- */
 .mv-md-math { display: inline-block; vertical-align: middle; }
 .mv-md-display { display: block; text-align: center; margin: 0.6em 0; overflow-x: auto; }
 .mv-md-block { margin: 0.8em 0; }

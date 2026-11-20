@@ -53,7 +53,7 @@ export function render(node) {
 }
 
 const SYMBOLS = {
-    '=': '=', '===': '=', '≠': '≠', '≠=': '≠', '<': '&lt;', '>': '&gt;', '≤': '≤', '≥': '≥',   // strict equality is a code distinction: maths writes =
+    '=': '=', '===': '=', '≠': '≠', '≠=': '≠', '<': '&lt;', '>': '&gt;', '≤': '≤', '≥': '≥',   // strict equality is a code distinction: math writes =
     '∈': '∈', '∉': '∉', '→': '→', '±': '±', 'mod': 'mod', '≈': '≈', '∪': '∪', '∩': '∩', '≡': '≡',
     '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓',
 };

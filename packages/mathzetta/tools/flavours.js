@@ -1,5 +1,5 @@
 /**
- * The <script> builds — build/mathzetta.<flavour>.min.js: the core (parse, the tree tools, the
+ * The <script> builds — build/mathzetta.<flavor>.min.js: the core (parse, the tree tools, the
  * operator table) plus these outputs, each setting window.MathZetta. rollup.config.js builds them,
  * `tools/cdn.js --sizes` lists them in build/sizes.json, and the site's cdn.html picks the smallest
  * one holding what a page ticks. `all` is build/mathzetta.min.js (src/all.js, plus toUnified).
@@ -26,9 +26,9 @@ export const FLAVOURS = {
 };
 
 /**
- * The "plain" flavours: the same, built without the code-spelling reader (src/parse/clean/code.js:
+ * The "plain" flavors: the same, built without the code-spelling reader (src/parse/clean/code.js:
  * numpy, SymPy, SQL, spreadsheet and GLSL spellings on input) — about 5 KB gzipped less — for pages
- * that read maths and LaTeX only. Only the flavours without a code output have one: writing code
+ * that read maths and LaTeX only. Only the flavors without a code output have one: writing code
  * out and reading it back belong together (the round-trip test).
  */
 const CODE_OUTPUTS = ['javascript', 'python', 'sql', 'excel', 'glsl', 'formulas'];
@@ -37,5 +37,5 @@ export const PLAIN_FLAVOURS = Object.fromEntries(Object.entries(FLAVOURS)
     .map(([name, outputs]) => [name === 'core' ? 'plain' : `plain-${name}`, outputs]));
 export const isPlain = (name) => name === 'plain' || name.startsWith('plain-');
 
-/** The file a flavour is built to. */
+/** The file a flavor is built to. */
 export const flavourFile = (name) => (name === 'all' ? 'build/mathzetta.min.js' : `build/mathzetta.${name}.min.js`);

@@ -44,7 +44,7 @@ export function sym(token) {
 /**
  * A number written exactly, as a decimal token of any length ("123456789012345678901", "-0.125").
  * `value` is the nearest double; `token` (and so `s`) keeps every digit, so big exact
- * results (2^100) survive. Spellings are normalised: "3.0" and "3", "-0" and "0" are one token.
+ * results (2^100) survive. Spellings are normalized: "3.0" and "3", "-0" and "0" are one token.
  */
 export function exactNum(token) {
   const m = /^(-?)0*(\d+?)(?:\.(\d*?)0*)?$/.exec(String(token));

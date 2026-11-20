@@ -1,5 +1,5 @@
 /**
- * Running maths: evaluate(), formulas over table columns as JavaScript (the row evaluator, the generated-code whitelist) and as SQL (the SQLite dialect, checked against evaluate() in a real SQLite).
+ * Running math: evaluate(), formulas over table columns as JavaScript (the row evaluator, the generated-code whitelist) and as SQL (the SQLite dialect, checked against evaluate() in a real SQLite).
  */
 import { suite, test, eq, throws } from '../harness.js';
 import {
@@ -346,7 +346,7 @@ suite('evaluate: sets, intervals, chains', () => {
         eq(E('sum(i^2, i=1, 5)'), 55); eq(E('\\prod_{k=1}^{4} k'), 24); eq(E('\\sum_{i=1}^{n} i', { n: 10 }), 55);
         throws(() => E('\\sum_{i=1}^{\\infty} i'), /over that range/);
     });
-    test('a chain of comparisons is read as maths', () => {
+    test('a chain of comparisons is read as math', () => {
         eq(E('3 < x < 7', { x: 5 }), true); eq(E('3 < x < 7', { x: 10 }), false); eq(E('1 ≤ x ≤ 1', { x: 1 }), true);
     });
     test('refusals: a name with no value, a symbolic operation', () => {
@@ -448,10 +448,10 @@ suite('limits: work, size and depth', () => {
         quick(() => throws(() => toJavaScript('x between 1 and '.repeat(40) + '2'), /too long/));
         quick(() => throws(() => parse('trunc('.repeat(30) + 'x' + ')'.repeat(30)), /expands too much/));
     });
-    test('a filter pass has at most 24 neighbourhood calls (the GPU watchdog)', () => {
+    test('a filter pass has at most 24 neighborhood calls (the GPU watchdog)', () => {
         const parse = (t) => parseTree(t);
         eq(typeof filterShader('gaussian(8) * '.repeat(24) + '1', { parse }), 'string');
-        throws(() => filterShader('gaussian(8) * '.repeat(25) + '1', { parse }), /At most 24 neighbourhood/);
+        throws(() => filterShader('gaussian(8) * '.repeat(25) + '1', { parse }), /At most 24 neighborhood/);
     });
     test("English operands don't backtrack across a long word", () => {
         quick(() => parse('x is within ' + 'a'.repeat(4900) + ' of 2'), 500);

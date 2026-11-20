@@ -31,6 +31,7 @@ const CLOSE = ')}]';
 
 /** Phase run before whitespace is removed. */
 export function spacedRewrites(input) {
+    input = bareRoots(mixedNumbers(unicodeScripts(input)));
     input = ifThenElse(input);
     // a ≡ b (mod n): the congruence form, applying to the whole statement
     input = input.replace(/\(\s*\\?b?mod\s+([^()\s](?:[^()]*[^()\s])?)\s*\)/g, ' \\pmod{$1}');   // the body starts and ends on a non-space: no backtracking over a run of spaces
@@ -55,6 +56,7 @@ export function spacedRewrites(input) {
             if (input[j] === '-') j++;
             while (j < input.length && '.0123456789'.includes(input[j])) j++;
             if (j === i + 2 && input[i + 1] === '-') j = i + 1;   // a lone `-` is not a number
+            if (input[i + 1] === '-' && /^\s*[\^!]/.test(input.slice(j, j + 8))) continue;   // 2^-3^2 is 2^(-(3^2)), as 2^-x^2 is: the minus takes the power
             if (j > i + 1) input = input.slice(0, i + 1) + '{' + input.slice(i + 1, j) + '}' + input.slice(j);
         }
     }
@@ -100,7 +102,104 @@ export function compactRewrites(input) {
             }
         }
     }
+    // a single letter set upright or named is that letter: \mathrm{e}^x, \operatorname{f}(x) (the d of an integral or
+    // a derivative, \mathrm{d}x, has been read by now; longer names were set aside whole before cleaning)
+    input = input.replace(/\\(?:text|textrm|textit|mathrm|mathit|mathbf|mathsf|operatorname)\{([A-Za-z])\}/g, '$1');
     return input.replace(/\\log/g, 'log');
+}
+
+// ---- written small: x₁, x¹², 1½, \sqrt x -------------------------------------
+
+const SUPERSCRIPTS = { __proto__: null };
+const SUBSCRIPTS = { __proto__: null };
+[...'⁰¹²³⁴⁵⁶⁷⁸⁹'].forEach((c, n) => { SUPERSCRIPTS[c] = String(n); });
+[...'₀₁₂₃₄₅₆₇₈₉'].forEach((c, n) => { SUBSCRIPTS[c] = String(n); });
+Object.assign(SUPERSCRIPTS, {
+    '⁺': '+', '⁻': '-', '⁼': '=', '⁽': '(', '⁾': ')',
+    'ᵃ': 'a', 'ᵇ': 'b', 'ᶜ': 'c', 'ᵈ': 'd', 'ᵉ': 'e', 'ᶠ': 'f', 'ᵍ': 'g', 'ʰ': 'h', 'ⁱ': 'i', 'ʲ': 'j', 'ᵏ': 'k', 'ˡ': 'l', 'ᵐ': 'm',
+    'ⁿ': 'n', 'ᵒ': 'o', 'ᵖ': 'p', 'ʳ': 'r', 'ˢ': 's', 'ᵗ': 't', 'ᵘ': 'u', 'ᵛ': 'v', 'ʷ': 'w', 'ˣ': 'x', 'ʸ': 'y', 'ᶻ': 'z',
+});
+Object.assign(SUBSCRIPTS, {
+    '₊': '+', '₋': '-', '₌': '=', '₍': '(', '₎': ')',
+    'ₐ': 'a', 'ₑ': 'e', 'ₕ': 'h', 'ᵢ': 'i', 'ⱼ': 'j', 'ₖ': 'k', 'ₗ': 'l', 'ₘ': 'm', 'ₙ': 'n', 'ₒ': 'o', 'ₚ': 'p', 'ᵣ': 'r', 'ₛ': 's',
+    'ₜ': 't', 'ᵤ': 'u', 'ᵥ': 'v', 'ₓ': 'x',
+});
+const SCRIPT_RUNS = new RegExp(`[${Object.keys(SUPERSCRIPTS).join('')}]+|[${Object.keys(SUBSCRIPTS).join('')}]+`, 'g');
+
+/**
+ * Characters written small are one script, however many there are: x₁₂ is x_{12} and x¹² is x^{12} (one
+ * character at a time, x¹² was (x^1)^2 and x₁ was x times a thing called ₁); x⁻ⁿ is x^{-n}, xᵢ is x_{i}.
+ */
+function unicodeScripts(input) {
+    return input.replace(SCRIPT_RUNS, (run) => {
+        const up = run[0] in SUPERSCRIPTS;
+        return `${up ? '^' : '_'}{${[...run].map((c) => (up ? SUPERSCRIPTS : SUBSCRIPTS)[c]).join('')}}`;
+    });
+}
+
+const VULGAR = {
+    __proto__: null,
+    '½': '1/2', '⅓': '1/3', '⅔': '2/3', '¼': '1/4', '¾': '3/4', '⅕': '1/5', '⅖': '2/5', '⅗': '3/5', '⅘': '4/5', '⅙': '1/6', '⅚': '5/6',
+    '⅐': '1/7', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8', '⅑': '1/9', '⅒': '1/10',
+};
+const MIXED_CHAR = new RegExp(`(?<![\\w.,^_])(\\d+)[ \\t]?([${Object.keys(VULGAR).join('')}])`, 'g');
+const MIXED_SLASH = /(?<![\w.,^_/])(\d+)[ \t]+([1-9]\d*)\/(\d+)(?![\d./^!])/g;
+const MIXED_FRAC = /(?<![\w.,^_])(\d+)\s*\\[dtc]?frac\s*(?:\{\s*(\d+)\s*\}\s*\{\s*(\d+)\s*\}|(\d)(\d)(?!\d))/g;
+
+/**
+ * A whole number with a fraction right after it is a mixed number, their sum: 1½, 2 ¾, 1 1/2, 3\frac{1}{4}.
+ * Only a proper fraction makes one (2\frac{3}{2} and 2 3/2 stay as they were), and never after ^ or _
+ * (x^2\frac{1}{2} is x² times a half). In 1 234/567 the space groups the digits, as in 1 000.
+ */
+function mixedNumbers(input) {
+    input = input.replace(MIXED_CHAR, (_, whole, c) => `(${whole}+${VULGAR[c]})`);
+    input = input.replace(MIXED_SLASH, (all, whole, n, d) => (Number(n) < Number(d) && n.length !== 3 ? `(${whole}+${n}/${d})` : all));
+    return input.replace(MIXED_FRAC, (all, whole, n, d, n1, d1) => {
+        const [top, bottom] = [n ?? n1, d ?? d1];
+        return Number(top) < Number(bottom) ? `(${whole}+\\frac{${top}}{${bottom}})` : all;
+    });
+}
+
+/**
+ * \sqrt with no braces takes what TeX would give it: one letter, one number, or one command with its
+ * arguments — \sqrt x, \sqrt 2, \sqrt\pi, \sqrt\frac{1}{2}, 2\sqrt x + 1. (\sqrt 2x is √2 · x, as it is
+ * typeset; the plain word reads on: sqrt 2x is √(2x).) A number is taken whole, as x^12 is.
+ */
+function bareRoots(input) {
+    // the last one first, so \sqrt\sqrt x has its inner root braced when the outer one looks
+    for (let at = input.lastIndexOf('\\sqrt'); at >= 0; at = at > 0 ? input.lastIndexOf('\\sqrt', at - 1) : -1) {
+        let i = at + 5;
+        if (/[A-Za-z]/.test(input[i] ?? '')) continue;            // another command: \sqrtsign
+        while (isSpace(input[i])) i++;
+        const rest = input.slice(i);
+        let token = /^(?:§\d+§|-?(?:\d+(?:\.\d+)?|\.\d+)|-?[A-Za-zͰ-Ͽ])/.exec(rest)?.[0];
+        if (!token && /^\\[A-Za-z]/.test(rest) && !rest.startsWith('\\left')) {
+            let j = /^\\[A-Za-z]+/.exec(rest)[0].length;
+            const digits = /^\d\d/.exec(rest.slice(j));           // \frac12
+            if (digits && /frac$/.test(rest.slice(0, j))) j += 2;
+            else {
+                const index = /^\s*\[[^\[\]{}]*\]/.exec(rest.slice(j));   // \sqrt[3]{x} inside: its index first
+                if (index) j += index[0].length;
+                for (;;) {                                         // its {arguments}, each closed
+                    let k = j;
+                    while (isSpace(rest[k])) k++;
+                    if (rest[k] !== '{') break;
+                    let depth = 0;
+                    let end = -1;
+                    for (let m = k; m < rest.length; m++) {
+                        if (rest[m] === '{') depth++;
+                        else if (rest[m] === '}' && --depth === 0) { end = m; break; }
+                    }
+                    if (end < 0) break;
+                    j = end + 1;
+                }
+            }
+            token = rest.slice(0, j);
+        }
+        if (!token) continue;                                      // \sqrt{…}, \sqrt[n]…, \sqrt(…): read as before
+        input = `${input.slice(0, at)}\\sqrt{${token}}${input.slice(i + token.length)}`;
+    }
+    return input;
 }
 
 // ---- before names are protected ----------------------------------------------
@@ -269,7 +368,7 @@ function logBases(input) {
                 else if (commas === 0) value += input[j];
                 else base += input[j];
             }
-            if (commas === 1) input = input.slice(0, i + 1) + '_{' + base + '}(' + value + ')' + input.slice(end + 1);
+            if (commas === 1 && end > 0) input = input.slice(0, i + 1) + '_{' + base + '}(' + value + ')' + input.slice(end + 1);
         }
     }
     return input;
@@ -392,7 +491,7 @@ function integral(input) {
         const lone = [...stripSpacing(body).matchAll(/(?<![A-Za-z\\])([A-Za-z])(?![A-Za-z(])/g)].map((m) => m[1]);
         variable = lone.find((v) => v !== lower && v !== upper) ?? 'x';
     }
-    let out = 'int(' + (stripSpacing(body) || '1');   // ∫ dx is ∫ 1 dx
+    let out = 'int(' + (stripSpacing(body).trim() ? stripSpacing(body) : '1');   // ∫ dx is ∫ 1 dx, with or without a space
     if (variable) out += ',' + variable;
     if (lower || upper) out += ',' + lower + ',' + upper;
     return out + ')' + rest;

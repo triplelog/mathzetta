@@ -12,7 +12,7 @@
  *
  * Once something listens for 'click', the drawing works from the keyboard too:
  * Tab to it, arrow keys walk its parts (Down into a part, Up out of it,
- * Left/Right between neighbours, Home or Escape back to the whole), Enter or
+ * Left/Right between neighbors, Home or Escape back to the whole), Enter or
  * Space fires the click handlers for the current part, and each part is spoken.
  *
  * view.editable({ toText }) (toText from 'mathzetta/text') lets the reader change it: double-click
@@ -55,6 +55,9 @@ export class View {
      * point is the motion, started by the reader).
      */
     set(input, { animate = false, duration = 600, easing = 'ease-in-out' } = {}) {
+        // read and drawn before anything changes: an expression that can't be drawn leaves the view as it was
+        const tree = treeOf(input, this.options);
+        const { html } = layout(tree, layoutOptions(tree, this.options));
         // an editor still open over the old expression would put its text at the old one's path
         if (this.editor) {
             const open = this.editor;
@@ -63,8 +66,8 @@ export class View {
         }
         const before = shouldAnimate(animate) && this.tree ? this.snapshot() : null;
         const isStep = this.tree !== undefined;
-        this.tree = treeOf(input, this.options);
-        this.element.innerHTML = layout(this.tree, layoutOptions(this.tree, this.options)).html;
+        this.tree = tree;
+        this.element.innerHTML = html;
         this.root = this.element.firstElementChild;
         if (this.handlers.length) this.root.classList.add(`${this.p}-clickable`);
         if (this.editing) this.root.classList.add(`${this.p}-editable`);
@@ -127,9 +130,9 @@ export class View {
         return this;
     }
 
-    /** Colour parts; pass null to clear. */
-    color(target, colour) {
-        this.elements(target).forEach((e) => { e.style.color = colour || ''; });
+    /** Color parts; pass null to clear. */
+    color(target, color) {
+        this.elements(target).forEach((e) => { e.style.color = color || ''; });
         return this;
     }
 
@@ -260,8 +263,8 @@ export class View {
         switch (event.key) {
             case 'ArrowDown': next = at ? this.partsOf(at)[0] : this.partsOf(this.tree)[0]; break;
             case 'ArrowUp': next = at ? this.outerOf(at) : undefined; break;
-            case 'ArrowRight': next = at ? this.neighbour(at, 1) : this.partsOf(this.tree)[0]; break;
-            case 'ArrowLeft': next = at ? this.neighbour(at, -1) : undefined; break;
+            case 'ArrowRight': next = at ? this.neighbor(at, 1) : this.partsOf(this.tree)[0]; break;
+            case 'ArrowLeft': next = at ? this.neighbor(at, -1) : undefined; break;
             case 'Home': case 'Escape': next = null; break;
             case 'F2':
                 if (!this.editing) return;
@@ -315,7 +318,7 @@ export class View {
     }
 
     /** The part beside this one (dir 1 next, -1 previous), or undefined at the end. */
-    neighbour(node, dir) {
+    neighbor(node, dir) {
         const siblings = this.partsOf(this.outerOf(node) || this.tree);
         const i = siblings.indexOf(node);
         return i < 0 ? undefined : siblings[i + dir];
@@ -415,7 +418,7 @@ function liveRegionFor(element, announce, prefix) {
 }
 
 /**
- * Should a step animate? true honours prefers-reduced-motion (no motion for a reader who asked
+ * Should a step animate? true honors prefers-reduced-motion (no motion for a reader who asked
  * for none), 'always' does not, false never animates.
  */
 export function shouldAnimate(animate) {

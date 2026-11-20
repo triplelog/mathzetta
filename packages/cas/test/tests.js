@@ -31,7 +31,7 @@ suite('expr', () => {
     equal(e.args[1].value, -2);
   });
 
-  test('normalises numeric spellings so 3.0 and 3 are the same subtree', () => {
+  test('normalizes numeric spellings so 3.0 and 3 are the same subtree', () => {
     equal(parse('3.0').s, parse('3').s);
   });
 
@@ -321,7 +321,7 @@ suite('simplify', () => {
     assert(out.steps.length <= 1, `stopped early, took ${out.steps.length} steps`);
   });
 
-  test('honours the step budget', () => {
+  test('honors the step budget', () => {
     const out = simplify(parse('1 1 + 1 + 1 + 1 +'), set, { maxSteps: 2 });
     equal(out.steps.length, 2);
     equal(out.stopped, 'maxSteps');

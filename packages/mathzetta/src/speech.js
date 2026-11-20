@@ -18,7 +18,7 @@ export function toSpeech(input, options = {}) {
     return speak(treeOf(input), options);
 }
 
-/** The spoken phrase in pieces tagged with node ids, [{ text, id }], for captions that follow the maths. */
+/** The spoken phrase in pieces tagged with node ids, [{ text, id }], for captions that follow the math. */
 export function toSpeechSegments(input, options = {}) {
     if (isEmpty(input)) return [];
     return speakSegments(treeOf(input), options);

@@ -345,7 +345,7 @@ function scalar(value) {
   if (value === null || value === undefined) return 'null';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new YamlError(`cannot serialise ${value}`);
+    if (!Number.isFinite(value)) throw new YamlError(`cannot serialize ${value}`);
     return String(value);
   }
   const text = String(value);

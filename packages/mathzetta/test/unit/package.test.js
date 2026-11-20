@@ -1,5 +1,5 @@
 /**
- * What ships: the package's exports, files and bundles (the CDN flavours, the split ES modules, the CommonJS builds, the plain builds, sizes.json).
+ * What ships: the package's exports, files and bundles (the CDN flavors, the split ES modules, the CommonJS builds, the plain builds, sizes.json).
  */
 import { createRequire } from 'node:module';
 import { suite, test, eq } from '../harness.js';
@@ -22,7 +22,7 @@ suite('package', () => {
             for (const p of paths) eq(existsSync(new URL(p, root)), true, `${key} → ${p}`);
         }
     });
-    test('the files list ships src, build, the types, the licence and the readme', () => {
+    test('the files list ships src, build, the types, the license and the readme', () => {
         for (const f of ['src/', 'build/', 'README.md', 'LICENSE']) eq(pkg.files.includes(f), true, f);
         eq(existsSync(new URL('LICENSE', root)), true);
         eq(pkg.publishConfig?.access, 'public');
@@ -80,7 +80,7 @@ suite('package', () => {
         const cjs = (entry) => requireHere(new URL(`build/cjs/${entry}.cjs`, root).pathname);
         eq(cjs('latex').toLaTeX('x^2/2'), (await import('../../src/latex.js')).toLaTeX('x^2/2'));
         eq(cjs('calculate').calculate('1/3 + 1/6'), (await import('../../src/calculate.js')).calculate('1/3 + 1/6'));    });
-    test('the plain builds read maths and LaTeX like the core, and no code spellings', async () => {
+    test('the plain builds read math and LaTeX like the core, and no code spellings', async () => {
         const plain = await import(new URL('build/mathzetta.plain.esm.min.js', root));
         for (const input of ['3x^2 + sin(x)', '\\frac{d}{dx} x^2', 'sqrt(8)/2', 'x_1 + y_2', '2^3^2', 'max(a, b+1)']) eq(plain.parse(input), parse(input), input);
         eq(parse('np.sin(x)'), ['x', 'sin'], 'the core reads numpy');

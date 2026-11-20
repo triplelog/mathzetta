@@ -295,7 +295,7 @@ except FloatingPointError as e:
         test('a filled template runs', () => {
             eq(runPython(fillPythonTemplate(TEMPLATE)).trim(), '7.0');
         });
-        test('the example model runs, as is and customised', () => {
+        test('the example model runs, as is and customized', () => {
             const template = readFileSync(new URL('../../examples/python/logistic.py', import.meta.url), 'utf8');
             const years = (formula) => runPython(fillPythonTemplate(template, formula)).trim().split('\n');
             eq(years().length, 11);
@@ -334,7 +334,7 @@ if (hasNumpy) {
         });
         test('1/0 raises by default, and gives nan with --errors nan', () => {
             const raised = cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--run');
-            const stderr = raised.stderr.replace(/\x1b\[[0-9;]*m/g, '');   // Python 3.13+ colours tracebacks
+            const stderr = raised.stderr.replace(/\x1b\[[0-9;]*m/g, '');   // Python 3.13+ colors tracebacks
             eq([raised.status !== 0, /FloatingPointError: value\(data\): no finite value/.test(stderr)], [true, true]);
             eq(cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--errors', 'nan', '--run').stdout, '5.000 nan 2.000\n');
         });
@@ -375,7 +375,7 @@ suite('python: sympy', () => {
     }
 });
 
-// ---- added 2026-11-11: negatives and halves, where Python's own %, round and format differ from maths ----
+// ---- added 2026-11-11: negatives and halves, where Python's own %, round and format differ from math ----
 suite('python: negatives and halves give what evaluate() gives', () => {
     const CASES = ['x mod 3', 'x mod -3', 'round(x)', 'round(x, 1)', 'trunc(x)', 'cbrt(x)', 'root(5, x)', 'x xor 0', 'x ≈ 0',
         '-1*(x+1)', 'max(x)', 'fixed(x, 0)', 'fixed(x, 2)'];
@@ -402,4 +402,37 @@ suite('python: negatives and halves give what evaluate() gives', () => {
     test('python', () => check((c) => toPython(c), 'import math', 'python'));
     // .item(): the plain Python value, every digit (an array's repr keeps eight)
     if (hasNumpy) test('numpy', () => check((c) => `np.asarray(${toPython(c, { numpy: true })}).item()`, 'import numpy as np', 'numpy'));
+});
+
+// The review before 1.2 (2026-11-19): plain Python's round and fixed raised on NaN and ±∞ (math.floor)
+suite('python: NaN and infinity', () => {
+    if (hasPython) test('round and fixed pass NaN and ±∞ through, as JavaScript and evaluate() do', () => {
+        const lines = ['round(x)', 'round(x, 2)', 'fixed(x, 2)', 'round(x + 1)', 'round(x*y + 1, 2)'].map((f) => `print(repr(${toPython(f)}))`);
+        const out = (x) => runPython(`import math\nx = ${x}\ny = 2.0\n${lines.join('\n')}`).trim().split('\n');
+        eq(out('float("nan")'), ['nan', 'nan', "'nan'", 'nan', 'nan']);
+        eq(out('float("inf")'), ['inf', 'inf', "'inf'", 'inf', 'inf']);
+        eq(out('-2.5'), ['-3', '-2.5', "'-2.50'", '-2', '-4.0']);
+    });
+});
+
+// Python chains every comparison: y == x > 0 is (y == x) and (x > 0). A comparison inside another is bracketed.
+suite('python: a comparison inside a comparison', () => {
+    const cases = ['(y = x > 0) ? 1 : 2', 'y = (x > 0)', '3 < x < 7', 'x > 0 = (y < 1)', 'y ≠ (x ≤ 1)', '(a < b) = (c < d)'];
+    const scopes = [{ x: 2, y: 1, a: 1, b: 2, c: 2, d: 3 }, { x: -1, y: 0, a: 3, b: 2, c: 2, d: 1 }, { x: 1, y: 1, a: 1, b: 1, c: 1, d: 1 }];
+    test('written with brackets', () => {
+        eq(toPython('y = (x > 0)'), 'y == (x > 0)');
+        eq(toPython('(y = x > 0) ? 1 : 2'), '(1 if (y == (x > 0)) else 2)');
+        eq(toPython('3 < x < 7'), '3 < x < 7');   // a chain written as one stays one
+        eq(toPython('y = (x > 0)', { numpy: true }), 'y == (x > 0)');
+    });
+    const run = (flavor, wrap) => () => {
+        for (const scope of scopes) {
+            const vars = Object.entries(scope).map(([k, v]) => `${k} = ${v}`).join('\n');
+            const lines = cases.map((c) => `print(float(${wrap(toPython(c, flavor))}))`).join('\n');
+            const got = runPython(`import math\n${flavor.numpy ? 'import numpy as np\n' : ''}${vars}\n${lines}`).trim().split('\n').map(Number);
+            eq(got, cases.map((c) => Number(evaluate(c, scope))), JSON.stringify(scope));
+        }
+    };
+    if (hasPython) test('Python gives what evaluate() gives', run({}, (code) => code));
+    if (hasNumpy) test('numpy gives what evaluate() gives', run({ numpy: true }, (code) => `np.asarray(${code}).item()`));
 });

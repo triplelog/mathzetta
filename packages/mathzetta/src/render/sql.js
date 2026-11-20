@@ -1,5 +1,5 @@
 /**
- * Tree → SQL expression. PostgreSQL flavoured by default (POWER, LN,
+ * Tree → SQL expression. PostgreSQL flavored by default (POWER, LN,
  * GREATEST, ...); `dialect: 'sqlite'` writes SQL that SQLite (3.35+, built
  * with its math functions) runs: real division, MAX/MIN, 9e999 for ∞, and
  * an error for anything SQLite has no function for.
@@ -30,7 +30,14 @@ export function toSqlCode(node, options = {}) {
         stringQuote: options.stringQuote ?? "'",   // "Bob" in PostgreSQL is the column Bob
         columns: new Set(options.columns ?? []),
     };
-    const render = (n) => guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts));
+    // each node is written once, however often a rule asks for it: a rule that reads its operands, then falls back
+    // to another that reads them again, doubled the work at every level (x/y/y/… 25 deep took seconds)
+    const written = new Map();
+    const render = (n) => {
+        let text = written.get(n);
+        if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts)));
+        return text;
+    };
     return render(node);
 }
 
@@ -170,7 +177,7 @@ function operation(node, render, options) {
         }
         case 'round':   // PostgreSQL has ROUND(x, d) for NUMERIC only, which takes halves away from zero
             return `ROUND(CAST(${render(a)} AS NUMERIC), ${render(b)})`;
-        case 'mod': {   // SQL's MOD takes the sign of a; mod in maths takes the divisor's: -7 mod 3 is 2
+        case 'mod': {   // SQL's MOD takes the sign of a; mod in math takes the divisor's: -7 mod 3 is 2
             const [x, n] = [render(a), render(b)];
             if (/^\d+(\.\d+)?$/.test(x) && /^\d+(\.\d+)?$/.test(n)) return `MOD(${x}, ${n})`;   // 7 mod 3: no sign to take
             return `MOD(MOD(${x}, ${n}) + ${n}, ${n})`;
@@ -194,7 +201,7 @@ function operation(node, render, options) {
         case 'pmod':
             return a.type === 'op' && ['≡', '='].includes(a.op)
                 ? `MOD((${render(a.args[0])}) - (${render(a.args[1])}), ${render(b)}) = 0`
-                : `MOD(${render(a)}, ${render(b)})`;
+                : operation({ ...node, op: 'mod' }, render, options);   // x (mod n) alone is x mod n, with the divisor's sign
         case '\\not':
             return 'NOT ' + (unaryNeedsBrackets(op, a) ? `(${render(a)})` : render(a));
         case '&':
@@ -216,7 +223,7 @@ function operation(node, render, options) {
         case 'prod':
             return args.map((x, i) => sideOf('*', x, i ? 'right' : 'left')).join(' * ');
         case 'mean':   // written out as a sum, so bracket like +
-            return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length})`;
+            return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length}.0)`;   // .0: whole numbers divide as whole numbers
         case '∈': case '∉':
             return membership(node, render);
         case '±':
@@ -236,7 +243,7 @@ function sqliteOperation(node, render, side, list, sideOf) {
     const { op, args } = node;
     const [a, b] = args;
     if (SQLITE_UNSUPPORTED.has(op)) throw new Error(`No SQLite SQL for ${NO_SQL[op] ?? SQLITE_WORDS[op] ?? `'${op}'`}`);
-    if (SQLITE_FUNCTIONS[op]) return args.length === 1 ? render(a) : `${SQLITE_FUNCTIONS[op]}(${list()})`;
+    if (SQLITE_FUNCTIONS[op]) return args.length === 1 ? (a.type === 'op' ? `(${render(a)})` : render(a)) : `${SQLITE_FUNCTIONS[op]}(${list()})`;
     if (SQLITE_RECIPROCALS[op]) return `(1.0 / ${SQLITE_RECIPROCALS[op]}(${render(a)}))`;
     if (operator(op)?.group) {
         // A lone bracketed value is just brackets; (a, b) or [1, 2) has no meaning outside ∈.

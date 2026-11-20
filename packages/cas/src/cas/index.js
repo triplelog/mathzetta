@@ -9,7 +9,7 @@
 //   cas.approximate('2 sqrt', { digits: 50 }).text  '1.4142135623730950488016887242096980785696718753769'
 //
 // Input is MathZetta's postfix (a string, its tokens, or a @mathzetta/cas node); pass
-// `read: (text) => parse(text)` (MathZetta's parse) to give it ordinary maths.
+// `read: (text) => parse(text)` (MathZetta's parse) to give it ordinary math.
 // Everything is exact (fractions of any size, √2, π stay as they are); ask for
 // a decimal with approximate() or { approximate: digits } on any call.
 //
@@ -42,7 +42,7 @@ export const MESSAGES = {
   'factor.common': 'Take out the common factor {common}.',
   'factor.polynomial': 'Factor what is left: {roots}.',
   'together': 'Write it as one fraction over a common denominator.',
-  cancel: 'Cancel the factors the top and bottom share: {cancelled}.',
+  cancel: 'Cancel the factors the top and bottom share: {canceled}.',
   'solve.move': 'Keep the terms with {v} on the left and move the others to the right.',
   'solve.divide': 'Divide both sides by {by}.',
   'solve.multiply': 'Multiply both sides by {by}.',
@@ -170,10 +170,10 @@ class CAS {
     raw.push(...base.steps);
     let best = base.node;
     let extra = null;
-    // other shapes, kept only when shorter: cancelled, multiplied out, factored
+    // other shapes, kept only when shorter: canceled, multiplied out, factored
     const x = canon(best);
     const tries = [];
-    // a plain number (1/2 - i/2, √2 + 1) is not factored or cancelled
+    // a plain number (1/2 - i/2, √2 + 1) is not factored or canceled
     const plain = freeSymbols(best).size === 0;
     const c = plain ? null : cancelForm(x);
     if (c) tries.push({ node: drawFactored(c), id: 'simplify.cancel', name: 'Cancel' });
@@ -208,7 +208,7 @@ class CAS {
     return this.result(out, raw, options);
   }
 
-  /** One fraction, with common factors cancelled: (x² - 1)/(x - 1) → x + 1. */
+  /** One fraction, with common factors canceled: (x² - 1)/(x - 1) → x + 1. */
   cancel(input, options = {}) {
     const start = this.node(input);
     const x = canon(start);
@@ -219,7 +219,7 @@ class CAS {
     const one = op('/', [display(t.num), display(t.den)]);
     const raw = [];
     if (start.op !== '/' || one.s !== normal(start).s) raw.push(this.step('together', 'One fraction', ['together'], start, one));
-    if (out.s !== one.s) raw.push(this.step('cancel', 'Cancel', ['cancel'], one, out, { cancelled: c.cancelled.length ? c.cancelled.map((b) => this.format(display(b))).join(', ') : 'numbers' }));
+    if (out.s !== one.s) raw.push(this.step('cancel', 'Cancel', ['cancel'], one, out, { canceled: c.canceled.length ? c.canceled.map((b) => this.format(display(b))).join(', ') : 'numbers' }));
     return this.result(out, raw, options);
   }
 

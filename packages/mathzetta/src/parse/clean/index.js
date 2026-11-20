@@ -214,7 +214,7 @@ function evaluateBlocks(text, strings, evaluate) {
             if (/^[\d.]/.test(value) && (/[\d.]$/.test(before) || /^[\d.]/.test(after))) value = `(${value})`;
             if (argument) value = `{${value}}`;   // the block is the whole argument: \frac{{2+2}}{4} is \frac{4}{4}
             text = text.slice(0, start) + ' ' + value + ' ' + text.slice(end + 2);
-            from = 0;
+            from = start + 1 + value.length;   // past the value: what a handler returns is not read for blocks again
         } catch {
             from = end + 2;
         }

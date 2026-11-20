@@ -89,7 +89,7 @@ suite('calculate: exact arithmetic', () => {
 });
 
 suite('calculate: no answer, or none yet', () => {
-    test('maths with no answer throws MathError', () => {
+    test('math with no answer throws MathError', () => {
         for (const s of ['1/0', 'sqrt(-1)', '0^0', 'ln(0)', '(-1)!', 'tan(pi/2)', 'arcsin(2)']) throws(() => calculate(s), MathError);
     });
     test('what cannot be worked out throws UnknownError', () => {
@@ -212,7 +212,7 @@ suite('calculate: options and lists', () => {
     test('BigInt values in the scope stay exact', () => {
         eq(calculate('n + 1', { n: 2n ** 70n }).text, String(2n ** 70n + 1n));
     });
-    test('a chain of comparisons, as maths', () => {
+    test('a chain of comparisons, as math', () => {
         eq(calculate('3 < x < 7', { x: 10 }).value, false);
         eq(calculate('3 < x < 7', { x: 5 }).value, true);
     });

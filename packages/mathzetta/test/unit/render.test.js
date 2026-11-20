@@ -35,8 +35,8 @@ suite('fixed: round, then exactly that many decimals', () => {
         eq(toJavaScript('fixed(x, 2)'), 'Number(x).toFixed(2)');
         eq(toJavaScript('fixed(x + 1, n)'), 'Number(x + 1).toFixed(n)');
         // rounded first, halves away from zero: format(2.5, '.0f') alone is '2', format(0.125, '.2f') '0.12'
-        eq(toPython('fixed(x, 2)'), 'format((math.floor(x * 10 ** 2 + 0.5) if x >= 0 else -math.floor(-x * 10 ** 2 + 0.5)) / 10 ** 2, ".2f")');
-        eq(toPython('fixed(x, n)'), 'format((math.floor(x * 10 ** n + 0.5) if x >= 0 else -math.floor(-x * 10 ** n + 0.5)) / 10 ** n, "." + str(n) + "f")');
+        eq(toPython('fixed(x, 2)'), 'format(((math.floor(x * 10 ** 2 + 0.5) if x >= 0 else -math.floor(-x * 10 ** 2 + 0.5)) / 10 ** 2 if abs(x) < math.inf else x), ".2f")');   // NaN and ±∞ pass through: math.floor raises on them
+        eq(toPython('fixed(x, n)'), 'format(((math.floor(x * 10 ** n + 0.5) if x >= 0 else -math.floor(-x * 10 ** n + 0.5)) / 10 ** n if abs(x) < math.inf else x), "." + str(n) + "f")');
         eq(toPython('fixed(x, 2)', { numpy: true }), 'np.char.mod("%.2f", np.where(x >= 0, np.floor(x * 10.0 ** 2 + 0.5), -np.floor(-x * 10.0 ** 2 + 0.5)) / 10.0 ** 2)');
         eq(toSQL('fixed(x, 2)'), 'ROUND(CAST(x AS NUMERIC), 2)');
         eq(toSQL('fixed(x, 2)', { dialect: 'sqlite' }), "printf('%.2f', x)");
@@ -51,7 +51,7 @@ suite('fixed: round, then exactly that many decimals', () => {
     });
 });
 
-suite('piecewise: a ?: is a cases block in every maths display', () => {
+suite('piecewise: a ?: is a cases block in every math display', () => {
     test('a case nobody wrote (unchanged) is not drawn or read out; code keeps it', () => {
         const input = 'f(x)=\\begin{cases}x & x>0\\\\-x & x\\le 0\\end{cases}';
         eq(toLaTeX(parse(input)), 'f\\left(x\\right) = \\begin{cases}x & \\text{if } x > 0 \\\\ -x & \\text{if } x \\leq 0 \\end{cases}');
@@ -89,7 +89,7 @@ suite('piecewise: a ?: is a cases block in every maths display', () => {
     });
 });
 
-suite('strict equality shows as = in every maths display', () => {
+suite('strict equality shows as = in every math display', () => {
     test('LaTeX, MathML and speech write =; text and JavaScript keep ===', () => {
         eq(toLaTeX('a === b'), 'a = b');
         eq(toMathML('a === b').replace(/ id="mz-\d+"/g, ''), '<math><mrow><mi>a</mi><mo>=</mo><mi>b</mi></mrow></math>');
@@ -211,7 +211,7 @@ suite('calculus display', () => {
         eq(toLaTeX('x^2 + 2xy + y^2'), 'x^2 + 2xy + y^2');
         eq(toLaTeX('2\\sec^2(2x)'), '2\\sec\\left(2x\\right)^2');
         eq(toLaTeX('\\frac{a}{b}\\cdot\\frac{c}{d}'), '\\frac{a}{b} \\cdot \\frac{c}{d}');
-        eq(toLaTeX('2\\frac{1}{3}'), '2 \\cdot \\frac{1}{3}');   // not the mixed number 2⅓
+        eq(toLaTeX(['2', '1', '3', '/', '*']), '2 \\cdot \\frac{1}{3}');   // the product, not the mixed number 2⅓ (which 2\\frac{1}{3} now reads as)
     });
     test('Δx and ∞', () => {
         eq(toLaTeX('\\frac{\\Delta y}{\\Delta x}'), '\\frac{\\Delta y}{\\Delta x}');
@@ -293,7 +293,7 @@ suite('MathML decorations', () => {
     });
 });
 
-suite('audio speech: the grouping in the words, for a listener who cannot see the maths', () => {
+suite('audio speech: the grouping in the words, for a listener who cannot see the math', () => {
     // pairs toSpeech() reads alike (the drawing tells them apart) that a listener alone could not
     const PAIRS = [
         ['\\sqrt{x+1}', '\\sqrt{x}+1'], ['\\sqrt{x+1}+2', '\\sqrt{x+1+2}'], ['\\sqrt[3]{x+1}', '\\sqrt[3]{x}+1'],
@@ -316,7 +316,7 @@ suite('audio speech: the grouping in the words, for a listener who cannot see th
             eq(/end \w+$/.test(toAudioSpeech(input)), false, `${input} ends on an end word`);
         }
     });
-    test('the video reading is untouched, and simple maths reads the same both ways', () => {
+    test('the video reading is untouched, and simple math reads the same both ways', () => {
         eq(toSpeech('\\sqrt{x+1}+2'), 'the square root of x plus 1, plus 2');
         for (const input of ['x^2 + 1', '2x', '\\sin x', '\\frac{1}{2}', '\\int_0^1 x^2\\,dx']) eq(toAudioSpeech(input), toSpeech(input), input);
     });
@@ -389,7 +389,7 @@ suite('GLSL names and sets', () => {
 suite('filter shaders', () => {
     const has = (text, part) => { if (!text.includes(part)) throw new Error(`missing ${JSON.stringify(part)}`); };
     const lacks = (text, part) => { if (text.includes(part)) throw new Error(`unexpected ${JSON.stringify(part)}`); };
-    test('one expression sets the whole colour', () => {
+    test('one expression sets the whole color', () => {
         const shader = filterShader('(1 - r, 1 - g, 1 - b)');
         has(shader, 'uniform sampler2D image;');
         has(shader, 'uniform float t;');
@@ -417,13 +417,13 @@ suite('filter shaders', () => {
         has(filterVertexShader({ version: 300 }), 'in vec2 position;');
         has(filterVertexShader(), 'attribute vec2 position;');
     });
-    test('neighbourhood functions are added only when used', () => {
+    test('neighborhood functions are added only when used', () => {
         const shader = filterShader('rgb + 1.5 (rgb - gaussian(2))');
         has(shader, 'vec3 gaussian(float sigma)');
         has(shader, 'mz_rgba(rgb + 1.5 * (rgb - gaussian(2.0)))');
         has(filterShader('if sobel() > 0.3 then 1 else 0'), '(sobel() > 0.3 ? 1.0 : 0.0)');
         has(filterShader('convolve(0, -1, 0, -1, 5, -1, 0, -1, 0)'), 'convolve(0.0, -1.0, 0.0, -1.0, 5.0, -1.0, 0.0, -1.0, 0.0)');
-        has(filterShader({ r: 'gaussian(4)' }), 'color.r = mz_ch_r(gaussian(4.0));');     // a colour gives that channel
+        has(filterShader({ r: 'gaussian(4)' }), 'color.r = mz_ch_r(gaussian(4.0));');     // a color gives that channel
         lacks(filterShader('gray'), 'mz_tap');
         lacks(filterShader('blurry'), 'mz_tap');
     });
@@ -480,38 +480,38 @@ suite('excel', () => {
 
 // ---- from filter-pictures.test.js ----
 const has = (text, part) => { if (!text.includes(part)) throw new Error(`missing ${JSON.stringify(part)}`); };
-const colour = (shader) => shader.split('\n').find((l) => l.includes('color = mz_rgba(')).trim();
+const color = (shader) => shader.split('\n').find((l) => l.includes('color = mz_rgba(')).trim();
 
 suite('filter pictures: alpha outside, built-in names', () => {
-    test('a geometry read as the whole colour keeps its alpha', () => {
+    test('a geometry read as the whole color keeps its alpha', () => {
         const shader = filterShader('zoom(0.5)');
-        eq(colour(shader), 'color = mz_rgba(mz_sample_image(mz_zoom(0.5)));');
+        eq(color(shader), 'color = mz_rgba(mz_sample_image(mz_zoom(0.5)));');
         has(shader, 'vec4 mz_sample_image(vec2 p)');
-        eq(colour(filterShader('zoom(inset, 0.5)', { images: ['inset'] })), 'color = mz_rgba(mz_sample_inset(mz_zoom(0.5)));');
+        eq(color(filterShader('zoom(inset, 0.5)', { images: ['inset'] })), 'color = mz_rgba(mz_sample_inset(mz_zoom(0.5)));');
     });
-    test('…but inside an expression it is a colour, with alpha() saying where the picture is', () => {
-        eq(colour(filterShader('mix(rgb, zoom(0.5), 0.5)')), 'color = mz_rgba(mix(rgb, mz_at_image(mz_zoom(0.5)), 0.5));');
-        eq(colour(filterShader('mix(rgb, zoom(0.5), alpha(zoom(0.5)))')), 'color = mz_rgba(mix(rgb, mz_at_image(mz_zoom(0.5)), alpha(mz_sample_image(mz_zoom(0.5)))));');
-        eq(colour(filterShader('alpha(rotate(inset, 1))', { images: ['inset'] })), 'color = mz_rgba(alpha(mz_sample_inset(mz_rotate(1.0))));');
+    test('…but inside an expression it is a color, with alpha() saying where the picture is', () => {
+        eq(color(filterShader('mix(rgb, zoom(0.5), 0.5)')), 'color = mz_rgba(mix(rgb, mz_at_image(mz_zoom(0.5)), 0.5));');
+        eq(color(filterShader('mix(rgb, zoom(0.5), alpha(zoom(0.5)))')), 'color = mz_rgba(mix(rgb, mz_at_image(mz_zoom(0.5)), alpha(mz_sample_image(mz_zoom(0.5)))));');
+        eq(color(filterShader('alpha(rotate(inset, 1))', { images: ['inset'] })), 'color = mz_rgba(alpha(mz_sample_inset(mz_rotate(1.0))));');
     });
-    test('a bare picture as the whole colour keeps its alpha; as a channel it does not', () => {
-        eq(colour(filterShader('inset', { images: ['inset'] })), 'color = mz_rgba(mz_px_inset);');
+    test('a bare picture as the whole color keeps its alpha; as a channel it does not', () => {
+        eq(color(filterShader('inset', { images: ['inset'] })), 'color = mz_rgba(mz_px_inset);');
         has(filterShader({ r: 'inset' }, { images: ['inset'] }), 'color.r = mz_ch_r(inset);');
     });
     test("GLSL's own functions are calls, not letters", () => {
-        eq(colour(filterShader('fract(x * 4)')), 'color = mz_rgba(fract(x * 4.0));');
-        eq(colour(filterShader('step(0.5, gray)')), 'color = mz_rgba(step(0.5, gray));');
+        eq(color(filterShader('fract(x * 4)')), 'color = mz_rgba(fract(x * 4.0));');
+        eq(color(filterShader('step(0.5, gray)')), 'color = mz_rgba(step(0.5, gray));');
     });
 });
 
-suite('filter colour spaces', () => {
+suite('filter color spaces', () => {
     const has = (text, part) => { if (!text.includes(part)) throw new Error(`missing ${JSON.stringify(part)}`); };
     test('conversion functions are calls, included when used', () => {
         const shader = filterShader('fromhsv((fract(red(tohsv(rgb)) + 0.1), green(tohsv(rgb)), blue(tohsv(rgb))))');
         has(shader, 'vec3 tohsv(vec3 c)');
         has(shader, 'mz_rgba(fromhsv(fract(red(tohsv(rgb)) + 0.1), green(tohsv(rgb)), blue(tohsv(rgb))))');   // a bracketed group is the call's arguments
         has(shader, 'vec3 fromhsv(float x, float y, float z)');
-        if (filterShader('gray').includes('vec3 tohsv')) throw new Error('colour block included when unused');
+        if (filterShader('gray').includes('vec3 tohsv')) throw new Error('color block included when unused');
     });
     test('in a space, pictures are converted as sampled and gray is still what is seen', () => {
         const shader = filterShader('mix(rgb, overlay, luma(mask))', { images: ['overlay', 'mask'], space: 'hsv' });
@@ -534,7 +534,7 @@ suite('filter selection', () => {
         if (filterShader('gray').includes('mz_img_selection')) throw new Error('declared when unused');
         has(filterShader('luma(selection(px + 2, py))'), 'luma(mz_sample_selection(px + 2.0, py))');   // a channel of a read keeps its alpha, as with zoom()
     });
-    test('a selection is not converted into a colour space', () => {
+    test('a selection is not converted into a color space', () => {
         const shader = filterShader('(r, g, selected)', { space: 'hsv' });
         has(shader, 'vec4 mz_sample_selection(vec2 p) { vec2 q = p + 0.5; return texture2D(mz_img_selection');
         if (shader.includes('mz_raw_selection')) throw new Error('selection converted');

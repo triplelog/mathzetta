@@ -4,9 +4,11 @@
  *
  * A matrix is an array of rows, each an array of entries, all the same length; a vector is a flat
  * array. `ring` says how to work with the entries:
- *   { add, sub, mul, div, isZero, zero, one, size?, fail, make? }
+ *   { add, sub, mul, div, isZero, zero, one, size?, fail, make?, charge? }
  * size(x) (a magnitude, for choosing pivots in doubles) is optional; fail(message) throws the
  * caller's "no answer" error; make(rows, like) wraps a result the way the caller marks matrices.
+ * charge(entries) is told how many entry products an operation is about to do, so the caller's work budget
+ * covers them (a 100 by 100 matrix to the power 2³⁰⁰ is 600 products of a million entries each).
  */
 
 /** Is `v` a matrix: rows of entries, all the same length (and no deeper lists)? */
@@ -21,6 +23,7 @@ export function matrixArithmetic(ring) {
     const R = ring;
     const make = R.make ?? ((rows) => rows);
     const size = R.size ?? (() => 1);
+    const charge = R.charge ?? (() => {});
     const shape = (A) => `${A.length} by ${A[0].length}`;
 
     const identity = (n, like) => make(Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? R.one() : R.zero()))), like);
@@ -28,6 +31,7 @@ export function matrixArithmetic(ring) {
 
     function times(A, B) {
         if (A[0].length !== B.length) R.fail(`a ${shape(A)} matrix times a ${shape(B)} one`);
+        charge(A.length * B.length * B[0].length);
         return make(A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => R.add(s, R.mul(x, B[k][j])), R.zero()))), A);
     }
 
@@ -36,6 +40,7 @@ export function matrixArithmetic(ring) {
         const M = A.map((r) => r.slice());
         const rows = M.length;
         const cols = M[0].length;
+        charge(rows * rows * cols);
         let det = R.one();
         let rank = 0;
         for (let c = 0; c < cols && rank < rows; c++) {

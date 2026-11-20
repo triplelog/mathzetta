@@ -1,5 +1,5 @@
 /**
- * Inline Math — draws calculus-level maths as HTML and CSS, from anything
+ * Inline Math — draws calculus-level math as HTML and CSS, from anything
  * MathZetta can read, with every part addressable.
  *
  *   import { toHTML, render } from '@mathzetta/inlinemath';

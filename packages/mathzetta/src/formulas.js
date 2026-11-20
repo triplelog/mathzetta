@@ -4,7 +4,7 @@
  * over rows of a spreadsheet.
  *
  * Column names are matched case-insensitively as whole words and swapped
- * for placeholders before parsing, so names that look like maths (`e`,
+ * for placeholders before parsing, so names that look like math (`e`,
  * `max`) still mean the column.
  */
 
@@ -12,6 +12,7 @@ import { parse } from './parse/index.js';
 import { isOperator, isCustomFunction } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 import { fromPostfix } from './tree.js';
+import { percentDecimal } from './common.js';
 import { checkGeneratedJs } from './safe.js';
 
 export { checkGeneratedJs, isSafeGeneratedJs, UnsafeCodeError } from './safe.js';
@@ -28,7 +29,7 @@ import { replaceColumnNames, columnIndexOf, placeholderFor } from './columns.js'
  * @param {string[]} header column names
  * @param {string} formula
  * @param {Map<string, {type, value}>} [unknownStringSelections] what to do
- *   with words that are neither columns nor maths: `{ type: 'column' |
+ *   with words that are neither columns nor math: `{ type: 'column' |
  *   'integer' | 'float' | 'string', value }`
  * @returns {{ success: true, jsFunction, postfixArray, types, unknownStrings,
  *   mathMLOriginal, mathMLSubbed } | { success: false, error, unknownStrings }}
@@ -37,10 +38,17 @@ export function strToFunction(header, formula, unknownStringSelections = new Map
     const compiled = compile(header, formula, unknownStringSelections);
     if (!compiled.success) return compiled;
     const { columnsAsIndexes, columnsAsNames } = compiled;
-    const mathml = toMathml(namedTree(compiled));
+    let mathml;
+    let jsFunction;
+    try {   // what JavaScript has no way to write (a limit, a derivative) is an answer, not an exception
+        mathml = toMathml(namedTree(compiled));
+        jsFunction = toCode(fromPostfix(columnsAsIndexes));
+    } catch (error) {
+        return { success: false, error: error.message, unknownStrings: compiled.unknownStrings };
+    }
     return {
         success: true,
-        jsFunction: toCode(fromPostfix(columnsAsIndexes)),
+        jsFunction,
         postfixArray: columnsAsIndexes,
         mathMLOriginal: mathml,
         mathMLSubbed: mathml,
@@ -214,7 +222,7 @@ function compile(header, formula, selections) {
 
 function classify(token, header) {
     if (isOperator(token)) return { type: 'operator', value: token };
-    if (isNumber(token, true)) return { type: 'number', value: token };
+    if (isNumber(token, true) || percentDecimal(token) !== null) return { type: 'number', value: token };   // 50% is 0.5
     if (['true', 'false', 'null', 'undefined'].includes(token)) return { type: 'boolean', value: token };
     if (token.length > 1 && /^(["'`]).*\1$/s.test(token)) return { type: 'string', value: token };
     const index = columnIndexOf(token, header);

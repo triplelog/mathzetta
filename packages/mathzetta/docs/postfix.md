@@ -49,7 +49,7 @@ Fixed arity — no count token:
 | Token | Arity | Meaning | Example postfix |
 | --- | --- | --- | --- |
 | `+` `-` `*` `/` `^` | 2 | arithmetic | `a b ^` = a<sup>b</sup> |
-| `mod` | 2 | remainder, with the divisor's sign (floored, as in maths): `-7 mod 3` is 2. JavaScript and SQL, whose `%`/`MOD` take the dividend's, are written to match | `a n mod` |
+| `mod` | 2 | remainder, with the divisor's sign (floored, as in math): `-7 mod 3` is 2. JavaScript and SQL, whose `%`/`MOD` take the dividend's, are written to match | `a n mod` |
 | `≡` | 2 | congruent | `a b ≡` |
 | `pmod` | 2 | a statement taken mod n | `a b ≡ n pmod` = a ≡ b (mod n) |
 | `±` | 2 | plus or minus | `a b ±` |
@@ -80,6 +80,13 @@ Fixed arity — no count token:
 | `∪` `∩` | 2 | union, intersection | `-∞ 0 2 () 0 ∞ 2 () ∪` |
 | `&` `\|` `\not` `\xor` `\nand` `\nor` | 2 (`\not`: 1) | logic | |
 | `?:` | 3 | condition, then, else | `c a b ?:` |
+
+`=` binds tighter than `?:`, so `x = 1 ? a : b` tests x = 1 (`x 1 = a b ?:`). One exception reads a definition: when
+what follows an `=` is itself true or false (a comparison, and, or, not) and a `?` comes after it within the same
+brackets, the whole conditional is the right side. `f(x) = x < 0 ? x^2 : 2x` is `f(x) = (x < 0 ? x^2 : 2x)`
+(`x 1 \:f x 0 < x 2 ^ 2 x * ?: =`), since comparing f(x) with a true/false value is never what is meant.
+Brackets keep the test: `(y = x > 0) ? 1 : 2` is `y x 0 > = 1 2 ?:`, and the text, JavaScript and GLSL outputs
+write that bracket so it reads back the same.
 
 Variadic — a count token comes first:
 

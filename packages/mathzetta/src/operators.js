@@ -135,7 +135,7 @@ export const precedenceOf = (token) => operator(token)?.prec;
  * `side` is 'left' or 'right' for binary parents.
  */
 export function needsParens(parentOp, childOp, side) {
-    // mod reads differently in maths (everything to its left) and in code
+    // mod reads differently in math (everything to its left) and in code
     // (like *), so it gets brackets wherever a reader could hesitate: around
     // any compound operand, (a + b) mod n, (a·b) mod n, a mod (2n); inside a
     // product, (a mod n)·2; and on the right of + or -, 1 + (a mod n).

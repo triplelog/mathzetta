@@ -3,17 +3,17 @@
 //   mathzetta.esm.js / .esm.min.js   everything (src/all.js) as an ES module
 //   mathzetta.cjs                    CommonJS, for require()
 //   mathzetta.js / .min.js           everything for a <script> tag: window.MathZetta
-//   mathzetta.<flavour>.min.js       <script> tags with less in them, each setting window.MathZetta:
-//                                    the flavours are listed in tools/flavours.js (core; core + one output;
-//                                    display; maths; maths + display; maths + one code output; code)
+//   mathzetta.<flavor>.min.js       <script> tags with less in them, each setting window.MathZetta:
+//                                    the flavors are listed in tools/flavours.js (core; core + one output;
+//                                    display; maths; maths + display; maths + one code output; code — the flavors' names)
 //   mathzetta.core.esm.min.js        the core as an ES module
 //   esm/<entry>.js, esm/chunks/      every entry point as its own ES module, all of them sharing
 //                                    chunks/core.js: a page imports the outputs it wants, the core loads once
 //   cjs/<entry>.cjs, cjs/chunks/     the same for require('mathzetta/<entry>') (require('mathzetta') is everything)
 //   mathzetta.plain*.min.js, mathzetta.plain.esm.min.js, mathzetta.plain.cjs, esm-plain/
 //                                    the same without the code-spelling reader (src/parse/clean/code.js —
-//                                    numpy, SymPy, SQL, spreadsheets, GLSL on input): maths and LaTeX
-//                                    only, about 5 KB gzipped less; the flavours without a code output
+//                                    numpy, SymPy, SQL, spreadsheets, GLSL on input): math and LaTeX
+//                                    only, about 5 KB gzipped less; the flavors without a code output
 import terser from '@rollup/plugin-terser';
 import { rollup } from 'rollup';
 import { readFileSync } from 'node:fs';
@@ -21,13 +21,13 @@ import { ENTRIES, FLAVOURS, PLAIN_FLAVOURS } from './tools/flavours.js';
 
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const src = (entry) => new URL(`./src/${entry}.js`, import.meta.url).pathname;
-const banner = (what = '') => `/* MathZetta ${version}${what ? ' ' + what : ''} — MIT licence — https://mathzetta.com */`;
+const banner = (what = '') => `/* MathZetta ${version}${what ? ' ' + what : ''} — MIT license — https://mathzetta.com */`;
 // The <script> builds also define this global; window.MathZetta is the one to use.
 const name = 'MathZettaModule';
-const min = terser({ format: { comments: /MIT licence/ } });
+const min = terser({ format: { comments: /MIT license/ } });
 const quiet = (warning, warn) => { if (!['NAMESPACE_CONFLICT', 'MIXED_EXPORTS', 'CIRCULAR_DEPENDENCY'].includes(warning.code)) warn(warning); };
 
-// a flavour's entry: the core and some outputters as one object, on window.MathZetta like src/all.js
+// a flavor's entry: the core and some outputters as one object, on window.MathZetta like src/all.js
 const flavour = (outputs) => ({
     name: 'flavour',
     resolveId: (id) => (id === '\0flavour' ? id : null),

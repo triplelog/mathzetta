@@ -83,7 +83,7 @@ console.log(`MathZetta ${version} on a CDN (after \`npm publish\`):
 Less than everything, for a script tag (each sets window.MathZetta; the core — parse, the tree tools,
 the operator table — is in every one):
 ${Object.entries(FLAVOURS).map(([f, outs]) => `  ${f.padEnd(18)} ${cdns(flavourFile(f))[0].padEnd(78)} ${outs.length ? '+ ' + outs.join(', ') : 'the core alone'}`).join('\n')}
-Plain — the same without the code-spelling reader (maths and LaTeX in, not numpy/SQL/spreadsheet spellings), ~5 KB less:
+Plain — the same without the code-spelling reader (math and LaTeX in, not numpy/SQL/spreadsheet spellings), ~5 KB less:
 ${Object.entries(PLAIN_FLAVOURS).map(([f, outs]) => `  ${f.padEnd(18)} ${cdns(flavourFile(f))[0].padEnd(78)} ${outs.length ? '+ ' + outs.join(', ') : 'the core alone'}`).join('\n')}
   (ES modules: build/mathzetta.plain.esm.min.js, and build/esm-plain/<entry>.js like build/esm/)
 Any combination, as ES modules sharing one core (the site's cdn.html page writes these for you):

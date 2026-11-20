@@ -127,7 +127,7 @@ The rules that make it read the way a person does:
   `a(t)`, `y(0)`. With more inside the brackets it is a product: `x(x+1)`,
   `x(2t)`, `a(b+c)` — and so are `x(x)` and `e(…)`. Words of three or more
   letters are custom functions: `myFunction(x)`.
-- **mod.** Written as a word (`mod`, `\bmod`) it follows maths: it takes
+- **mod.** Written as a word (`mod`, `\bmod`) it follows math: it takes
   everything to its left, back to an `=` or comparison, and one factor on
   its right — `2 + 3 mod 4` is (2+3) mod 4, `c = m^e mod n`, `a mod 2n` is
   a mod (2n), `(2 mod 3)·4`. The symbol `%` follows programming and binds
@@ -181,7 +181,7 @@ treat exactly like `*`; `buildTree` makes each one a `*` node with
 postfix index. `parseSteps()` returns that map as `written` (`{ 2: 'cross' }`
 for `a × b`) and puts `written` on the tree's nodes, so `parseTree()` has it
 too. `parse()` still returns plain postfix, and the stages `parseSteps` shows
-(cleaned text, tokens, raw postfix) show `*`. The maths displays use it:
+(cleaned text, tokens, raw postfix) show `*`. The math displays use it:
 LaTeX writes `\cdot` or `\times`, MathML `⋅` or `×`, text `·` or `×` (so it
 reads back marked), Inline Math draws the sign, and speech says "dot" or
 "cross" between vectors (`\vec`, `\hat`; the `words` option renames them) and
@@ -255,7 +255,7 @@ toSpeech(x, { say: { sqrt: ([a]) => `root ${a}` } })     // a whole phrase
 ```
 
 **Without the drawing: `toAudioSpeech()`.** Everything above assumes the
-listener can see the maths — a pause is enough to end "the square root of x
+listener can see the math — a pause is enough to end "the square root of x
 plus 1," because the radical shows where it ends. A screen reader or an
 audio-only lesson has no picture, and a pause is easy to miss, so
 `toAudioSpeech()` puts the grouping in the words. It is the same speaker with
@@ -304,7 +304,7 @@ the output differs from the JavaScript in a few deliberate ways:
 - `GLSL_HELPERS` is a string of `mz_*` functions to paste above `main()`:
   what GLSL ES 1.0 (WebGL 1) lacks — `round`, `sinh`, `asinh`, cube
   roots, factorial, gcd, infinity — with vec2/vec3/vec4 overloads so an
-  expression over a colour works. `{ version: 300 }` uses the native
+  expression over a color works. `{ version: 300 }` uses the native
   functions where GLSL ES 3.0 has them.
 - `30°` is `radians(30.0)`; `mod` is GLSL's `mod()`; `(r, g, b)` is
   `vec3(r, g, b)`; `±x` is `vec2(x, -x)`; `x ∈ ℤ` is `fract(x) == 0.0`.
@@ -314,7 +314,7 @@ the output differs from the JavaScript in a few deliberate ways:
   calls to functions you supply, as in the JavaScript output; strings and
   nested lists have no GLSL form.
 
-Shareable filters (a JSON format of maths, parameters and chains, and the WebGL runner) are
+Shareable filters (a JSON format of math, parameters and chains, and the WebGL runner) are
 [qblur](https://qblur.com), built on this.
 
 `filterShader(spec)` wraps all this into a complete fragment shader for

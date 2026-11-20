@@ -312,12 +312,12 @@ test('the core imports only what every page maps (mathzetta, mathzetta/speech, m
     }
 });
 
-// ---- Markdown with maths (inlinemath/markdown) -------------------------------------------
+// ---- Markdown with math (inlinemath/markdown) -------------------------------------------
 
 const { markdownToHTML, extractMath } = await import('../src/markdown.js');
 const spoken = (html) => [...html.matchAll(/class="mv-md-(?:math|display)"(?: data-mv-md="\d+")?><span[^>]*aria-label="([^"]*)"/g)].map((m) => m[1]);
 
-test('markdown: which dollars are maths', () => {
+test('markdown: which dollars are math', () => {
     const pieces = (t) => extractMath(t).math.map((m) => `${m.display ? 'D' : 'I'}:${m.source}`);
     assert.deepEqual(pieces('a $x^2$ b $$y$$ c'), ['I:x^2', 'D:y']);
     assert.deepEqual(pieces('it costs $5 and $10'), []);
@@ -331,10 +331,10 @@ test('markdown: which dollars are maths', () => {
     assert.deepEqual(extractMath('$a$ $$b$$', { delimiters: ['$$'] }).math.map((m) => m.source), ['b']);
 });
 
-test('markdown: maths drawn inline and on its own, worked out, remembered', () => {
+test('markdown: math drawn inline and on its own, worked out, remembered', () => {
     const html = markdownToHTML('The area is $\\pi r^2$; for $r = 3$ it is ${{pi r^2}}$.\n\n$$\\int_0^1 x^2 dx = {{\\int_0^1 x^2 dx}}$$');
     assert.deepEqual(spoken(html), ['pi r squared', 'r equals 3', '9 pi', 'the integral from 0 to 1 of x squared, d x equals one third']);
-    assert.ok(html.includes('<div class="mv-md-block"><span class="mv-md-display" data-mv-md="3">'), 'display maths is a block');
+    assert.ok(html.includes('<div class="mv-md-block"><span class="mv-md-display" data-mv-md="3">'), 'display math is a block');
     assert.deepEqual(spoken(markdownToHTML('$r = 1/3$, ${{3r}}$')), ['r equals one third', '1'], 'definitions are exact');
     assert.deepEqual(spoken(markdownToHTML('$r = 3$ ${{r}}$', { define: false })), ['r equals 3', 'r'], 'define: false');
     const det = spoken(markdownToHTML('$A = \\begin{pmatrix} 2 & 1 \\\\ 1 & 3 \\end{pmatrix}$ ${{det(A)}}$'));
@@ -356,7 +356,7 @@ test('markdown: a saved variable is not put in for the variable d/dx, ∫ … dx
     assert.match(t('$x := [[1..5 = 2]]$ $\\lim_{x \\to 0} x$'), /limx→0x$/, 'nor a limit\'s variable');
 });
 
-test('markdown: maths that does not read is shown as written, with the reason', () => {
+test('markdown: math that does not read is shown as written, with the reason', () => {
     const html = markdownToHTML('bad $\\frac{1$ here');
     assert.match(html, /<span class="mv-md-error" data-mv-md="0" title="[^"]+"><code>\$\\frac\{1\$<\/code><\/span>/);
 });
@@ -379,7 +379,7 @@ test('markdown: safe by default', () => {
     assert.ok(markdownToHTML('<b>bold</b>', { html: true }).includes('<b>bold</b>'), 'html: true lets it through');
 });
 
-test('markdown: another renderer, with the maths put back into its output', () => {
+test('markdown: another renderer, with the math put back into its output', () => {
     const render = (md) => `<article>${md.replace(/\*(.+?)\*/g, '<i>$1</i>')}</article>`;
     const html = markdownToHTML('*so* $x^2$', { render });
     assert.ok(html.startsWith('<article><i>so</i> <span class="mv-md-math" data-mv-md="0">'));
@@ -403,7 +403,7 @@ test('markdown: saved variables — $A := 2+2$, then A is drawn as 2 + 2 and {{A
     assert.deepEqual(spoken(markdownToHTML('$r = 3$ $\\pi r^2 = {{pi r^2}}$')), ['r equals 3', 'pi r squared equals 9 pi']);
     assert.deepEqual(spoken(markdownToHTML('$g := 10$ ${{2g}}$')), ['g is defined as 10', '20']);
     assert.match(markdownToHTML('$_x$'), /mv-md-error[^>]*title="a hidden/, 'a $_…$ that saves nothing is an error');
-    assert.deepEqual(all(markdownToHTML('$$_A := 2$$\n\n$A$')), ['2'], 'display maths too');
+    assert.deepEqual(all(markdownToHTML('$$_A := 2$$\n\n$A$')), ['2'], 'display math too');
 });
 
 test('markdown: inputs set variables — [[…]] is a textbox, [[a | b]] a dropdown, [[1..10]] a slider', () => {
@@ -499,7 +499,7 @@ test('matrices: a grid in brackets, rows addressable, worked out', () => {
     test('a step whose rule id holds a quote keeps its attribute whole', () => {
         assert.ok(stepsHTML([{ id: 'a"b', name: 'n', from: 'x', to: 'x', path: [] }]).includes('data-rule="a&quot;b"'));
     });
-    test('a colour is one CSS value: anything else is left out', () => {
+    test('a color is one CSS value: anything else is left out', () => {
         assert.ok(toHTML('x', { colors: { x: 'crimson' } }).includes('color:crimson'));
         assert.ok(toHTML('x', { colors: { x: 'rgb(0 102 204 / 50%)' } }).includes('color:rgb(0 102 204 / 50%)'));
         for (const bad of ['red;background:url(https://example.com/x)', 'red" onmouseover="x', 'expression(alert(1))']) {
@@ -616,16 +616,16 @@ test('markdown: typed placeholder characters are only characters', () => {
     for (const s of ['' + '0' + '', '' + '5' + ' and $x$', '$x$ and ' + '0' + ' again', '`code` ' + '0' + '']) {
         const html = markdownToHTML(s);
         assert.ok(!html.includes('undefined'), `${JSON.stringify(s)} → ${html}`);
-        assert.equal((html.match(/mv-md-math/g) || []).length, s.includes('$x$') ? 1 : 0, `${JSON.stringify(s)}: the maths drawn once`);
+        assert.equal((html.match(/mv-md-math/g) || []).length, s.includes('$x$') ? 1 : 0, `${JSON.stringify(s)}: the math drawn once`);
         assert.equal((html.match(/<code>/g) || []).length, s.includes('`') ? 1 : 0);
     }
 });
 
-test('markdown: maths in an indented code block is code, and defines nothing', () => {
+test('markdown: math in an indented code block is code, and defines nothing', () => {
     const drawn = (s) => text(markdownToHTML(s).replace(/aria-label="[^"]*"/g, ''));
     assert.equal(drawn('    $_A := 5$\n\n$A + 1$'), '$_A := 5$\nA+1');
     assert.equal(drawn('$_A := 5$\n\n$A + 1$'), '5+1');
-    assert.ok(drawn('- item\n\n    $x$ in the item').includes('x in the item'), 'inside a list item it is maths');
+    assert.ok(drawn('- item\n\n    $x$ in the item').includes('x in the item'), 'inside a list item it is math');
 });
 
 test('markdown: long runs of $ and many saved variables stay fast', () => {
@@ -694,11 +694,11 @@ test('view: on() stops, destroy() stops everything, one live region per element,
         assert.equal(element.count('click') + element.count('keydown') + element.count('dblclick'), 0);
         assert.ok(live.removed, 'the live region this view added is gone');
 
-        let cancelled = 0;
+        let canceled = 0;
         const third = new View(new FakeElement(), 'x', {});
-        third.editor = { cancelEdit: () => { cancelled++; } };
+        third.editor = { cancelEdit: () => { canceled++; } };
         third.set('x + 1');
-        assert.equal(cancelled, 1, 'an editor over the old expression is closed, not committed to the new one');
+        assert.equal(canceled, 1, 'an editor over the old expression is closed, not committed to the new one');
     } finally {
         if (hadDocument) { /* a real page's document stays */ } else delete globalThis.document;
     }
@@ -728,6 +728,62 @@ test('view: a step moves each part from where it was, not from inside a part tha
     } finally {
         if (!hadElement) delete globalThis.Element;
     }
+});
+
+// ---- from the review before 0.3 ---------------------------------------------------------
+
+test('Markdown: nothing a document can write runs for long or overflows the stack', () => {
+    const within = (ms, md) => {
+        const start = Date.now();
+        markdownToHTML(md);
+        assert.ok(Date.now() - start < ms, `${JSON.stringify(md.slice(0, 12))}… took ${Date.now() - start} ms`);
+    };
+    within(1500, '# a' + ' '.repeat(20000) + 'x');      // the heading pattern was cubic: 4,000 spaces took 20 s
+    within(1500, '# ' + '#'.repeat(100000) + ' a');
+    within(1500, '>'.repeat(5000));                      // quotes in quotes: a RangeError from 2,344
+    within(1500, '- '.repeat(3000) + 'x');
+    within(1500, '1. '.repeat(3000) + 'x');
+    within(1500, '\\( '.repeat(33000));                  // every unclosed \( looked for its \) to the end
+    within(1500, '['.repeat(100000));
+    within(1500, '!['.repeat(50000));
+});
+
+test('Markdown: headings, with and without closing #s', () => {
+    const h = (md) => markdownToHTML(md);
+    assert.equal(h('# Title ##'), '<h1>Title</h1>');
+    assert.equal(h('## x   '), '<h2>x</h2>');
+    assert.equal(h('# a#'), '<h1>a#</h1>', 'a # that touches the text is text');
+    assert.equal(h('# a \\#'), '<h1>a #</h1>', 'and so is an escaped one');
+    assert.equal(h('# # #'), '<h1>#</h1>');
+    assert.equal(h('#'), '<p>#</p>');
+    assert.equal(h('#\tTab'), '<h1>Tab</h1>');
+});
+
+test('Markdown: links and images still read, with brackets in the address and an image as a label', () => {
+    const html = markdownToHTML('[a *b*](http://x.y/Function_(math) "t") ![alt](i.png) [![i](i.png)](u)');
+    assert.ok(html.includes('<a href="http://x.y/Function_(math)" title="t">a <em>b</em></a>'), html);
+    assert.ok(html.includes('<img src="i.png" alt="alt">'), html);
+    assert.ok(html.includes('<a href="u"><img src="i.png" alt="i"></a>'), html);
+    assert.ok(markdownToHTML('> > - a\n> >   - b $x^2$').includes('<blockquote>\n<blockquote>\n<ul>'), 'ordinary nesting is unchanged');
+});
+
+test('the attributes hook: a class and a name cannot close the tag', () => {
+    const html = toHTML('x', { attributes: () => ({ class: 'a" onmouseover="alert(1)', 'onx="1" y': 'z', 'data-k': 'v"' }) });
+    assert.ok(!/ onmouseover="/.test(html) && !/ onx=/.test(html), html);
+    assert.ok(html.includes('data-k="v&quot;"'), html);
+    assert.ok(toHTML('x', { attributes: () => ({ class: 'mine', 'data-k': '1' }) }).includes('mv-var mine" data-node="0" data-k="1"'));
+});
+
+test('View.set: an expression that cannot be drawn leaves the view as it was', async () => {
+    const { View } = await import('../src/view.js');
+    const element = { innerHTML: '', firstElementChild: { classList: { add() {} }, setAttribute() {} }, addEventListener() {}, removeEventListener() {} };
+    let view;
+    try { view = new View(element, 'x^2+1'); } catch { return; }   // no DOM to stand on here: the browser checks cover it
+    const tree = view.tree;
+    const html = element.innerHTML;
+    assert.throws(() => view.set({ type: 'op', op: 'nosuchop', args: [{ type: 'symbol', value: 'q' }] }));
+    assert.equal(view.tree, tree);
+    assert.equal(element.innerHTML, html);
 });
 
 // ---- report -------------------------------------------------------------------------

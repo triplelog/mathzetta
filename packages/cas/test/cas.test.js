@@ -1,4 +1,4 @@
-// The CAS (src/cas): exact answers, steps, customising, and property checks
+// The CAS (src/cas): exact answers, steps, customizing, and property checks
 // against MathZetta's evaluate (simplified = original, d/dx by finite differences,
 // d/dx ∫ f = f, every solution satisfies its equation).
 

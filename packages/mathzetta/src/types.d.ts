@@ -142,7 +142,7 @@ export interface SpeechOptions {
 export function toSpeech(input: Input, options?: SpeechOptions): string;
 /** The same phrase in pieces, each tagged with the node it belongs to. */
 export function toSpeechSegments(input: Input, options?: SpeechOptions): { text: string; id?: number }[];
-/** For a listener who cannot see the maths (a screen reader, audio only): groups are opened with
+/** For a listener who cannot see the math (a screen reader, audio only): groups are opened with
  *  "the quantity" and closed with an end word — "the square root of the quantity x plus 1, end root, plus 2". */
 export function toAudioSpeech(input: Input, options?: SpeechOptions): string;
 /** toAudioSpeech() in pieces tagged with node ids. */
@@ -283,8 +283,12 @@ export function toGLSL(input: Input, options?: { version?: 100 | 300 }): string;
 export const GLSL_HELPERS: string;
 /** A complete fragment shader applying expressions to every pixel; the filter format on top of it is the qblur package. */
 export function filterShader(spec: string | { r?: string; g?: string; b?: string; a?: string; rgb?: string; rgba?: string }, options?: { version?: 100 | 300; names?: string[]; values?: string[]; uniforms?: Record<string, string>; blend?: boolean; images?: string[] | Record<string, { place?: string }>; space?: string }): string;
-/** Colour spaces a filter can work in ('srgb', 'linear', 'hsv', 'hsl', 'lab', 'oklab', 'ycbcr'); to<space>(c) / from<space>(c) convert. */
+/** Color spaces a filter can work in ('srgb', 'linear', 'hsv', 'hsl', 'lab', 'oklab', 'ycbcr'); to<space>(c) / from<space>(c) convert. */
+export const COLOR_SPACES: string[];
+export const COLOR_FUNCTIONS: string[];
+/** @deprecated COLOR_SPACES (the same array), its name until 1.1. */
 export const COLOUR_SPACES: string[];
+/** @deprecated COLOR_FUNCTIONS (the same array), its name until 1.1. */
 export const COLOUR_FUNCTIONS: string[];
 /** Pictures every filter has without declaring them: 'source' (the frame a chain started from) and 'selection' (white = selected). */
 export const IMPLICIT_PICTURES: string[];
@@ -293,6 +297,8 @@ export function filterVertexShader(options?: { version?: 100 | 300 }): string;
 export const FILTER_VALUES: string[];
 export const FILTER_FUNCTIONS: string[];
 export const FILTER_NAMES: string[];
+export const NEIGHBORHOOD: string[];
+/** @deprecated NEIGHBORHOOD (the same array), its name until 1.1. */
 export const NEIGHBOURHOOD: string[];
 export const GEOMETRY: string[];
 export const PLACES: string[];
@@ -327,7 +333,7 @@ export interface Calculation {
 export function calculate(input: Input, scope?: Record<string, unknown>, options?: CalculateOptions): Calculation;
 /** The text of a `{{...}}` block → what replaces it in the input. */
 export function calculateBlock(text: string, scope?: Record<string, unknown>): string;
-/** The maths has no answer: 1/0, √−1, a divergent integral. */
+/** The math has no answer: 1/0, √−1, a divergent integral. */
 export class MathError extends Error {}
 /** It can't be worked out: an unset variable, an integral without limits. */
 export class UnknownError extends Error {}

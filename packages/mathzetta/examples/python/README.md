@@ -17,7 +17,7 @@ and a default formula. A parameter written `data: columns` holds the table:
 the formula can use any column by name (`H / AB`, `2B`), and with numpy
 `sum(HR)`, `max(HR)`, `mean(HR)`, `median(HR)`, `stdev(HR)` are over the
 column. Each filled function also gets `.formula` (the text) and `.latex`
-(for matplotlib labels). Formulas can only do maths: calls like `print` or
+(for matplotlib labels). Formulas can only do math: calls like `print` or
 `exec`, attributes and unknown names are refused.
 
 ```bash
@@ -28,7 +28,7 @@ node tools/python-template.js examples/python/logistic.py -o model.py           
 
 `logistic.py` is a population model whose growth law is a slot.
 **[pyslots](https://tabdn.com/pyslots/)** turns templates like it into web pages — a form
-from the slots, the formulas drawn as maths, Python run in the browser
+from the slots, the formulas drawn as math, Python run in the browser
 (Pyodide) or on a Flask server — and has the matplotlib chart examples over
 baseball data (scatter, histogram, box plots, aging curve, trends, top-N,
 pitcher density).

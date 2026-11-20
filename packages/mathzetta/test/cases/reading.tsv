@@ -126,7 +126,7 @@ Infinity + NaN	∞+NaN	["∞","NaN","+"]
 --x	--x	["x","neg","neg"]	-\left(-x\right)
 x++y	x++y	["x","y","+"]	x + y	<math><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow></math>
 x+-y	x+-y	["x","y","neg","+"]
-z² = z*z	z^2=z*z	["z","2","^","z","z","*","="]	z^2 = zz	<math><mrow><msup><mi>z</mi><mn>2</mn></msup><mo>=</mo><mrow><mi>z</mi><mo>⁢</mo><mi>z</mi></mrow></mrow></math>
+z² = z*z	z^{2}=z*z	["z","2","^","z","z","*","="]	z^2 = zz	<math><mrow><msup><mi>z</mi><mn>2</mn></msup><mo>=</mo><mrow><mi>z</mi><mo>⁢</mo><mi>z</mi></mrow></mrow></math>
 3 ⋅ 4	3*4	["3","4","*"]	3 \cdot 4	<math><mrow><mn>3</mn><mo>⋅</mo><mn>4</mn></mrow></math>
 ⅓ + ¼	(1/3)+(1/4)	["1","3","/","1","4","/","+"]	\frac{1}{3} + \frac{1}{4}	<math><mrow><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>+</mo><mfrac><mn>1</mn><mn>4</mn></mfrac></mrow></math>
 true ⊕ FALSE	true \xor false	["true","false","\\xor"]	\mathrm{true} \oplus \mathrm{false}	<math><mrow><mi>true</mi><mo>⊕</mo><mi>false</mi></mrow></math>
@@ -506,3 +506,10 @@ x is within 0.001 of 7		["x","7","-","abs","0.001","≤"]	\left|x - 7\right| \le
 x is within 1% of 7		["x","7","-","abs","1","100","/","7","*","≤"]	\left|x - 7\right| \leq \frac{1}{100} \cdot 7
 x is within 5 percent of y		["x","y","-","abs","5","100","/","y","abs","*","≤"]	\left|x - y\right| \leq \frac{5}{100}\left|y\right|
 x is not within 0.1 of 2		["x","2","-","abs","0.1",">"]	\left|x - 2\right| > 0.1
+# = before a conditional defines it when what follows the = is true or false: the whole conditional is the right side (parser.js equals()); brackets keep a test
+f(x) = x < 0 ? x^2 : x < 1 ? 1 : 2x - 1		["x","1","\\:f","x","0","<","x","2","^","x","1","<","1","2","x","*","1","-","?:","?:","="]
+y = x > 0 ? 1 : 2		["y","x","0",">","1","2","?:","="]
+y = x > 0 and z < 1 ? 1 : 2		["y","x","0",">","z","1","<","&","1","2","?:","="]
+(y = x > 0) ? 1 : 2		["y","x","0",">","=","1","2","?:"]
+a = b and c = d ? 1 : 2		["a","b","=","c","d","=","&","1","2","?:"]
+x = 1 ? a : b		["x","1","=","a","b","?:"]

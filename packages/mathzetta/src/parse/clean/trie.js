@@ -58,14 +58,14 @@ function longestMatch(root, text, start) {
     return best;
 }
 
-/** `Max` → `max`, `MAX`; `math.pi` → `Math.Pi`: lower, upper and capitalised words. */
+/** `Max` → `max`, `MAX`; `math.pi` → `Math.Pi`: lower, upper and capitalized words. */
 function caseVariants(text) {
-    const variants = new Set([text.toLowerCase(), text.toUpperCase(), capitalise(text)]);
+    const variants = new Set([text.toLowerCase(), text.toUpperCase(), capitalize(text)]);
     variants.delete(text);
     return variants;
 }
 
-function capitalise(text) {
+function capitalize(text) {
     let out = '';
     let afterLetter = false;
     for (const ch of text) {

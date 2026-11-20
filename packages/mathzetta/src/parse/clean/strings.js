@@ -41,6 +41,27 @@ export function markPrimes(input) {
     return out;
 }
 
+/**
+ * `from` inside quoted strings becomes `to` ("§3" in a filter on text); the rest is as it was. Quotes are found as
+ * markPrimes finds them, so f'(x) holds no string. Length and positions are kept.
+ */
+export function swapInStrings(input, from, to) {
+    if (!input.includes(from)) return input;
+    const marked = markPrimes(input);
+    let out = '';
+    for (let i = 0; i < marked.length; i++) {
+        const c = marked[i];
+        if (c === '"' || c === '`' || c === "'") {
+            const end = closingQuote(marked, i);
+            out += input.slice(i, end + 1).replaceAll(from, to);
+            i = end;
+        } else {
+            out += input[i];
+        }
+    }
+    return out;
+}
+
 function closingQuote(input, start) {
     let escaped = false;
     for (let j = start + 1; j < input.length; j++) {

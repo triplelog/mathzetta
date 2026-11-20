@@ -1,6 +1,6 @@
 /**
  * '@mathzetta/inlinemath/lite' — Inline Math's drawing only: `toHTML()` and nothing live. The same layout,
- * glyphs, colours, highlights and accessible (spoken) labels as the full build, without the live
+ * glyphs, colors, highlights and accessible (spoken) labels as the full build, without the live
  * view (render, step animation, events), Markdown, the CAS or the calculator.
  *
  *   import { toHTML } from '@mathzetta/inlinemath/lite';

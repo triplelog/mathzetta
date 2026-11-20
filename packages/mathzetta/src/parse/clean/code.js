@@ -1,8 +1,8 @@
 /**
  * Programming spellings, rewritten into ones the rest of the cleaner reads:
  * what JavaScript, Python (math, numpy, scipy), SQL and GLSL write for
- * maths — MathZetta's own code outputs among them, so each reads back as the
- * maths it came from (test/unit/roundtrip.test.js).
+ * math — MathZetta's own code outputs among them, so each reads back as the
+ * math it came from (test/unit/roundtrip.test.js).
  *
  *   np.sin(x), np.arctan2(y, x)        Math.sin(x), Math.atan2(y, x)   (then replacements.js)
  *   np.where(c, a, b), a if c else b   ((c) ? (a) : (b))
@@ -111,7 +111,7 @@ function jsHelpers(text) {
 
 // ---- spreadsheets (a formula starting with =) ---------------------------------------
 
-/** Excel and Sheets functions, by what they are in maths (render/excel.js writes them). */
+/** Excel and Sheets functions, by what they are in math (render/excel.js writes them). */
 const SHEET_CALLS = {
     IF: (a) => a.length >= 2 && `((${a[0]}) ? (${a[1]}) : (${a[2] ?? 'false'}))`,
     AND: (a) => a.length && `(${a.map(p).join(' & ')})`,
@@ -265,7 +265,7 @@ function sql(text) {
     text = rewriteCalls(text, /(?<![\w.])LOG\s*\(/g, (args) => (args.length === 2 ? `log_{${args[0]}}(${args[1]})` : `log_{10}(${args[0]})`));
     text = text.replace(/(?<![\w.])PI\s*\(\s*\)/g, 'π');
     text = text.replace(/(?<![\w.])([A-Z][A-Z0-9]*)(?=\s*\()/g, (name) => SQL_NAMES[name] ?? name);
-    // x IN (1, 2), x NOT IN (1, 2): capitals only, as (0, 1) after "in" is an interval in maths
+    // x IN (1, 2), x NOT IN (1, 2): capitals only, as (0, 1) after "in" is an interval in math
     for (const [pattern, symbol] of [[/\bNOT\s+IN\s*\(/g, '∉'], [/\bIN\s*\(/g, '∈']]) {
         for (let m = pattern.exec(text); m; m = pattern.exec(text)) {
             const open = m.index + m[0].length - 1;
@@ -371,7 +371,7 @@ const interval = (brackets) => (a) => a.length === 2 && `${brackets[0]}${a[0]}, 
 /** (x, a, b) in integrate and summation: the variable and its bounds. */
 const bounds = (arg) => pieceOf(arg) ?? [arg];
 
-/** Calls the cleaner doesn't otherwise know, as maths. */
+/** Calls the cleaner doesn't otherwise know, as math. */
 const CALLS = {
     where: (a) => a.length === 3 && `((${a[0]}) ? (${a[1]}) : (${a[2]}))`,
     logical_and: (a) => a.length === 2 && `((${a[0]}) & (${a[1]}))`,
@@ -460,7 +460,30 @@ function generator(kind) {
     };
 }
 
+/**
+ * (lambda v: body)(x) → body with (x) for v: how Python output writes an expression once that it uses more than once
+ * (round, odd roots). The last one first, so a lambda inside another's argument is reduced before it.
+ */
+function lambdaCalls(text) {
+    for (let at = text.lastIndexOf('(lambda'); at >= 0; at = at > 0 ? text.lastIndexOf('(lambda', at - 1) : -1) {
+        const close = closing(text, at);
+        if (close < 0 || text[close + 1] !== '(') continue;
+        const end = closing(text, close + 1);
+        const fn = /^\(lambda\s+([\w\s,]+?)\s*:\s*([\s\S]*)\)$/.exec(text.slice(at, close + 1));
+        if (end < 0 || !fn) continue;
+        const names = fn[1].split(',').map((n) => n.trim());
+        const args = splitArgs(text.slice(close + 2, end));
+        if (args.length !== names.length || !names.every((n) => /^[A-Za-z_]\w*$/.test(n))) continue;
+        const values = new Map(names.map((n, i) => [n, args[i]]));
+        const body = fn[2].replace(new RegExp(`(?<![\\w.])(${names.join('|')})(?!\\w)`, 'g'), (n) => `(${values.get(n)})`);
+        text = text.slice(0, at) + `(${body})` + text.slice(end + 1);
+        if (text.length > 100000) throw new Error('The expression expands too much when read');   // each level writes its argument once per use
+    }
+    return text;
+}
+
 function calls(text) {
+    text = lambdaCalls(text);
     // scipy.integrate.quad(lambda x: f, a, b)[0] → int(f, x, a, b)
     text = rewriteCalls(text, call('quad'), (args, m, after) => {
         const fn = /^lambda\s+(\w+)\s*:\s*(.*)$/s.exec(args[0] ?? '');
@@ -540,7 +563,7 @@ export function codeRewrites(text) {
     if (/^\s*=(?!=)/.test(text)) text = spreadsheet(text);
     text = jsHelpers(text);
     text = text.replace(/(?<![\w.])9e999\b/g, '∞');
-    text = text.replace(/(?<![\w.])(\d+(?:\.\d+)?)[eE]([+-]\d+)(?![\w.])/g, '($1*10^{$2})');
+    text = text.replace(/(?<![\w.])(\d+(?:\.\d+)?)[eE]([+-]?\d+)(?![\w.])/g, '($1*10^{$2})');   // 1e5 too: a digit, e, a digit is no product
     text = sql(text);
     text = prefixes(text);
     text = pythonSets(text);

@@ -3,7 +3,7 @@
  *
  * Matching is longest-first at each position (see trie.js), so `\\log_10`
  * wins over `\\log`. Unless an entry ends with `true` ("case sensitive"),
- * its all-lower, ALL-UPPER and Capitalised spellings are added too —
+ * its all-lower, ALL-UPPER and Capitalized spellings are added too —
  * so `Max` also covers `max` and `MAX`, but an exact entry always beats a
  * generated variant.
  *
@@ -87,6 +87,7 @@ export const SYMBOL_REPLACEMENTS = [
     ["\\frac", "frac"],
     ["\\dfrac", "frac"],
     ["\\tfrac", "frac"],
+    ["\\cfrac", "frac"],
     ["\\lim", "lim"],
     ["\\sum", "\\sumidx"],
     ["\\prod", "\\prodidx"],
@@ -270,6 +271,8 @@ export const SYMBOL_REPLACEMENTS = [
     ["⅜", "(3/8)"],
     ["⅝", "(5/8)"],
     ["⅞", "(7/8)"],
+    ["⅕", "(1/5)"], ["⅖", "(2/5)"], ["⅗", "(3/5)"], ["⅘", "(4/5)"], ["⅙", "(1/6)"], ["⅚", "(5/6)"],
+    ["⅐", "(1/7)"], ["⅑", "(1/9)"], ["⅒", "(1/10)"],
     ["⊕", " \\xor "],
     ["∞", "∞"],
     ["⋅", DOT_TIMES],

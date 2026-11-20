@@ -12,11 +12,14 @@
 import { clean as cleanText } from './clean/index.js';
 import { casesToTernary } from './clean/latex.js';
 import { isOperatorWord, WRITTEN_TIMES } from './vocabulary.js';
-import { restoreStrings } from './clean/strings.js';
+import { restoreStrings, swapInStrings } from './clean/strings.js';
 import { tokenize, PROTECTED } from './tokenize.js';
 import { toRawPostfix } from './parser.js';
 import { buildTree } from './build.js';
 import { toPostfix, fromPostfix, walk } from '../tree.js';
+
+/** § typed inside a quoted string, until the strings are put back (a private-use character). */
+const IN_STRING = '\uE000';
 
 /** The cleaner's · and × (WRITTEN_TIMES) shown as the * they stand for, in the stages a caller sees. */
 const TIMES_MARKS = new RegExp(`[${Object.keys(WRITTEN_TIMES).join('')}]`, 'g');
@@ -110,7 +113,7 @@ function cleanMarked(expression, options = {}) {
  *   written: { postfix index: 'dot' | 'cross' } for each product typed as · (\cdot) or × (\times); the
  *   tree's nodes carry it too (node.written). The postfix itself has only `*`.
  */
-/** The longest expression read by default: far more than maths needs, and a bound on the work. */
+/** The longest expression read by default: far more than math needs, and a bound on the work. */
 export const MAX_LENGTH = 5000;
 
 export function parseSteps(expression, options = {}) {
@@ -120,7 +123,10 @@ export function parseSteps(expression, options = {}) {
         // a bound on the work: some cleaning and tokenizing steps grow faster than the length
         const maxLength = options.maxLength ?? MAX_LENGTH;
         if (expression.length > maxLength) throw new Error(`Longer than ${maxLength} characters (options.maxLength)`);
-        // § marks the names kept whole (§0§): a typed one would be taken for a mark, or never end
+        // § marks the names kept whole (§0§): a typed one would be taken for a mark, or never end. Inside a quoted string
+        // it is only text: held as a private-use character until the strings are back ("§3" in a filter on text)
+        if (expression.includes(IN_STRING)) throw new Error('The character U+E000 can\'t be read: MathZetta uses it to hold § in strings');
+        expression = swapInStrings(expression, PROTECTED, IN_STRING);
         if (expression.includes(PROTECTED)) throw new Error(`The character ${PROTECTED} can't be read: MathZetta uses it to mark names`);
         // =B2*2: a spreadsheet formula, whose cells (B2, $C$3) and ranges (B2:B9) are names
         const sheet = /^\s*=(?!=)/.test(expression);
@@ -131,7 +137,8 @@ export function parseSteps(expression, options = {}) {
         const { text, protectedNames } = protectNames(beforeProtecting(expression), options.names, [...(options.values ?? []), ...cells]);
         const mode = modeOf(text);
         const { cleaned, stringMap, steps: cleanSteps } = cleanMarked(text, { blocks: options.blocks, scope: options.scope });
-        const restore = (tokens) => restoreStrings(restoreStrings(tokens, stringMap), protectedNames);
+        const restore = (tokens) => restoreStrings(restoreStrings(tokens, stringMap), protectedNames)
+            .map((t) => (typeof t === 'string' ? t.replaceAll(IN_STRING, PROTECTED) : t));
         steps.mode = mode;
         steps.cleaned = plainTimes(restore([cleaned])[0]);
         steps.cleanSteps = cleanSteps.map(([name, text]) => [name, plainTimes(text)]);

@@ -1,5 +1,5 @@
 /**
- * The words and symbols the tokenizer recognises as operators, with the
+ * The words and symbols the tokenizer recognizes as operators, with the
  * precedence (binding power) the parser gives them.
  *
  * This is deliberately separate from the operator table in ../operators.js.

@@ -1,5 +1,5 @@
 /**
- * MathZetta — reads maths written almost any way (plain text, LaTeX,
+ * MathZetta — reads math written almost any way (plain text, LaTeX,
  * unicode, JavaScript, Python) into **standard postfix** and a tree.
  *
  *   import { parse, parseTree } from 'mathzetta';
@@ -16,7 +16,7 @@
  *   'mathzetta/calculate'  calculate (exact) — loading it also fills {{…}} blocks in any input
  *   'mathzetta/all'        everything, plus toUnified; what the <script> build contains
  *
- * Maths display is a separate library, Inline Math, which draws these trees.
+ * Math display is a separate library, Inline Math, which draws these trees.
  * The postfix format is described in docs/postfix.md; the pipeline in
  * docs/how-it-works.md.
  */
@@ -25,7 +25,7 @@ import { fromPostfix } from './tree.js';
 import { operatorNames, precedenceOf } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 
-export const version = '1.1.0';
+export const version = '1.2.0';
 
 export { parse, parse as parseToPostfix, parseSteps, parseTree, clean, setBlockHandler } from './parse/index.js';
 export { fromPostfix, toPostfix, asTree, walk, firstVariable, num, sym, op, leaf } from './tree.js';

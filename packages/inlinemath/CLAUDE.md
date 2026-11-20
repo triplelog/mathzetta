@@ -1,6 +1,6 @@
 # CLAUDE.md — inlinemath
 
-Draws maths (anything MathZetta reads) as HTML+CSS; every node's element
+Draws math (anything MathZetta reads) as HTML+CSS; every node's element
 carries `data-node` = MathZetta's postfix index, which is the id speech
 segments and MathZetta CAS paths use. Standalone library; depends on
 `mathzetta` as a package (in this workspace, `../mathzetta`; npm install at the repository root links it).
@@ -18,14 +18,15 @@ npm run build   # dist/ (ES modules + <script> builds, mathzetta and @mathzetta/
 - `src/layout.js` — tree → HTML with em-based box estimates (no DOM measuring, so `toHTML` works in Node). Metrics at the top must match `inlinemath.css`.
 - `src/glyphs.js` — SVG paths for `( ) { } √ ∫ ∑ ∏`.
 - `src/select.js` — targets: id, expression text, `{ path }`, test function.
-- `src/view.js` — live view: highlight, colour, events, speech segments, step animation (`set(next, { animate })`).
+- `src/view.js` — live view: highlight, color, events, speech segments, step animation (`set(next, { animate })`).
 - `src/html.js` — `toHTML`, `treeOf` (parses text with `{{…}}` via calculateBlock, or `options.blocks`).
-- `src/markdown.js` — `@mathzetta/inlinemath/markdown`: `markdownToHTML(text, options)` (maths in `$…$`/`$$…$$`/`\(…\)`/`\[…\]` taken out first as private-use placeholders, then a built-in Markdown renderer or `options.render`, then the drawings put back), `extractMath`, `renderMarkdown`. Raw HTML escaped by default — keep it that way. The playground is inlinemath.com/markdown.html (mathzetta-website).
+- `src/markdown.js` — `@mathzetta/inlinemath/markdown`: `markdownToHTML(text, options)` (math in `$…$`/`$$…$$`/`\(…\)`/`\[…\]` taken out first as private-use placeholders, then a built-in Markdown renderer or `options.render`, then the drawings put back), `extractMath`, `renderMarkdown`. Raw HTML escaped by default — keep it that way. The playground is inlinemath.com/markdown.html (mathzetta-website).
 - `src/cas.js` — `@mathzetta/inlinemath/cas`: `mathCAS()` (MathZetta CAS reading MathZetta text), `casBlocks()` (`{{simplify(…)}}`, `{{solve(…, x)}}`, `{{diff(…)}}` …; everything else still calculateBlock), `stepsHTML(steps)`, `tokensOf(node)` (declared functions → `\:name`). MathZetta CAS is an optional peer dependency. The playground is inlinemath.com/cas.html (mathzetta-website).
 
 ## Rules
 
-- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (index, lite, lite-calc, markdown, cas); peers are `mathzetta ^1` and, optional, `MathZetta CAS ^0.1`.
+- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (index, lite, lite-calc, markdown, cas); peers are `mathzetta ^1.2` and, optional, `MathZetta CAS ^0.2` (package.json has the exact ranges).
+- `markdownToHTML` takes untrusted documents: no pattern there may hold two unbounded runs of the same characters side by side (the heading one was cubic), nested blocks stop at `MAX_NESTING`, and a search that failed once to the end of the text is remembered (`noCloser`, `never`). The "review before 0.3" tests in test/run.js time each case.
 
 - Check looks with a headless-Chrome screenshot of the gallery (the demos are inlinemath.com's pages, in the private
   mathzetta-website repository; its dev server serves them over this package). The tests can't see layout.

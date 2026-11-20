@@ -6,12 +6,12 @@
  * LibreOffice): ceil is -INT(-x), sec 1/COS(x), xor NOT(a)<>NOT(b) — the
  * 2013 functions (CEILING.MATH, SEC, XOR) are missing from Numbers.
  *
- * Spreadsheets differ from the maths in ways that need care:
+ * Spreadsheets differ from the math in ways that need care:
  *   - unary minus binds tighter than ^ (Excel: -2^2 is 4), and ^ groups left
  *     to right (2^3^2 is 64), so powers are bracketed: -(x^2), 2^(3^2);
  *   - ATAN2 takes (x, y), LOG takes (number, base), & joins text (and is AND()),
  *     % is a percentage (remainder is MOD), = compares;
- *   - there is no infinity, and no symbolic maths (derivatives, sums to n),
+ *   - there is no infinity, and no symbolic math (derivatives, sums to n),
  *     so those throw `No spreadsheet formula for …`, as SQLite's SQL does.
  *
  * Variables are written as names (Excel's defined names) unless `cells`
@@ -32,7 +32,14 @@ import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLengt
 export function toExcelFormula(node, options = {}) {
     const lookup = (map) => (typeof map === 'function' ? map : (name) => (map && Object.prototype.hasOwnProperty.call(map, name) ? map[name] : undefined));
     const opts = { cell: lookup(options.cells), range: lookup(options.ranges), functions: options.functions };
-    const render = (n) => guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts));
+    // each node is written once, however often a rule asks for it: a rule that reads its operands, then falls back
+    // to another that reads them again, doubled the work at every level (x/y/y/… 25 deep took seconds)
+    const written = new Map();
+    const render = (n) => {
+        let text = written.get(n);
+        if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts)));
+        return text;
+    };
     const body = render(node);
     return options.equals === false ? body : `=${body}`;
 }
@@ -78,7 +85,7 @@ const UNSUPPORTED = { der: 'a derivative', int: 'an integral', lim: 'a limit', '
 
 const COMPARING = new Set(['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≡']);
 
-/** Brackets for a spreadsheet: as in maths, except that powers and negation bracket more. */
+/** Brackets for a spreadsheet: as in math, except that powers and negation bracket more. */
 function excelBracketOp(node) {
     if (node.type !== 'op') return null;
     // written as bare operators, not calls: sum(a, b) is a+b, a ≈ b is ABS(…)<1E-9, x ∈ ℤ is x=INT(x)
@@ -122,7 +129,7 @@ function operation(node, render, opts) {
     if (AGGREGATES[op] && args.length === 1) {
         const range = a.type === 'symbol' ? opts.range(a.value) : undefined;
         if (range !== undefined) return `${AGGREGATES[op]}(${range})`;
-        if (op === 'sum' || op === 'prod' || op === 'mean' || op === 'max' || op === 'min') return render(a);
+        if (op === 'sum' || op === 'prod' || op === 'mean' || op === 'max' || op === 'min') return a.type === 'op' ? `(${render(a)})` : render(a);   // max(a+b)*2: (a+b)*2
     }
     if (op === '+' && isText(node)) return `${render(a)}&${render(b)}`;   // joining text
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;

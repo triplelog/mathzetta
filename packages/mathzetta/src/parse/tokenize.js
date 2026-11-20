@@ -1,7 +1,7 @@
 /**
  * Tokenizer: cleaned text → infix tokens.
  *
- * Runs after the cleaner, so spellings are normalised (`\sin` → `sin`,
+ * Runs after the cleaner, so spellings are normalized (`\sin` → `sin`,
  * `×` → `*`, ...) and whitespace is gone except single spaces between two
  * letters, which separate words (`cos t`). The rules:
  *

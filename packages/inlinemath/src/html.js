@@ -22,7 +22,7 @@ export function treeOf(input, options = {}) {
 /**
  * @param {string|string[]|object} input
  * @param {object} [options] layout options (see DEFAULTS in layout.js) plus:
- * @param {object|Array} [options.colors]    { 'x^2': 'red', 3: '#06c' } or [[target, colour], …]
+ * @param {object|Array} [options.colors]    { 'x^2': 'red', 3: '#06c' } or [[target, color], …]
  * @param {*} [options.highlight]            target(s) to mark with the mv-hl class
  * @param {object} [options.scope]           variable values for `{{...}}` blocks
  * @returns {string}

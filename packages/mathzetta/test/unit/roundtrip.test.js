@@ -116,7 +116,8 @@ suite('round trip: mathzetta reads what it writes', () => {
     test('the sweep covers the cases, in every format', () => {
         // on 2026-11-11: 2068 for most, sympy 1978, sql 2027, glsl 2013, sqlite 1905, excel 1965 (the rest have
         // no such code: SQL and GLSL refuse derivatives, integrals, limits, sums to n and set operations)
-        const FLOOR = { sympy: 1950, sql: 2000, glsl: 1990, sqlite: 1880, excel: 1940 };
+        // 2026-11-19: glsl 1933, now that GLSL refuses text (a quoted string was written into the shader as it stood)
+        const FLOOR = { sympy: 1950, sql: 2000, glsl: 1910, sqlite: 1880, excel: 1940 };
         eq(checked > 20000, true, `${checked} checks`);
         eq(EVERY.filter((f) => counts[f] < (FLOOR[f] ?? 2040)).map((f) => `${f}: ${counts[f]}`), []);
     });

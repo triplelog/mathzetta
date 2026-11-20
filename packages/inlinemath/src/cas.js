@@ -1,6 +1,6 @@
 /**
  * '@mathzetta/inlinemath/cas' — @mathzetta/cas in Inline Math: `{{…}}` blocks that simplify,
- * solve, differentiate …, and step lists drawn as maths.
+ * solve, differentiate …, and step lists drawn as math.
  *
  *   import { toHTML } from '@mathzetta/inlinemath';
  *   import { casBlocks, stepsHTML, mathCAS } from '@mathzetta/inlinemath/cas';

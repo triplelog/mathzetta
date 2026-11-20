@@ -1,8 +1,8 @@
 # Inline Math
 
-Draws calculus-level maths as plain HTML and CSS (the `@mathzetta/inlinemath` package, at inlinemath.com). The input is anything
+Draws calculus-level math as plain HTML and CSS (the `@mathzetta/inlinemath` package, at inlinemath.com). The input is anything
 [MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta) reads (`sin^2 x`, `\frac{d}{dx}(x^2)`, `x**2/2`, `√x`).
-Every part of the drawing can be found, coloured, clicked and animated.
+Every part of the drawing can be found, colored, clicked and animated.
 
 Inline Math is not a LaTeX engine. It covers what a Calculus course writes:
 - fractions, exponents and subscripts, radicals, brackets that grow;
@@ -47,7 +47,7 @@ as text, the edited part's path and what was typed; `view.edit(target)` opens th
 
 **Keyboard and screen readers.** Every drawing has an accessible name (`role="math"`, its spoken form for a listener
 who can't see it). Once a view listens for `'click'`, the drawing is one tab stop: the arrow keys walk its parts (Down
-into a part, Up out, Left/Right between neighbours, Home or Escape back to the whole), each part is spoken through a
+into a part, Up out, Left/Right between neighbors, Home or Escape back to the whole), each part is spoken through a
 polite live region and ringed, and Enter or Space calls the click listener for the current part (`event` is then the
 KeyboardEvent). `view.focusPart(node)` moves there from code.
 
@@ -66,7 +66,7 @@ import '@mathzetta/inlinemath/fonts/fonts.css';    // optional: Latin Modern, th
 
 ### Lite: drawing only
 
-`@mathzetta/inlinemath/lite` is `toHTML()` and nothing live: the same layout, glyphs, colours, highlights and
+`@mathzetta/inlinemath/lite` is `toHTML()` and nothing live: the same layout, glyphs, colors, highlights and
 spoken labels for screen readers, without the live view (`render`, step animation, events), Markdown
 or the CAS — about a third smaller. `{{…}}` blocks are worked out only if MathZetta's calculator is
 loaded too (`import 'mathzetta/calculate'`, or `@mathzetta/inlinemath/lite-calc`, which brings it); otherwise
@@ -95,14 +95,14 @@ npm test          # 253 checks; every input in mathzetta/test/cases/calculus.tsv
 | `src/layout.js` | Turns a tree into HTML. All notation choices live here. |
 | `src/glyphs.js` | SVG paths for `( ) { } √ ∫ ∑ ∏`. Change a shape here. |
 | `src/select.js` | Picks parts by id, expression, path or test. Also `numberTree`. |
-| `src/view.js` | The live view: highlight, colour, events, speech segments, step animation. |
+| `src/view.js` | The live view: highlight, color, events, speech segments, step animation. |
 | `src/html.js` | `toHTML`, `treeOf`, and the `colors` / `highlight` options. |
 | `inlinemath.css` | All the styling. The numbers marked *metric* must match the constants in layout.js. |
 
-## How it lays maths out
+## How it lays math out
 
 - **Estimated, not measured.** Each piece knows roughly how far it reaches above and below the baseline, in em.
-  - From that, `layout.js` writes `vertical-align` values that put fraction bars on the maths axis, lift exponents above tall bases, and size `∫` to its integrand.
+  - From that, `layout.js` writes `vertical-align` values that put fraction bars on the math axis, lift exponents above tall bases, and size `∫` to its integrand.
   - The same string comes out in Node, in a browser or in a video frame, with no layout pass after rendering.
 - **Self-stretching delimiters.** Brackets, bars, floors and braces are drawn at `height: 100%` of what they enclose (SVG or CSS borders), so they need no estimate at all.
   - This is the best idea from inline-math's imcss renderer. Inline Math fixes its aspect-ratio bug: shapes use `preserveAspectRatio="none"` with a fixed width.
@@ -123,7 +123,7 @@ These go to `toHTML(input, options)` and `render(el, input, options)`.
 | `scriptFractions` | `'slash'` | x^{3/2} written with a slash. `'stack'` stacks it. |
 | `cases` | `true` | `c ? a : b` drawn as a piecewise brace |
 | | | A product typed with `·` (`\cdot`) or `×` (`\times`) is drawn with that sign (MathZetta's `node.written`); other products get a sign only where one is needed. Postfix input has no such marks. |
-| `colors` | | `{ 'x^2': 'red', 5: 'blue' }` (number keys are ids) or `[[target, colour]]` |
+| `colors` | | `{ 'x^2': 'red', 5: 'blue' }` (number keys are ids) or `[[target, color]]` |
 | `highlight` | | target(s) that get the `mv-hl` class |
 | `attributes`, `style` | | `(node) => ({…})` / `(node) => 'css'` for each node's element |
 | `mathml` | | MathZetta's `toMathML` (`import { toMathML } from 'mathzetta/mathml'`): also write the expression as visually hidden MathML (no ids), which screen readers can step through part by part and show in math braille; the drawing stays hidden from them and the label is dropped (MathML carries the meaning). A keyboard-enabled view keeps its label on the focusable element |
@@ -193,7 +193,7 @@ don't, so a page using them links `dist/inlinemath.css`. **The fonts are optiona
 declares Latin Modern Roman (the TeX look) in two files, regular 45 KB and italic 47 KB (woff2), and
 its Greek letters, which Latin Modern lacks, from New Computer Modern in the same design (10 KB each,
 `fonts/README-inlinemath-greek.txt`). Each file is downloaded only when text uses it, so a page without
-Greek never fetches those two; without the link the maths is drawn in the system serif.
+Greek never fetches those two; without the link the math is drawn in the system serif.
 
 Every build comes **with MathZetta inside, or without it** (`*.external.*`), with or without the
 CAS (MathZetta CAS). Sizes, gzipped:
@@ -209,7 +209,7 @@ CAS (MathZetta CAS). Sizes, gzipped:
 | with the CAS, without MathZetta | `cas.external.js` 50 KB | `inlinemath-cas.external.global.min.js` 63 KB |
 
 Without MathZetta, the page loads it once itself: a classic page puts a MathZetta `<script>` first —
-`mathzetta.min.js`, or the `maths-display` flavour, since speech, text and calculate are used (for
+`mathzetta.min.js`, or the `maths-display` flavor, since speech, text and calculate are used (for
 lite, `display`, or `maths-display` to work out `{{…}}`) — and
 the external classic build reads `window.MathZetta`; a module page maps the names with an import
 map (every name can point at the one MathZetta bundle). The fonts are 94 KB more (and 20 KB for Greek, only where it appears), only if linked.
@@ -227,7 +227,7 @@ map (every name can point at the one MathZetta bundle). The fonts are 94 KB more
 
 Publishing is `npm publish` (`prepublishOnly` runs the tests and the build).
 
-## Markdown with maths: `@mathzetta/inlinemath/markdown`
+## Markdown with math: `@mathzetta/inlinemath/markdown`
 
 ```js
 import { markdownToHTML } from '@mathzetta/inlinemath/markdown';
@@ -235,14 +235,14 @@ el.innerHTML = markdownToHTML(text);                          // needs inlinemat
 el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}}, {{diff(…)}} too
 ```
 
-- **Maths:** `$…$` inline, `$$…$$` or a ` ```math ` fence on its own (centred), and
+- **Math:** `$…$` inline, `$$…$$` or a ` ```math ` fence on its own (centered), and
   `\(…\)` / `\[…\]`. MathZetta reads it, so LaTeX, plain text (`$sqrt(x)/2$`) and
   code all work.
-- **Working out:** `{{…}}` inside maths is worked out (the calculator, or the CAS with
+- **Working out:** `{{…}}` inside math is worked out (the calculator, or the CAS with
   `blocks`). A definition like `$r = 3$` is remembered, exactly, for the `{{…}}` after it
   (`define: false` turns that off; `scope: { r: 3 }` gives values).
 - **Saved variables:** `$A := 2+2$` saves A (drawn A ≔ 2 + 2), and `$_A := 2+2$` saves it
-  without drawing anything. After that, A in any maths is drawn as its expression and `{{A}}`
+  without drawing anything. After that, A in any math is drawn as its expression and `{{A}}`
   is its value, so `$A = {{A}}$` draws 2 + 2 = 4 and `$3A$` draws 3(2 + 2). A name is a letter
   (Greek too), optionally with a subscript (`A_1`); a variable may use the ones before it
   (`$_B := 2A$`), and saving it again replaces it from there on. A plain `$r = 3$` still only
@@ -266,18 +266,18 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
 - **Editing by double-click:** in `renderMarkdownInto`, a part drawn from a textbox variable is
   edited where it is drawn with `{ editable: { toText } }` (the whole variable is written back
   into its textbox, so everything using it redraws); without `toText` the textbox is focused.
-  Double-clicking any other part fires `inlinemath:select` on the element with where that maths
+  Double-clicking any other part fires `inlinemath:select` on the element with where that math
   is in the Markdown (`detail.start`, `detail.end`, `detail.raw`; for a part drawn from a
   variable saved in the same text, where it was saved), so an editor beside it can select it.
   `extractMath` gives every piece's `start` and `end` too.
-- **Dollars:** a `$` is maths only when it looks like it (Pandoc's rule): "$5 and $10"
+- **Dollars:** a `$` is math only when it looks like it (Pandoc's rule): "$5 and $10"
   stays text, and `\$` is a dollar sign. Code spans and fences are left alone.
-- **Bad maths:** maths that doesn't read is shown as written, marked, with the reason as
+- **Bad math:** math that doesn't read is shown as written, marked, with the reason as
   its tooltip.
 - **The Markdown:** a small built-in renderer — headings, emphasis, links, images, lists,
   quotes, code, tables, rules. Raw HTML is shown as text unless `html: true`, and
   `javascript:` links are dropped. `render: (md) => html` uses another renderer
-  (marked, markdown-it); the maths is taken out first and put back into its output.
+  (marked, markdown-it); the math is taken out first and put back into its output.
 - **Options:** `math` passes options to every drawing (`fnParens`, `colors` …);
   `delimiters` picks which marks count.
 - **Playground:** [inlinemath.com/markdown.html](https://inlinemath.com/markdown.html), an editor with a live preview.
@@ -285,7 +285,7 @@ el.innerHTML = markdownToHTML(text, { blocks: casBlocks() }); // {{solve(…)}},
 ## The CAS: `@mathzetta/inlinemath/cas`
 
 MathZetta CAS (exact simplify, factor, solve, d/dx, ∫ …; @mathzetta/cas's docs/cas.md)
-in drawn maths:
+in drawn math:
 
 ```js
 import { toHTML } from '@mathzetta/inlinemath';

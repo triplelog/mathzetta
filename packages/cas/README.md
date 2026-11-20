@@ -17,14 +17,14 @@ const cas = createCAS();
 cas.solve('x 2 ^ 5 x * - 6 + 0 =', 'x', { steps: 'brief' })   // x = 2 or x = 3, with steps
 cas.integrate('x x sin *', 'x').text                           // -x·cos(x) + sin(x)
 
-import { parse } from 'mathzetta';                              // or read ordinary maths first
+import { parse } from 'mathzetta';                              // or read ordinary math first
 const typed = createCAS({ read: (text) => parse(text) });
 typed.diff('x^3 sin(x)', 'x').text                             // x^3·cos(x) + 3x^2·sin(x)
 ```
 
 Expressions are [MathZetta](https://github.com/triplelog/mathzetta/tree/main/packages/mathzetta)
 postfix, and [Inline Math](https://github.com/triplelog/mathzetta/tree/main/packages/inlinemath)
-draws the results (`@mathzetta/inlinemath/cas` puts the CAS and its steps in drawn maths). The
+draws the results (`@mathzetta/inlinemath/cas` puts the CAS and its steps in drawn math). The
 guide to the CAS is [docs/cas.md](docs/cas.md); try it at [mathzetta.com/cas/](https://mathzetta.com/cas/).
 
 ## The rule engine: `@mathzetta/cas/engine`

@@ -2,7 +2,7 @@
  * Reading: the pipeline from text to postfix (clean → tokenize → parse → tree), the postfix format, the tree tools, edge cases, conditionals, strings and {{blocks}}.
  */
 import { suite, test, eq, throws } from '../harness.js';
-import { parse, parseSteps, clean, toSpeech } from '../../src/all.js';
+import { parse, parseSteps, clean, toSpeech, toText, toJavaScript, toGLSL, toPython, evaluate, toLaTeX } from '../../src/all.js';
 import { tokenize } from '../../src/parse/tokenize.js';
 import { toRawPostfix } from '../../src/parse/parser.js';
 import { fromPostfix, toPostfix, firstVariable } from '../../src/tree.js';
@@ -252,6 +252,25 @@ suite('conditionals', () => {
         eq(P('if x < 0.5 then (if y < 0.5 then r else g) else b'), 'x 0.5 < y 0.5 < r g ?: b ?:');
     });
     test('if() needs two or three arguments', () => throws(() => parse('if(x)'), /condition/));
+    test('= before a conditional defines it when what follows the = is true or false', () => {
+        eq(P('f(x) = x < 0 ? x^2 : x < 1 ? 1 : 2x - 1'), 'x 1 \\:f x 0 < x 2 ^ x 1 < 1 2 x * 1 - ?: ?: =');
+        eq(P('f(x) = x < 0 ? x^2 : x < 1 ? 1 : 2x - 1'), P('f(x) = (x < 0 ? x^2 : x < 1 ? 1 : 2x - 1)'));
+        eq(P('y = x > 0 and z < 1 ? 1 : 2'), 'y x 0 > z 1 < & 1 2 ?: =');
+        eq(P('y = not z ? 1 : 2'), 'y z \\not 1 2 ?: =');
+        eq(P('max(y = x > 0 ? 1 : 2, 3)'), 'y x 0 > 1 2 ?: = 3 2 max');
+    });
+    test('a test stays a test: a value after =, brackets, ===, and = only on the right of and', () => {
+        eq(P('x = 1 ? a : b'), 'x 1 = a b ?:');
+        eq(P('Status = "Active" ? Value : 0'), 'Status "Active" = Value 0 ?:');
+        eq(P('(y = x > 0) ? 1 : 2'), 'y x 0 > = 1 2 ?:');
+        eq(P('a = b and c = d ? 1 : 2'), 'a b = c d = & 1 2 ?:');
+        eq(P('y = x > 0'), 'y x 0 > =');
+    });
+    test('the test written out is bracketed, so it reads back as a test', () => {
+        const test = ['y', 'x', '0', '>', '=', '1', '2', '?:'];
+        eq(toText(test), '(y = x > 0) ? 1 : 2');
+        for (const code of [toText(test), toJavaScript(test), toGLSL(test), toPython(test)]) eq(P(code).replace(/\.0\b/g, ''), test.join(' '));
+    });
 });
 
 // ---- from tree.test.js ----
@@ -508,5 +527,181 @@ suite('how a product was written: · and × beside the postfix', () => {
         const written = {};
         eq(toPostfix({ type: 'op', op: '*', written: 'cross', args: [{ type: 'symbol', value: 'a' }, { type: 'symbol', value: 'b' }] }, written), ['a', 'b', '*']);
         eq(written, { 2: 'cross' });
+    });
+});
+
+// ---- misreads found in the review before 1.2: each with the neighbors that must stay as they are ----
+suite('reading: \\sqrt without braces', () => {
+    test('one letter, one number, or one command with its arguments', () => {
+        eq(P('\\sqrt x'), 'x sqrt');
+        eq(P('\\sqrt 2'), '2 sqrt');
+        eq(P('\\sqrt 23'), '23 sqrt');          // a number is taken whole, as x^12 is
+        eq(P('\\sqrt 2.5x'), '2.5 sqrt x *');
+        eq(P('\\sqrt -1'), '-1 sqrt');
+        eq(P('\\sqrt\\pi'), 'pi sqrt');
+        eq(P('\\sqrt\\alpha+1'), 'α sqrt 1 +');
+        eq(P('\\sqrt\\frac{1}{2}'), '1 2 / sqrt');
+        eq(P('\\sqrt\\frac12'), '1 2 / sqrt');
+        eq(P('\\sqrt\\frac{x^{2}}{3}+1'), 'x 2 ^ 3 / sqrt 1 +');   // nested braces stay inside
+        eq(P('2\\sqrt x + 1'), '2 x sqrt * 1 +');
+        eq(P('\\sqrt x + \\sqrt y'), 'x sqrt y sqrt +');
+    });
+    test('only that much: what follows is outside the root, as it is typeset', () => {
+        eq(P('\\sqrt 2x'), '2 sqrt x *');
+        eq(P('\\sqrt xy'), 'x sqrt y *');
+        eq(P('\\sqrt x^2'), 'x sqrt 2 ^');
+        eq(P('\\sqrt{x}^2'), 'x sqrt 2 ^');
+    });
+    test('the plain word still reads on: sqrt 2x is √(2x)', () => {
+        eq(P('sqrt 2x'), '2 x * sqrt');
+        eq(P('sqrt xy'), 'x y * sqrt');
+        eq(P('sqrt x'), 'x sqrt');
+        eq(P('√x'), 'x sqrt');
+    });
+    test('roots in roots, and the forms that were already read', () => {
+        eq(P('\\sqrt\\sqrt x'), 'x sqrt sqrt');
+        eq(P('\\sqrt\\sqrt{x}'), 'x sqrt sqrt');
+        eq(P('\\sqrt\\sqrt[3]{x}'), '3 x root sqrt');
+        eq(P('\\sqrt{x}'), 'x sqrt');
+        eq(P('\\sqrt[3]{x}'), '3 x root');
+        eq(P('\\sqrt[3] x'), '3 x root');
+        eq(P('\\sqrt(x+1)'), 'x 1 + sqrt');
+        eq(P('\\sqrt\\left(x+1\\right)'), 'x 1 + sqrt');
+    });
+});
+
+suite('reading: one letter set upright, \\cfrac, 1e5, ∫ dx', () => {
+    test('\\mathrm{e}, \\operatorname{f}: a single letter is that letter', () => {
+        eq(P('\\mathrm{e}^x'), 'e x ^');
+        eq(P('\\mathrm{d}x'), 'd x *');
+        eq(P('\\operatorname{f}(x)'), 'x 1 \\:f');
+        eq(P('\\mathit{x}+1'), 'x 1 +');
+        eq(P('\\text{a}+1'), 'a 1 +');
+    });
+    test('a longer name stays one name, and the d of calculus is still read', () => {
+        eq(P('\\mathrm{ab}^x'), 'ab x ^');
+        eq(P('\\operatorname{sgn}(x)'), P('sgn(x)'));
+        eq(P('\\int x^2 \\mathrm{d}x'), 'x 2 ^ x 2 int');
+        eq(P('\\int \\mathrm{d}x'), '1 x 2 int');
+        eq(P('\\frac{\\mathrm{d}y}{\\mathrm{d}x}'), 'y x der');
+        eq(P('\\frac{\\mathrm{d}}{\\mathrm{d}x} x^2'), 'x 2 ^ x der');
+    });
+    test('\\cfrac is a fraction, like \\dfrac and \\tfrac', () => {
+        eq(P('\\cfrac{1}{2}'), '1 2 /');
+        eq(P('\\cfrac{1}{1+\\cfrac{1}{x}}'), '1 1 1 x / + /');
+        eq(P('\\dfrac{1}{2}'), '1 2 /');
+        eq(P('\\tfrac12'), '1 2 /');
+    });
+    test('1e5 is 1·10^5, with or without a sign', () => {
+        eq(P('1e5'), '1 10 5 ^ *');
+        eq(P('1E5'), '1 10 5 ^ *');
+        eq(P('1.5e3'), '1.5 10 3 ^ *');
+        eq(P('1e+5'), '1 10 5 ^ *');
+        eq(P('1e-9'), '1 10 -9 ^ *');
+        eq(evaluate('2e3 + 1'), 2001);
+    });
+    test('…but e is still e where no digit follows, and a name is still a name', () => {
+        eq(P('2e'), '2 e *');
+        eq(P('2e^3'), '2 e 3 ^ *');
+        eq(P('e5'), 'e5');
+        eq(P('x1e5'), 'x1e5');
+        eq(P('2e3x'), '2 e3x *');     // unchanged: not a number followed by a name
+    });
+    test('∫ dx is ∫ 1 dx, however it is spaced', () => {
+        for (const s of ['\\int dx', '\\int  dx', '\\int\\,dx', '∫ dx', '∫dx']) eq(P(s), '1 x 2 int', s);
+        eq(P('\\int_0^1 dx'), '1 x 0 1 4 int');
+        eq(P('\\int x dx'), 'x x 2 int');
+        eq(P('\\int dt'), '1 t 2 int');
+    });
+});
+
+suite('reading: characters written small are one subscript or one power', () => {
+    test('subscripts: x₁ is x_1, x₁₂ is x_{12}', () => {
+        eq(P('x₁'), P('x_1'));
+        eq(P('x₁'), 'x 1 _');
+        eq(P('x₁₂'), 'x 12 _');
+        eq(P('a₁+a₂'), 'a 1 _ a 2 _ +');
+        eq(P('2x₁'), '2 x 1 _ *');
+        eq(P('xₙ'), 'x n _');
+        eq(P('xₙ₊₁'), P('x_{n+1}'));
+        eq(P('xᵢⱼ'), P('x_{ij}'));
+        eq(P('H₂O'), P('H_2O'));
+        eq(P('log₂ 8'), P('log_2 8'));
+        eq(evaluate('log₂ 8'), 3);
+    });
+    test('a subscript and a power on one name', () => {
+        eq(P('x₁²'), P('x_1^2'));
+        eq(P('x₁²'), 'x 1 _ 2 ^');
+    });
+    test('powers: x¹² is x^12, not (x^1)^2', () => {
+        eq(P('x¹²'), 'x 12 ^');
+        eq(P('x²³'), 'x 23 ^');
+        eq(P('x⁻¹²'), 'x -12 ^');
+        eq(P('2⁻ⁿ'), P('2^{-n}'));
+        eq(P('e⁻ˣ'), P('e^{-x}'));
+        eq(evaluate('2¹⁰'), 1024);
+    });
+    test('…and what one small character already meant', () => {
+        eq(P('x²'), 'x 2 ^');
+        eq(P('x⁻¹'), 'x -1 ^');
+        eq(P('xⁿ'), 'x n ^');
+        eq(P('x²y³'), 'x 2 ^ y 3 ^ *');     // two names, two powers
+        eq(P('(a+b)²'), 'a b + 2 ^');
+        eq(P('sin²x'), P('sin^2 x'));
+    });
+});
+
+suite('reading: mixed numbers', () => {
+    test('a whole number with a fraction character is their sum', () => {
+        eq(P('1½'), '1 1 2 / +');
+        eq(P('1 ½'), '1 1 2 / +');
+        eq(P('3 ¾'), '3 3 4 / +');
+        eq(P('2⅒'), '2 1 10 / +');
+        eq(evaluate('1½'), 1.5);
+        eq(evaluate('2½ * 2'), 5);
+        eq(evaluate('-1½'), -1.5);          // the minus takes the whole of it
+        eq(evaluate('5-1½'), 3.5);
+        eq(P('2½x'), '2 1 2 / + x *');
+    });
+    test('written with a space and a slash, or with \\frac', () => {
+        eq(P('1 1/2'), '1 1 2 / +');
+        eq(P('12 3/4'), '12 3 4 / +');
+        eq(P('1 2/3 + 1'), '1 2 3 / + 1 +');
+        eq(P('1 1/2x'), '1 1 2 / + x *');
+        eq(P('1\\frac{1}{2}'), '1 1 2 / +');
+        eq(P('1\\frac12'), '1 1 2 / +');
+        eq(P('3 \\dfrac{1}{4}'), '3 1 4 / +');
+        eq(P('2\\frac{3}{4}x'), '2 3 4 / + x *');
+        eq(evaluate('3\\frac{1}{4}'), 3.25);
+    });
+    test('a fraction by itself, or beside a name, is still a fraction or a product', () => {
+        eq(P('½'), '1 2 /');
+        eq(P('⅐'), '1 7 /');
+        eq(P('x½'), 'x 1 2 / *');
+        eq(P('\\frac{1}{2}'), '1 2 /');
+        eq(P('2\\frac{x}{3}'), '2 x 3 / *');         // no number on top: a product
+        eq(P('2\\cdot\\frac{1}{3}'), '2 1 3 / *');
+        eq(P('1/2x'), '1 2 / x *');
+    });
+    test('only a proper fraction makes a mixed number', () => {
+        eq(P('2\\frac{3}{2}'), '2 3 2 / *');
+        eq(P('1 3/2'), '13 2 /');
+    });
+    test('never after ^, _, a point or a name: x^2\\frac{1}{2} is x² times a half', () => {
+        eq(P('x^2\\frac{1}{2}'), 'x 2 ^ 1 2 / *');
+        eq(P('1.5\\frac{1}{2}'), '1.5 1 2 / *');
+        eq(P('x_1½'), P('x_1*(1/2)'));
+    });
+    test('a space still groups digits: 1 000, and 1 234/567', () => {
+        eq(P('1 000'), '1000');
+        eq(P('2 3'), '23');
+        eq(P('1 234/567'), '1234 567 /');
+        eq(P('1 000/3'), '1000 3 /');
+    });
+    test('what is written reads back: the product 2·⅓ is written with its dot', () => {
+        eq(toLaTeX(['2', '1', '3', '/', '*']), '2 \\cdot \\frac{1}{3}');
+        eq(P(toLaTeX(['2', '1', '3', '/', '*'])), '2 1 3 / *');
+        eq(P(toLaTeX('2\\frac{1}{3}')), '2 1 3 / +');     // the mixed number, written as a sum, is read as that sum
+        eq(P(toText('1½')), '1 1 2 / +');
     });
 });

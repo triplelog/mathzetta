@@ -23,7 +23,7 @@ export function num(value: number): NumNode;
 export function sym(token: string): SymNode;
 /** A number written exactly, as a decimal token of any length; `value` is the nearest double. */
 export function exactNum(token: string): NumNode;
-/** A leaf from a raw token, numbers recognised. */
+/** A leaf from a raw token, numbers recognized. */
 export function leaf(token: string): NumNode | SymNode;
 export function op(symbol: string, args: Expr[]): OpNode;
 export function isNum(node: Expr): node is NumNode;
@@ -312,7 +312,7 @@ export interface CAS {
     simplify(input: ExprInput, options?: CallOptions): CASResult;
     expand(input: ExprInput, options?: CallOptions): CASResult;
     factor(input: ExprInput, options?: CallOptions): CASResult;
-    /** One fraction, common factors cancelled. */
+    /** One fraction, common factors canceled. */
     cancel(input: ExprInput, options?: CallOptions): CASResult;
     /** d/dv, `order` times. */
     diff(input: ExprInput, v?: string, options?: CallOptions & { order?: number }): CASResult;

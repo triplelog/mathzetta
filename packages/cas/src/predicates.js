@@ -116,7 +116,7 @@ defineRelation('differs', (...nodes) => new Set(nodes.map((n) => n.s)).size === 
 defineRelation('sameValue', (...nodes) => nodes.every((n) => isN(n)) && nodes.every((n) => n.value === nodes[0].value), 'these operands are the same number');
 
 /**
- * Normalise a YAML predicate entry into `{ name, args }`.
+ * Normalize a YAML predicate entry into `{ name, args }`.
  * Accepts "isZero" or ["contains", "x"].
  */
 export function normalizeCheck(entry) {

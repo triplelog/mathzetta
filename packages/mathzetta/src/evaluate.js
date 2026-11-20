@@ -17,6 +17,7 @@ import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 const M = matrixArithmetic({
     add: (a, b) => a + b, sub: (a, b) => a - b, mul: (a, b) => a * b, div: (a, b) => a / b,
     isZero: (x) => Math.abs(x) < 1e-12, zero: () => 0, one: () => 1, size: Math.abs,
+    charge: (entries) => { steps += entries / 16; if (steps > STEPS) throw new Error('Too much to work out'); },   // doubles: cheap, not free
     fail: (message) => { throw new Error(message); },
 });
 const isMatrix = (v) => isMatrixValue(v) && (v.length > 1 || v[0].length > 1);
@@ -99,7 +100,7 @@ const comb = (n, k) => {
     return Math.round(r);
 };
 const gcd2 = (a, b) => (b ? gcd2(b, a % b) : Math.abs(a));
-/** a mod n takes the divisor's sign, as in maths and calculate(): -7 mod 3 is 2 (JavaScript's % gives -1). */
+/** a mod n takes the divisor's sign, as in math and calculate(): -7 mod 3 is 2 (JavaScript's % gives -1). */
 const mod = (a, n) => ((a % n) + n) % n;
 /** Halves away from zero, as calculate(), spreadsheets and SQL do: round(-2.5) is -3 (Math.round gives -2). */
 const roundHalfAway = (x) => Math.sign(x) * Math.round(Math.abs(x));

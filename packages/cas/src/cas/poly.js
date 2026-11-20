@@ -423,7 +423,7 @@ export function together(x) {
 }
 
 /**
- * A fraction with common factors cancelled: (x² - 1)/(x - 1) → x + 1.
+ * A fraction with common factors canceled: (x² - 1)/(x - 1) → x + 1.
  * Returns the held factored form (and notes), or null when nothing cancels.
  */
 export function cancel(x) {
@@ -435,7 +435,7 @@ export function cancel(x) {
   const shared = b.factors.filter((f) => keysA.has(keyOf(f.base)));
   const factors = [...a.factors, ...b.factors.map((f) => ({ base: f.base, exp: neg(f.exp) }))];
   const merged = merge(a.coef.div(b.coef), factors, [...a.notes, ...b.notes]);
-  return { ...merged, cancelled: shared.map((f) => f.base) };
+  return { ...merged, canceled: shared.map((f) => f.base) };
 }
 
 export { CasError };

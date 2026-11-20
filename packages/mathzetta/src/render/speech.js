@@ -29,7 +29,7 @@
  * Two versions
  * ------------
  * toSpeech() is for speech WITH the drawing in view — narration over a video,
- * captions beside the maths — where the picture shows what a group holds, so a
+ * captions beside the math — where the picture shows what a group holds, so a
  * pause is enough: "the square root of x plus 1" next to a drawn radical.
  *
  * toAudioSpeech() is for speech ALONE — a screen reader, an audio-only lesson —

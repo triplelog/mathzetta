@@ -126,7 +126,7 @@ suite('agreement: speech alone keeps apart what the drawing keeps apart', () => 
     ];
     for (const [a, b] of PAIRS) test(`${a} and ${b}`, () => eq(toAudioSpeech(a) === toAudioSpeech(b), false, `both read "${toAudioSpeech(a)}"`));
     test('"to the the quantity": an exponent that opens a quantity takes "to the power of"', () => {
-        eq(toSpeech('2^-2^2'), '2 to the power of the quantity negative 2, squared');
+        eq(toSpeech('2^{(-2)^2}'), '2 to the power of the quantity negative 2, squared');
     });
 });
 

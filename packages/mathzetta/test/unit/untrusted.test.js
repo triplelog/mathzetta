@@ -148,3 +148,167 @@ suite('formulas: LaTeX over columns', () => {
         eq(run('\\frac{Value}{Count} \\cdot 100'), 25);
     });
 });
+
+// The review before 1.2 (2026-11-19): each test fails if its fix is undone.
+suite('review before 1.2: outputs', () => {
+    test('one value is its own max or min, kept in brackets (it was a + b * 2)', () => {
+        eq(toPython('max(a + b) * 2'), '(a + b) * 2');
+        eq(toPython('min(not (x > 1)) + 1'), '(not (x > 1)) + 1');
+        eq(toSQL('max(a + b) * 2', { dialect: 'sqlite' }), '(a + b) * 2');
+        eq(toExcel('2 - max(a - b)'), '=2-(a-b)');
+        eq(toGLSL('max(a + b) * 2'), '(a + b) * 2.0');
+    });
+    test('round, odd roots and mod write an expression once: nesting grows the output linearly', () => {
+        for (const fn of ['round(X)+1', 'round(X, 2)+1', 'root(5, X)+1', 'x mod (X)']) {
+            let s = 'x+1';
+            for (let i = 0; i < 12; i++) s = fn.replace('X', s);
+            for (const write of [toJavaScript, toPython, (t) => toPython(t, { numpy: true }), (t) => toPython(t, { sympy: true })]) {
+                const code = write(s);
+                eq(code.length < 5000, true, `${fn}: ${code.length} characters`);
+            }
+        }
+        // and each reads back with the same value (two deep: reading a lambda back writes its argument out again, and the
+        // reader gives up on conditionals nested past a few thousand characters)
+        for (const fn of ['round(X)+1', 'round(X, 2)+1', 'root(5, X)+1', 'x mod (X)']) {
+            let s = 'x+1';
+            for (let i = 0; i < 2; i++) s = fn.replace('X', s);
+            for (const x of [-1.7, 2.35]) {
+                const want = evaluate(s, { x });
+                for (const write of [toJavaScript, toPython, (t) => toPython(t, { numpy: true }), (t) => toPython(t, { sympy: true })]) {
+                    const code = write(s);
+                    eq(Math.abs(evaluate(code, { x }) - want) < 1e-9, true, `${code} at x = ${x}`);
+                }
+            }
+        }
+    });
+    test('a call is never repeated: x mod random() draws one number', () => {
+        eq(toJavaScript('x mod random()').split('Math.random()').length, 2);
+        eq(createRowEvaluator(strToFunction(['x'], 'x mod (x + 1)').jsFunction)([5]), 5);
+    });
+    test('a number in a set operation is a set of one in Python and SymPy', () => {
+        eq(toPython('{1,2} ∪ 3'), 'sorted(set({1, 2}) | set([3]))');
+        eq(toPython('{1,2} ∪ 3', { sympy: true }), 'sympy.Union(sympy.FiniteSet(1, 2), sympy.FiniteSet(3))');
+    });
+});
+
+suite('review before 1.2: reading and calculating', () => {
+    test('§ inside a quoted string is text; outside, it is still refused', () => {
+        eq(parse('name = "§3"'), ['name', '"§3"', '=']);
+        eq(strToFunction(['name'], 'name = "§ 2"').jsFunction, 'c0 == "§ 2"');
+        throws(() => parse('a § b'));
+        throws(() => parse('a  b'));
+    });
+    test('a percentage is a number in formulas, as toSQL writes it', () => {
+        eq(strToSQL(['a'], '50% * a', new Map()).sqlExpression, '0.5 * "a"');
+        eq(strToExcel(['a'], '50% * a').unknownStrings, []);
+    });
+    test('a numeric integral shows the digits its error leaves (not 2.49999985339)', () => {
+        eq(calculate('int(abs(x), x, -1, 2)').text, '2.5');
+        eq(calculate('int(abs(x-0.3), x, 0, 1)').text, '0.29');
+    });
+    test('a tiny negative fraction is a tiny negative double (>> rounds a negative BigInt down)', () => {
+        eq(calculate("-1/10^400").value === 0, true);   // -0: it was -1.09e-301
+        eq(calculate('-1/10^400').text, '-1*10^(-400)');
+        eq(Math.abs(calculate('-(2^2000)/3^1000').value / -8.68433580377441e124 - 1) < 1e-12, true);
+    });
+});
+
+suite('review before 1.2, second pass: nothing runs for long', () => {
+    const within = (ms, run) => {
+        const t = Date.now();
+        try { run(); } catch { /* refusing is fine */ }
+        eq(Date.now() - t < ms, true, `took ${Date.now() - t} ms`);
+    };
+    test('log(a, b with no closing bracket is refused, not doubled until memory runs out', () => {
+        within(300, () => parse('3+log(8,2'));
+        within(300, () => parse('log(x,log(x,'));
+        throws(() => parse('log(x,log(x,'));
+        eq(parse('log(8,2)+1'), ['2', '8', 'log', '1', '+']);
+    });
+    test('a definition of a conditional inside another is read once (was twice per level: 24 deep, 9 s)', () => {
+        let nested = 'x';
+        for (let i = 0; i < 40; i++) nested = `a=(${nested})<2?3:4`;
+        within(300, () => parse(nested));
+        eq(parse('f(x) = x < 0 ? x^2 : 2x').join(' '), 'x 1 \\:f x 0 < x 2 ^ 2 x * ?: =');
+        eq(parse('x = 1 ? a : b').join(' '), 'x 1 = a b ?:');
+    });
+    test('(lambda x: x+x+…)(…) nested stops at 100k characters', () => {
+        let nested = 'y';
+        for (let i = 0; i < 6; i++) nested = `(lambda x: ${Array(40).fill('x').join('+')})(${nested})`;
+        within(500, () => parse(nested));
+        eq(parse('(lambda v: v*v)(x+1)').join(' '), 'x 1 + x 1 + *');
+    });
+    test('a block handler that answers with a block is not asked again for ever', () => {
+        within(300, () => parse('{{1}}', { blocks: () => '{{1}}' }));
+        eq(parse('2{{1+1}} + {{3}}{{4}}').join(' '), '2 2 * 3 4 * +');
+    });
+    test('every output writes a node once: chains that fell back to a second rule doubled at each level', () => {
+        within(500, () => toPython('x' + '/y'.repeat(40), { sympy: true }));
+        within(500, () => toJavaScript('x' + ' mod y'.repeat(40)));
+        within(500, () => toExcel('ceil('.repeat(40) + 'x' + ')'.repeat(40)));
+        within(500, () => toSQL('x' + ' mod y'.repeat(40)));
+        within(500, () => toPython('if x>0 then '.repeat(30) + '1' + ' else 0'.repeat(30), { numpy: true }));
+    });
+    test('calculate charges factorials, perm, comb and matrix products to its budget', () => {
+        within(3000, () => calculate('\\sum_{i=1}^{1000} 0*20000!'));
+        throws(() => calculate('\\sum_{i=1}^{1000} 0*20000!'), /too much to work out/);
+        throws(() => calculate('\\sum_{i=1}^{3000} 0*comb(100000, 11000)'), /too much to work out/);
+        throws(() => calculate('identity(100)^(2^300)'), /too much to work out/);
+        within(3000, () => parse('{{\\sum_{i=1}^{300} 0*20000!}}'));
+        within(3000, () => evaluate('identity(100)^(2^1000)'));
+        throws(() => evaluate('identity(100)^(2^1000)'), /Too much to work out/);
+        eq(calculate('comb(52,5)').text, '2598960');
+        eq(calculate('[[1,2],[3,4]]^10').value, [[4783807, 6972050], [10458075, 15241882]]);
+        eq(evaluate('[[1,2],[3,4]]^10'), [[4783807, 6972050], [10458075, 15241882]]);
+        eq(calculate('\\sum_{i=1}^{100} i!').exact, true);
+    });
+});
+
+suite('review before 1.2, second pass: the checkers and the outputs', () => {
+    test('checked formula JavaScript has no assignment, and no code assigns to a member', () => {
+        for (const code of ['Math.abs = Math.sqrt', 'Math.max = () => 42', 'c0 = [1], c0 = [...c0, ...c0]', 'c0++', 'c0 += 1']) {
+            eq(String(createRowEvaluator(code)([1])).startsWith('Error: not allowed'), true, code);
+        }
+        eq(Math.abs(-4), 4);
+        eq(createRowEvaluator('c0 == 1 ? 2 : 3')([1]), 2);
+        eq(createRowEvaluator('c0 >= 1 && c0 <= 2 && c0 === 1')([1]), true);
+        eq(isSafeGeneratedJs('let $a = 1; $a += 2; $O[0] = $a; $a++', { variables: /^\$\w+$/, indexable: /^\$[A-Z]/ }), true);   // statements, where allowed
+        eq(isSafeGeneratedJs('let $a = 1; Math.abs = $a', { variables: /^\$\w+$/ }), false);
+    });
+    test('checked Python: SymPy code has no text (sympify runs it), sympy.S is only its sets, a bound name is no built-in', () => {
+        throws(() => checkGeneratedPython('sympy.S("lambdify((), 1)()")'));
+        throws(() => checkGeneratedPython('sympy.S(1)'), /sympy\.S/);
+        throws(() => checkGeneratedPython('sympy.sqrt("open(1)")'), /string/);
+        throws(() => checkGeneratedPython('(lambda exit: 0)(0) + scipy.integrate.quad(exit, 0, 1)[0]'), /bound name/);
+        eq(checkGeneratedPython('sympy.S.Reals'), 'sympy.S.Reals');
+        eq(checkGeneratedPython('sympy.limit(x, x, 0, "+")', { variables: ['x'] }), 'sympy.limit(x, x, 0, "+")');
+        for (const formula of ['\\sum_{i=1}^3 i^2', 'round(x/3, 2)', 'fixed(x, 2)', 'x \\in \\mathbb{R}']) {
+            for (const options of [{}, { numpy: true }, { sympy: true }]) toPythonFunction(formula, options);   // what the renderer writes still passes
+        }
+    });
+    test('GLSL has no text: a quoted string is refused, not written into the shader', () => {
+        throws(() => toGLSL('"abc" + x'), /No GLSL for text/);
+        throws(() => toGLSL("'\n#pragma x\n'"), /No GLSL for text/);
+    });
+    test('x (mod n) with no congruence is x mod n in code too: the divisor\'s sign', () => {
+        eq(evaluate('-7 (mod 8)'), 1);
+        eq(createRowEvaluator(toJavaScript('-7 (mod 8)'))([]), 1);
+        eq(toSQL('x (mod 3)'), toSQL('x mod 3'));
+        eq(toSQL('a ≡ b (mod 3)'), 'MOD((a) - (b), 3) = 0');
+    });
+    test('PostgreSQL: a mean of whole numbers is not a whole-number division', () => {
+        eq(toSQL('mean(1,2)'), '((1 + 2) / 2.0)');
+    });
+    test('2^-3^2: the minus takes the power, as 2^-x^2 does', () => {
+        eq(parse('2^-3^2').join(' '), '2 3 2 ^ neg ^');
+        eq(evaluate('2^-3^2'), 2 ** -9);
+        eq(parse('e^-2^x').join(' '), 'e 2 x ^ neg ^');
+        eq(parse('2^-3').join(' '), '2 -3 ^');
+        eq(parse('x^-1/2').join(' '), 'x -1 ^ 2 /');
+    });
+    test('strToFunction answers { success: false } for what JavaScript cannot write', () => {
+        const out = strToFunction(['Value'], 'lim(Value, Value, 0)');
+        eq(out.success, false);
+        eq(typeof out.error, 'string');
+    });
+});

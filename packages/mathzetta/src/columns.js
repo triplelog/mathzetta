@@ -1,7 +1,7 @@
 /**
  * Column names in formula text: `Value * 2 + Count` over a table's header.
  * Names are matched case-insensitively as whole words and swapped for
- * placeholders before parsing, so names that look like maths (`e`, `max`,
+ * placeholders before parsing, so names that look like math (`e`, `max`,
  * `2B`) still mean the column. Used by formulas.js (tabview, sqldn) and
  * python-function.js (Python templates over data).
  */

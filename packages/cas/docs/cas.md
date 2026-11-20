@@ -7,7 +7,7 @@ YAML rules anyone can change.
 
 ```js
 import { createCAS } from '@mathzetta/cas';
-import { parse } from 'mathzetta';                  // optional: read ordinary maths
+import { parse } from 'mathzetta';                  // optional: read ordinary math
 
 const cas = createCAS({ read: (text) => parse(text) });
 cas.simplify('sin(x)^2 + cos(x)^2 + sin(7pi/6)').text   // '1/2'
@@ -22,7 +22,7 @@ cas.approximate('e^(pi sqrt(163))', { digits: 30 }).text // '262537412640768743.
 
 Without `read`, strings are MathZetta postfix (`'x 2 ^ 3 *'`); token arrays and
 MathZetta CAS nodes work too. In Inline Math, `@mathzetta/inlinemath/cas` wires this up for you:
-`{{solve(x^2 = 4, x)}}` in drawn maths, and step lists drawn as maths
+`{{solve(x^2 = 4, x)}}` in drawn math, and step lists drawn as math
 ([inlinemath.com/cas.html](https://inlinemath.com/cas.html) is a playground).
 
 ## Calls
@@ -32,8 +32,8 @@ written by `format`), and takes `{ steps, approximate }` (below).
 
 | call | gives |
 | --- | --- |
-| `simplify(x)` | the normal form, then the simplify rules to a fixed point; then cancelled, multiplied out or factored if that is shorter |
-| `expand(x)`, `factor(x)`, `cancel(x)` | multiplied out; factored over the rationals; one fraction with common factors cancelled |
+| `simplify(x)` | the normal form, then the simplify rules to a fixed point; then canceled, multiplied out or factored if that is shorter |
+| `expand(x)`, `factor(x)`, `cancel(x)` | multiplied out; factored over the rationals; one fraction with common factors canceled |
 | `diff(x, v, { order })` | the differentiate rules (rules/calculus.yaml + rules/cas/derivatives.yaml), then simplify |
 | `integrate(x, v, { from, to, constant })` | the integrate rules, then (when no rule fits) multiplying out, taking a number out, polynomial division and partial fractions, a linear substitution, integration by parts. `from`/`to` (or an `int` with limits) gives F(b) − F(a), refused when the integrand has no value between the limits |
 | `solve(eq, v)` | `{ solutions, result, text, steps, unsolved, always }` — see below |
@@ -125,7 +125,7 @@ cas.diff(f, 'x', { steps: { show: ['chain', 'product'], hide: ['tidy'], explain:
 **Code** (src/cas): the normal form — exact arithmetic, like terms collected,
 like bases combined, roots of numbers simplified, a number multiplied into a
 sum, terms ordered x² + 3x + 1 — and the algorithms: polynomial expansion,
-rational roots, factoring, cancelling, the solver's strategy, numeric roots,
+rational roots, factoring, canceling, the solver's strategy, numeric roots,
 the integration strategies, approximation. Exact folds of functions of numbers
 (|−3|, 5!, floor, mod, gcd, max, comb, log_b of a power of b) are code too.
 

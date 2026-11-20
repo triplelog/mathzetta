@@ -12,7 +12,7 @@
  *   dist/inlinemath.external.global.min.js, dist/inlinemath-cas.external.global.min.js
  *                                     classic <script>s without MathZetta: they read window.MathZetta,
  *                                     which a MathZetta <script> put there first (mathzetta.min.js, or the
- *                                     maths-display flavour: speech, text and calculate are used)
+ *                                     maths-display flavor: speech, text and calculate are used)
  *   dist/inlinemath.global.min.js       a classic <script>: window.InlineMath (Inline Math + Markdown); it carries
  *                                       inlinemath.css and adds it to the page itself (<style id="inlinemath-css">)
  *   dist/inlinemath-cas.global.min.js   the same with the CAS: window.InlineMath.mathCAS, casBlocks …
@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
 const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
-const banner = `/* Inline Math ${pkg.version} — MIT licence; includes mathzetta (and @mathzetta/cas, for the CAS) */`;
+const banner = `/* Inline Math ${pkg.version} — MIT license; includes mathzetta (and @mathzetta/cas, for the CAS) */`;
 
 // the sibling packages, resolved as Node resolves them (in the workspace: packages/mathzetta, packages/cas)
 const resolveLikeThePage = {
@@ -73,7 +73,7 @@ const modules = await rollup({
     plugins: [resolveLikeThePage],
     onwarn: quiet,
 });
-await modules.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner, plugins: [terser({ format: { comments: /MIT licence/ } })] });
+await modules.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner, plugins: [terser({ format: { comments: /MIT license/ } })] });
 await modules.close();
 
 // the same without MathZetta: for a page that already has it (an import map supplies the names)
@@ -83,20 +83,20 @@ const external = await rollup({
     external: (id) => id.startsWith('mathzetta'),
     onwarn: quiet,
 });
-await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate with an import map'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
+await external.write({ dir: DIST, format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: map mathzetta, mathzetta/speech and mathzetta/calculate with an import map'), plugins: [terser({ format: { comments: /MIT license/ } })] });
 await external.close();
 
 // classic <script> builds
 for (const [file, kind] of [['inlinemath.global.min.js', 'full'], ['inlinemath-cas.global.min.js', 'cas'], ['inlinemath-lite.global.min.js', 'lite'], ['inlinemath-lite-calc.global.min.js', 'lite-calc']]) {
     const bundle = await rollup({ input: VIRTUAL, plugins: [globalEntry(kind), cssAsText, resolveLikeThePage], onwarn: quiet });
-    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', banner, plugins: [terser({ format: { comments: /MIT licence/ } })] });
+    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', banner, plugins: [terser({ format: { comments: /MIT license/ } })] });
     await bundle.close();
 }
 
 // the classic builds without MathZetta: every import of it becomes a read of window.MathZetta
 for (const [file, kind] of [['inlinemath.external.global.min.js', 'full'], ['inlinemath-cas.external.global.min.js', 'cas'], ['inlinemath-lite.external.global.min.js', 'lite']]) {
     const bundle = await rollup({ input: VIRTUAL, plugins: [globalEntry(kind), cssAsText, resolveLikeThePage], external: (id) => id.startsWith('mathzetta'), onwarn: quiet });
-    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', globals: () => 'MathZetta', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: load a MathZetta <script> (mathzetta.min.js or mathzetta.maths-display.min.js) first'), plugins: [terser({ format: { comments: /MIT licence/ } })] });
+    await bundle.write({ file: join(DIST, file), format: 'iife', name: 'InlineMath', globals: () => 'MathZetta', banner: banner.replace('; includes mathzetta (and @mathzetta/cas, for the CAS)', '; MathZetta not included: load a MathZetta <script> (mathzetta.min.js or mathzetta.maths-display.min.js) first'), plugins: [terser({ format: { comments: /MIT license/ } })] });
     await bundle.close();
 }
 

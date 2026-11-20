@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-MathZetta parses maths written almost any way into **standard postfix**
+MathZetta parses math written almost any way into **standard postfix**
 (docs/postfix.md). The core (`mathzetta`) is the parser, the operator table
 and the tree tools; each output format is its own entry point
 (`mathzetta/latex`, `/mathml`, `/text`, `/speech`, `/javascript`,
@@ -10,7 +10,7 @@ dependencies; plain ES modules.
 
 This package is `packages/mathzetta` of the public repository triplelog/mathzetta (an npm workspace,
 see ../../CLAUDE.md); `../inlinemath` (display) and `../cas` (rule rewriting, the CAS) are its
-neighbours there. Other projects build on it too (qblur, tabview, the tabdn servers, pyslots, the
+neighbors there. Other projects build on it too (qblur, tabview, the tabdn servers, pyslots, the
 calculus videos) from outside this repository. Keep MathZetta standalone — no imports from any of
 them, and nothing here about the closed projects beyond a public link.
 
@@ -34,7 +34,7 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
 - `src/operators.js` — the operator table (precedence, arity, fixity). Start here.
 - `src/parse/` — clean/ (text rewriting) → tokenize → parser.js (Pratt parser) → build (tree).
   `clean/index.js` takes the code-spelling phase from `clean/code-phase.js`; the "plain" builds (rollup.config.js, `tools/flavours.js`)
-  resolve that file to `code-phase.plain.js` (an identity) and read maths and LaTeX only.
+  resolve that file to `code-phase.plain.js` (an identity) and read math and LaTeX only.
   `clean/code.js` reads programming spellings (numpy, Python conditionals, SQL CASE/capitals, GLSL helpers,
   JavaScript's inline helpers from `src/js-helpers.js`). A renderer that starts writing something new fails
   test/unit/roundtrip.test.js until the parser reads it back — keep writer and reader in step.
@@ -96,8 +96,14 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   5000 characters (`maxLength`), trees are at most 1000 levels (`MAX_DEPTH`, src/tree.js), `evaluate` and
   `calculate` have a step budget (5,000,000 nodes per call, nested calls share it), perm/comb stop at ∞, a
   cleaning phase that grows past 100k characters and an output past a million (`guardLength`) are refused, a
-  filter pass has at most 24 neighbourhood calls, `§` is refused (it marks protected names), at most 100 `\int` are
+  filter pass has at most 24 neighborhood calls, `§` is refused outside quoted strings (it marks protected names; in a string it is held as U+E000 until the strings are back), at most 100 `\int` are
   read, `calculate` charges big-number gcds to its step budget and caps decimal places at 10,000, and generated
   JS factorial/perm/comb stop where a double reaches ∞ (test/unit/untrusted.test.js has these and the checker holes). A regex that starts with an operand anchors it to the start of
   a word (english.js), or a long word makes it quadratic. Generated JS sum loops cap each loop at a million but
   checkGeneratedJs refuses them, so only a caller running toJavaScript itself meets them.
+  Each renderer writes a node once (`written`, a Map in toCode / toSQL / toExcel / toGLSL): a rule may read an operand
+  as often as it likes, and a rule that falls back to another no longer doubles the work per level. `calculate` charges
+  factorial, perm, comb and matrix products (`charge`, matrix.js's `ring.charge`) to the same budget; a parser rule never
+  re-reads what it has read (`absorb` in parser.js). `checkGeneratedJs` refuses assignments with `keywords: false`, and an
+  assignment to a member always; `checkGeneratedPython` refuses text in SymPy code (sympify evaluates strings), a called
+  `sympy.S`, and a lambda or generator that binds a built-in's name.

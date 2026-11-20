@@ -1,6 +1,6 @@
 # MathZetta
 
-Parse maths written almost any way — plain text, LaTeX, unicode,
+Parse math written almost any way — plain text, LaTeX, unicode,
 JavaScript, Python (math, numpy or SymPy), SQL, GLSL or a spreadsheet formula — into **standard postfix**,
 then add the outputs you need: LaTeX, MathML, spoken English, JavaScript,
 Python, SQL, Excel/Sheets, GLSL, plain text, and exact or numeric evaluation. It reads
@@ -34,7 +34,7 @@ and LaTeX (`build/cjs/`), while `require('mathzetta')` is everything at once, li
 
 No runtime dependencies; ES modules for the browser and Node 18+. A
 `<script src="build/mathzetta.min.js">` tag exposes everything as
-`window.MathZetta`. Maths *display* is a separate library,
+`window.MathZetta`. Math *display* is a separate library,
 [Inline Math](https://inlinemath.com), which draws these trees with every part addressable.
 
 ## From a CDN
@@ -61,7 +61,7 @@ Every npm release is on jsDelivr (and unpkg) by itself — nothing to install or
 Less than everything — pick on the site's [CDN page](https://mathzetta.com/cdn.html), which writes
 the snippet and totals the size:
 
-- **`<script>` tags come in flavours** (`tools/flavours.js`; `build/mathzetta.<flavour>.min.js`, each
+- **`<script>` tags come in flavors** (`tools/flavours.js`; `build/mathzetta.<flavor>.min.js`, each
   setting `window.MathZetta`): `core` (parse, the tree tools, the operator table; 22 KB gzipped);
   the core plus one output — `latex`, `javascript`, `python`, `sql`, `excel`, `glsl` (which
   brings `formulas`); `formulas` (with the JavaScript, SQL and Excel outputs it is made of);
@@ -71,7 +71,7 @@ the snippet and totals the size:
   56 KB with brotli, which the CDN uses). `npm run cdn` lists them with their addresses.
 - **Plain** — the same without the code-spelling reader (`src/parse/clean/code.js`: numpy, SymPy,
   SQL, spreadsheet and GLSL spellings on input), about 5 KB gzipped less, for pages that read
-  maths and LaTeX only: `mathzetta.plain.min.js` (17 KB) and `plain-latex`,
+  math and LaTeX only: `mathzetta.plain.min.js` (17 KB) and `plain-latex`,
   `plain-display`, `plain-maths`, `plain-maths-display`; as modules
   `mathzetta.plain.esm.min.js` (`import … from 'mathzetta/plain'`; `require('mathzetta/plain')` loads `mathzetta.plain.cjs`) and `build/esm-plain/`. The code
   outputs keep the full reader: writing code out and reading it back belong together.
@@ -98,14 +98,14 @@ expression string, standard postfix, or a tree.
 | `mathzetta/latex` | `toLaTeX(x, { wrap })` — `wrap(node, latex)` can tag each subexpression |
 | `mathzetta/mathml` | `toMathML(x)` — each node's element has `id="mz-<index>"` |
 | `mathzetta/text` | `toText(x)` — readable text: `√(x)`, `x ∈ {1, 2}` |
-| `mathzetta/speech` | `toSpeech(x, { words, names, say })` — read aloud as a teacher would, beside the drawing (a video, captions), every word changeable; `toAudioSpeech(x)` — for a listener who can't see it (a screen reader): every group opened and closed in words; `toSpeechSegments(x)` / `toAudioSpeechSegments(x)` — the same in pieces tagged with node ids, for captions that follow the maths |
+| `mathzetta/speech` | `toSpeech(x, { words, names, say })` — read aloud as a teacher would, beside the drawing (a video, captions), every word changeable; `toAudioSpeech(x)` — for a listener who can't see it (a screen reader): every group opened and closed in words; `toSpeechSegments(x)` / `toAudioSpeechSegments(x)` — the same in pieces tagged with node ids, for captions that follow the math |
 | `mathzetta/javascript` | `toJavaScript(x)` — code using `Math.*` |
 | `mathzetta/python` | `toPython(x, { numpy, sympy })` — code using `math.*`, numpy element-wise, or SymPy (exact; `diff`, `integrate`, `limit`, `summation`); `toPythonFunction(f, { numpy, sympy, errors })` — a checked `def` (with sympy, the x of d/dx is a Symbol and a parameter x is substituted after) (1/0 raises, or `errors: 'nan'`); `fillPythonTemplate(program, formulas)` / `preparePythonTemplate` (per-slot results for a form) — a Python program with `# mathzetta: growth(P, r, K) = …` slots, including formulas over a dataset's columns (`keep(data: columns) = HR >= 30`); `mathzetta-python chart.py x='H / AB' --run out.png` fills and runs one. `examples/python/logistic.py` is a model; [pyslots](https://tabdn.com/pyslots/) makes templates into web pages (Pyodide or Flask), with matplotlib charts over baseball data |
 | `mathzetta/excel` | `toExcel(x, { cells, ranges })` — an Excel / Google Sheets formula (`=IF(x>0, SQRT(x), 0)`), bracketed for a spreadsheet's own rules; read back too (`=…` is read as a spreadsheet formula); `forXlsxFile` adds `_xlfn.` for an .xlsx file |
 | `mathzetta/sql` | `toSQL(x, { dialect, quoteIdentifiers, stringQuote })` — PostgreSQL by default, or `dialect: 'sqlite'` |
 | `mathzetta/glsl` | `toGLSL(x, { version })` — a shader expression, floats throughout; `GLSL_HELPERS`; `filterShader(spec)` — a whole fragment shader over an image's pixels (the filter format and WebGL runner on top of it are [qblur](https://qblur.com)) |
 | `mathzetta/evaluate` | `evaluate(x, scope)` — a value in double precision, without running generated code |
-| `mathzetta/calculate` | `calculate(x, scope, { decimal, places })` → `{ value, text, exact }` — exact where possible (fractions, 2¹⁰⁰, `2*sqrt(2)`, π, trig at standard angles, exact logs), numeric derivatives, definite integrals, limits and infinite sums otherwise (`∑ 1/n²` → `pi^2/6`). Throws `MathError` when there is no answer, `UnknownError` when it can't be worked out. **Loading this entry switches on `{{…}}` blocks** in every input: `{{1/3+1/6}}` → `1/2`, `{{~3 pi}}` → `3.142`. Matrices (`\begin{pmatrix}…`, `bmatrix([1, 2], [3, 4])`, `[[1, 2], [3, 4]]`) multiply as matrices, `A^-1` and `inv(A)` are exact inverses, `A^T` the transpose; `det`, `trace`, `rank`, `rref`, `identity(n)`, `dot`, `cross`, `linsolve(A, b)` |
+| `mathzetta/calculate` | `calculate(x, scope, { decimal, places })` → `{ value, text, exact }` — exact where possible (fractions, 2¹⁰⁰, `2*sqrt(2)`, π, trig at standard angles, exact logs), numeric derivatives at a point (`der(x^3, x = 2)` → `12`; a value the scope gives x makes x a constant), definite integrals, limits and infinite sums otherwise (`∑ 1/n²` → `pi^2/6`), a number that isn't recognized shown to the digits its error leaves. Throws `MathError` when there is no answer, `UnknownError` when it can't be worked out. **Loading this entry switches on `{{…}}` blocks** in every input: `{{1/3+1/6}}` → `1/2`, `{{~3 pi}}` → `3.142`. Matrices (`\begin{pmatrix}…`, `bmatrix([1, 2], [3, 4])`, `[[1, 2], [3, 4]]`) multiply as matrices, `A^-1` and `inv(A)` are exact inverses, `A^T` the transpose; `det`, `trace`, `rank`, `rref`, `identity(n)`, `dot`, `cross`, `linsolve(A, b)` |
 | `mathzetta/formulas` | `strToFunction(header, formula)`, `createRowEvaluator(js)`, `strToSQL(header, formula, selections, { dialect })` — formulas over table columns |
 | `mathzetta/all` | all of the above, plus `toUnified(x)` (every format at once) and `convert(x, format)` |
 
@@ -165,6 +165,6 @@ test/
   unit/             focused tests
   cases/            table tests (TSV); checked by test/checks.js
   known-failures.json   checks that fail today, with reasons
-tools/              the build's flavour list, the CDN addresses and sizes, test coverage, mathzetta-python
+tools/              the build's flavor list, the CDN addresses and sizes, test coverage, mathzetta-python
 docs/
 ```

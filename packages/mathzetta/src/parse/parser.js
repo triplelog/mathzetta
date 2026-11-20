@@ -64,6 +64,9 @@ const INFIX_FUNCTIONS = new Set(['\\comb', '\\perm', 'comb', 'perm']);
 /** Prefix words that take two {groups}: \frac{a}{b}, \binom{n}{k}. */
 const TWO_GROUPS = { frac: '/', '\\binom': '\\binom' };
 
+/** The raw tokens at the top of an expression that is true or false: comparisons, and, or, not, membership. */
+const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '==', '===', '≠', '≠=', '!=', '!==', '&', '|', '\\not', '\\xor', '∈', '∉', 'true', 'false']);
+
 /** Words the parser renames once it has finished. */
 const RENAMES = { '\\comb': 'comb', '\\perm': 'perm', 'deg': '°', 'π': 'pi', '∨': '|' };
 
@@ -99,6 +102,11 @@ class Parser {
     /** Parse whatever binds more tightly than `rbp`. `bare`: a function's unbracketed argument. */
     parseExpression(rbp, bare = false) {
         this.parseOperand();
+        this.absorb(rbp, bare);
+    }
+
+    /** After an operand: every operator that binds tighter than `rbp`, with what it takes. */
+    absorb(rbp, bare = false) {
         for (;;) {
             const t = this.peek();
             if (t === undefined || isCloser(t)) return;
@@ -135,6 +143,7 @@ class Parser {
             return { lbp: FUNCTION, run: () => { this.next(); this.parseExpression(FUNCTION); this.emit(t); } };
         }
         const prec = PARSE_PRECEDENCE[t];
+        if (t === '=' && prec !== undefined) return { lbp: prec, run: () => this.equals(prec) };
         if (prec !== undefined && !isFunction(t) && t !== '\\not' && !(t in TWO_GROUPS)) {
             const rbp = RIGHT_ASSOCIATIVE.has(t) ? prec - 1 : prec;
             return { lbp: prec, run: () => { this.next(); this.parseExpression(rbp); this.emit(t); } };
@@ -177,7 +186,7 @@ class Parser {
     }
 
     /**
-     * `mod` as written in maths: everything to its left (back to an = or a
+     * `mod` as written in math: everything to its left (back to an = or a
      * comparison) and one factor to its right. 2 + 3 mod 4 = (2+3) mod 4,
      * c = m^e mod n, a mod 2n = a mod (2n), (2 mod 3)·4, (3 mod tan x) + 4.
      */
@@ -185,6 +194,37 @@ class Parser {
         this.next();
         this.parseExpression(IMPLICIT, true);
         this.emit('mod');
+    }
+
+    /**
+     * `=`, which binds tighter than ? : (x = 1 ? a : b tests x = 1), except where it is a definition of a
+     * conditional: when what follows the = is itself true or false (a comparison, and/or, not) and a ? comes
+     * after it in the same brackets, the whole conditional is the right side. f(x) = x < 0 ? x^2 : 2x is
+     * f(x) = (x < 0 ? x^2 : 2x): comparing f(x) with a true/false value is never what is meant. `==` arrives
+     * here as `=` (the cleaner reads it so) and follows the same rule; `===` stays a test, and so does
+     * anything bracketed: (y = x > 0) ? 1 : 2.
+     */
+    equals(prec) {
+        this.next();
+        this.parseExpression(prec);
+        if (TRUE_OR_FALSE.has(this.out[this.out.length - 1]) && this.questionAhead()) {
+            this.absorb(8);   // on, below ?'s binding power (9): the conditional and all it holds (read on, not
+                              // again: reading the right side twice doubled the work at every nested definition)
+        }
+        this.emit('=');
+    }
+
+    /** Is there a ? ahead, before the brackets around this point close (or a comma ends the item)? */
+    questionAhead() {
+        let depth = 0;
+        for (let i = this.pos; i < this.tokens.length; i++) {
+            const t = this.tokens[i];
+            if (isOpener(t)) depth++;
+            else if (isCloser(t)) { if (depth-- === 0) return false; }
+            else if (depth === 0 && t === ',') return false;
+            else if (depth === 0 && t === '?') return true;
+        }
+        return false;
     }
 
     ternary() {

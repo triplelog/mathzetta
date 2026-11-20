@@ -40,7 +40,7 @@ export interface LayoutOptions {
 }
 
 export interface DrawOptions extends LayoutOptions {
-    /** Colours by target: { 'x^2': 'red', 3: '#06c' } or [[target, colour], …]. */
+    /** Colors by target: { 'x^2': 'red', 3: '#06c' } or [[target, color], …]. */
     colors?: Record<string | number, string> | Array<[Target, string]>;
     /** Parts to mark with the `<prefix>-hl` class. */
     highlight?: Target;
@@ -79,7 +79,7 @@ export const PATHS: Record<string, { fill?: string; stroke?: string }>;
 
 export interface ClickInfo { node: Node; id: number; path: number[] | null; element: Element; event: Event }
 
-/** A live drawing: highlight, colour, listen, step with animation. */
+/** A live drawing: highlight, color, listen, step with animation. */
 export class View {
     constructor(element: Element, input: Input, options?: ViewOptions);
     readonly element: Element;
@@ -96,7 +96,7 @@ export class View {
     elementOf(node: Node): Element | null;
     highlight(target: Target, className?: string): this;
     unhighlight(target?: Target | null, className?: string): this;
-    color(target: Target, colour: string): this;
+    color(target: Target, color: string): this;
     /** Listen for an event on the parts; returns a function that stops listening. A 'click' listener also makes the drawing work from the keyboard:
      *  one tab stop, arrow keys walk the parts (each spoken), Enter or Space calls the listener for the
      *  current part — `event` is then the KeyboardEvent. */
@@ -122,7 +122,7 @@ export class View {
 }
 /** Draw into an element and return the live view. */
 export function render(element: Element, input: Input, options?: ViewOptions): View;
-/** Should a step animate: true honours prefers-reduced-motion, 'always' does not, false never. */
+/** Should a step animate: true honors prefers-reduced-motion, 'always' does not, false never. */
 export function shouldAnimate(animate?: boolean | 'always'): boolean;
 
 // ---- inlinemath/markdown --------------------------------------------------------------------
@@ -138,12 +138,12 @@ export interface MarkdownOptions {
     define?: boolean;
     /** Let raw HTML through (default false: it is shown as text). */
     html?: boolean;
-    /** Another Markdown renderer; the maths is taken out first and put back into its output. */
+    /** Another Markdown renderer; the math is taken out first and put back into its output. */
     render?: (markdown: string) => string;
-    /** Which of '$$', '$', '\\[', '\\(' mark maths (default all). */
+    /** Which of '$$', '$', '\\[', '\\(' mark math (default all). */
     delimiters?: string[];
     /**
-     * The saved variables ($A := 2+2$) the maths may use. markdownToHTML: none by default;
+     * The saved variables ($A := 2+2$) the math may use. markdownToHTML: none by default;
      * renderMarkdownInto: the page's `variables` by default, false for none.
      */
     variables?: Variables | false | null;

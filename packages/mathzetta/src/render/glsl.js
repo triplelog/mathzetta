@@ -25,12 +25,12 @@
  *     to functions named for them, as in the JavaScript output; you supply
  *     them. Strings are written as they are and won't compile.
  *   - `°` is radians(): 30° → radians(30.0). mod is GLSL's mod(), which
- *     like the maths takes the sign of the divisor.
+ *     like the math takes the sign of the divisor.
  */
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, CUSTOM_PREFIX } from '../operators.js';
-import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex } from '../common.js';
+import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex, conditionNeedsBrackets } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -43,7 +43,14 @@ import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardL
  */
 export function toGlsl(node, options = {}) {
     const es3 = options.version === 300;
-    const render = (n) => guardLength(n.type === 'op' ? operation(n, render, es3, options.filter) : leaf(n));
+    // each node is written once, however often a rule asks for it: a rule that reads its operands, then falls back
+    // to another that reads them again, doubled the work at every level (x/y/y/… 25 deep took seconds)
+    const written = new Map();
+    const render = (n) => {
+        let text = written.get(n);
+        if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, es3, options.filter) : leaf(n)));
+        return text;
+    };
     return render(node);
 }
 
@@ -69,7 +76,7 @@ function leaf(node) {
     if (node.type === 'number') return float(v);
     const percent = node.type === 'symbol' && percentDecimal(v);
     if (percent) return float(percent);   // 50% is 0.5
-    if (node.type === 'string') return v;
+    if (node.type === 'string') throw new Error('No GLSL for text: a shader has numbers and vectors only');   // never spliced into shader source
     if (CONSTANTS[v] !== undefined) return CONSTANTS[v];
     if (v === '\\+' || v === '\\-') return v[1];
     return identifier(v);
@@ -102,7 +109,7 @@ const COMPARISONS = { '=': '==', '===': '==', '≠': '!=', '≠=': '!=', '<': '<
 /** Operators that come out already wrapped in brackets or as a call, so never need more. */
 const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '?:', 'mean', 'log', '≈', '∈', '∉']);
 
-/** The operator that decides brackets, where GLSL writes something differently from the maths. */
+/** The operator that decides brackets, where GLSL writes something differently from the math. */
 function glslBracketOp(node) {
     if (node.type !== 'op') return null;
     if (['!', 'perm'].includes(node.op)) return '*';
@@ -210,6 +217,7 @@ function operation(node, render, es3, filter = false) {
         case 'random':
             return 'mz_random()';
         case 'max': case 'min':
+            if (args.length === 1) return a.type === 'op' ? `(${render(a)})` : render(a);   // one value is its own max: max(a+b)*2 is (a+b)*2
             return args.map(render).reduce((acc, x) => `${op}(${acc}, ${x})`);
         case 'gcd':
             return args.map(render).reduce((acc, x) => `mz_gcd(${acc}, ${x})`);
@@ -234,7 +242,7 @@ function operation(node, render, es3, filter = false) {
         case '?:': {
             const isUnchanged = (n) => filter && n.type === 'symbol' && n.value === 'unchanged';
             const branch = (n, other) => (isUnchanged(n) && !isUnchanged(other) ? `mz_unchanged(${render(other)})` : render(n));
-            return `(${render(a)} ? ${branch(b, args[2])} : ${branch(args[2], b)})`;
+            return `(${conditionNeedsBrackets(a) ? `(${render(a)})` : render(a)} ? ${branch(b, args[2])} : ${branch(args[2], b)})`;   // (y == x > 0) ? …
         }
         case '≈':
             return `(abs(${render(a)} - ${side(b, 'right', '-')}) < 1e-5)`;   // a ≈ b - c: a - (b - c)
@@ -273,7 +281,7 @@ function operation(node, render, es3, filter = false) {
             if (b.type === 'symbol') return `${render(a)}_${render(b)}`;
             return `${render(a)}[int(${render(b)})]`;
     }
-    // a shader has no symbolic maths and no sets to combine: refused by name, never a call that won't compile
+    // a shader has no symbolic math and no sets to combine: refused by name, never a call that won't compile
     if (NO_GLSL[op]) throw new Error(`No GLSL for ${NO_GLSL[op]}`);
     throw new Error(`No GLSL for '${op}'`);
 }
@@ -348,7 +356,7 @@ const NO_GLSL = {
  * Helper functions the GLSL output may call. Paste this above main() in
  * any shader (GLSL ES 1.0 or 3.0); the compiler drops what isn't used.
  * mz_sq, mz_cube, mz_cbrt, mz_round and the hyperbolic functions have
- * vec2/vec3/vec4 overloads, so an expression over colours works too.
+ * vec2/vec3/vec4 overloads, so an expression over colors works too.
  */
 export const GLSL_HELPERS = [
     '#define MZ_INFINITY (1.0 / 0.0)',
@@ -376,15 +384,15 @@ export const GLSL_HELPERS = [
 
 /**
  * A complete fragment shader that applies expressions to every pixel of an
- * image — the fastest way to run a filter written in maths.
+ * image — the fastest way to run a filter written in math.
  *
  *   filterShader('(1 - r, 1 - g, 1 - b)')                  // invert
  *   filterShader({ r: 'g', g: 'r' })                       // swap channels; b, a unchanged
  *   filterShader('if gray > 0.5 then 1 else 0')            // threshold
  *   filterShader('pixel(px + 8 sin(py / 10 + t / 5), py)') // wave, animated by t
  *
- * `spec` is one expression for the whole colour — a number is grey, a
- * tuple (r, g, b) or (r, g, b, a) is the colour — or an object with any
+ * `spec` is one expression for the whole color — a number is gray, a
+ * tuple (r, g, b) or (r, g, b, a) is the color — or an object with any
  * of r, g, b, a, rgb, rgba, each an expression; channels not given are
  * left alone. In every expression these names are defined:
  *
@@ -402,12 +410,12 @@ export const GLSL_HELPERS = [
  *   zoom(s) zoom(s, cx, cy) shift(dx, dy) rotate(a) crop(x0, y0, x1, y1) tile(n) flipx() flipy()
  *                the picture read from somewhere else (GEOMETRY): put t in them and it moves;
  *                zoom(overlay, 2) does the same to another picture; width(overlay), height(overlay) its size.
- *                As the whole colour, a geometry read or a bare picture keeps its alpha — transparent
- *                outside the picture; inside a bigger expression it is a colour (black outside), and
+ *                As the whole color, a geometry read or a bare picture keeps its alpha — transparent
+ *                outside the picture; inside a bigger expression it is a color (black outside), and
  *                alpha(zoom(…)) says where the picture is.
- *   tohsv(c) fromhsv(c) tolinear(c) tohsl tolab tooklab toycbcr …   colour conversions (COLOUR_SPACES)
- *   blur(radius) gaussian(sigma) sharpen(amount)   the neighbourhood, as a vec3 like rgb
- *   dilate(radius) erode(radius) convolve(k × 9)    (NEIGHBOURHOOD below; blurx/blury and
+ *   tohsv(c) fromhsv(c) tolinear(c) tohsl tolab tooklab toycbcr …   color conversions (COLOR_SPACES)
+ *   blur(radius) gaussian(sigma) sharpen(amount)   the neighborhood, as a vec3 like rgb
+ *   dilate(radius) erode(radius) convolve(k × 9)    (NEIGHBORHOOD below; blurx/blury and
  *   sobel() sobelx() sobely() laplacian() emboss()   gaussianx/gaussiany for one axis at a time)
  *
  * plus everything GLSL has (clamp, mix, smoothstep, fract, length, …) and
@@ -430,7 +438,7 @@ export const GLSL_HELPERS = [
  * @param {100|300} [options.version] GLSL ES version; 300 for WebGL 2 only
  * @param {Record<string, string>} [options.uniforms] name → GLSL type, e.g. { cutoff: 'float', tint: 'vec3' }
  * @param {boolean} [options.blend] declare `uniform float mz_opacity` and end with `mix(input, result, mz_opacity)`
- * @param {string} [options.space] the colour space the frame holds for this pass (COLOUR_SPACES; 'srgb'
+ * @param {string} [options.space] the color space the frame holds for this pass (COLOR_SPACES; 'srgb'
  *   normally): named pictures and `source` are converted to it as they are sampled, and `gray` is
  *   still the brightness as seen (converted back). qblur' `"space"` compiles the
  *   conversion of the frame itself into passes around this one.
@@ -445,30 +453,30 @@ export const GLSL_HELPERS = [
 /** Names every filter expression can use, protected so `px` is not `p * x`; values are never calls, so `gray (1 - r)` is a product. */
 export const FILTER_VALUES = ['px', 'py', 'rgb', 'gray', 'unchanged', 'selected'];
 /** Functions over the pixels around this one; the GLSL for them is added to a shader only when it uses one. */
-export const NEIGHBOURHOOD = ['blur', 'blurx', 'blury', 'gaussian', 'gaussianx', 'gaussiany', 'sobel', 'sobelx', 'sobely',
+export const NEIGHBORHOOD = ['blur', 'blurx', 'blury', 'gaussian', 'gaussianx', 'gaussiany', 'sobel', 'sobelx', 'sobely',
     'laplacian', 'sharpen', 'emboss', 'dilate', 'erode', 'convolve'];
 /** Where to read the picture from: coordinate transforms, animated by putting t in them. */
 export const GEOMETRY = ['zoom', 'shift', 'rotate', 'crop', 'tile', 'flipx', 'flipy'];
 /** GLSL's own functions that are not MathZetta operators: protected so `fract` is not read as \frac, `step` as s·t·e·p. */
 export const GLSL_BUILTINS = ['fract', 'clamp', 'mix', 'smoothstep', 'step', 'distance', 'length', 'dot', 'normalize', 'cross', 'sign',
     'exp2', 'log2', 'inversesqrt', 'radians', 'degrees'];
-/** Colour spaces a filter can work in; sRGB is what the frame holds. `to<space>(c)` and `from<space>(c)` convert a colour. */
-export const COLOUR_SPACES = ['srgb', 'linear', 'hsv', 'hsl', 'lab', 'oklab', 'ycbcr'];
-export const COLOUR_FUNCTIONS = COLOUR_SPACES.filter((s) => s !== 'srgb').flatMap((s) => [`to${s}`, `from${s}`]);
-export const FILTER_FUNCTIONS = ['pixel', 'red', 'green', 'blue', 'alpha', 'luma', 'source', 'selection', 'width', 'height', ...NEIGHBOURHOOD, ...GEOMETRY, ...GLSL_BUILTINS, ...COLOUR_FUNCTIONS];
+/** Color spaces a filter can work in; sRGB is what the frame holds. `to<space>(c)` and `from<space>(c)` convert a color. */
+export const COLOR_SPACES = ['srgb', 'linear', 'hsv', 'hsl', 'lab', 'oklab', 'ycbcr'];
+export const COLOR_FUNCTIONS = COLOR_SPACES.filter((s) => s !== 'srgb').flatMap((s) => [`to${s}`, `from${s}`]);
+export const FILTER_FUNCTIONS = ['pixel', 'red', 'green', 'blue', 'alpha', 'luma', 'source', 'selection', 'width', 'height', ...NEIGHBORHOOD, ...GEOMETRY, ...GLSL_BUILTINS, ...COLOR_FUNCTIONS];
 /** Pictures every filter has without declaring them: the frame a chain started from, and the user's selection (white = selected). */
 export const IMPLICIT_PICTURES = ['source', 'selection'];
 
 /**
- * The colour conversions, all vec3 → vec3 with sRGB (0–1) on the other
+ * The color conversions, all vec3 → vec3 with sRGB (0–1) on the other
  * side, and every space's values kept in 0–1 so they survive an 8-bit
- * texture between passes: HSV/HSL hue 0–1; YCbCr chroma centred on 0.5;
+ * texture between passes: HSV/HSL hue 0–1; YCbCr chroma centered on 0.5;
  * Lab L/100 and a, b as 0.5 ± value/256; OKLab a, b as 0.5 + value.
  * src/cpu-helpers.js in qblur has the same formulas in JS.
  */
-function colourGlsl() {
+function colorGlsl() {
     return [
-        '// ---- colour spaces: to<space>(c) and from<space>(c), sRGB on the other side ----',
+        '// ---- color spaces: to<space>(c) and from<space>(c), sRGB on the other side ----',
         'vec3 tolinear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }',
         'vec3 fromlinear(vec3 c) { c = max(c, 0.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }',
         'float mz_hue(vec3 c, float v, float d) { float h = v == c.r ? (c.g - c.b) / d : v == c.g ? 2.0 + (c.b - c.r) / d : 4.0 + (c.r - c.g) / d; return fract(h / 6.0); }',
@@ -504,7 +512,7 @@ function colourGlsl() {
         '    return fromlinear(clamp(l, 0.0, 1.0));',
         '}',
         // fromhsv((h, s, v)) arrives as three arguments: a bracketed group becomes the call's arguments.
-        ...COLOUR_FUNCTIONS.map((fn) => `vec3 ${fn}(float x, float y, float z) { return ${fn}(vec3(x, y, z)); }`),
+        ...COLOR_FUNCTIONS.map((fn) => `vec3 ${fn}(float x, float y, float z) { return ${fn}(vec3(x, y, z)); }`),
     ];
 }
 /** How a named picture of another size is laid over the frame. */
@@ -519,7 +527,7 @@ const CHANNEL_FUNCTIONS = ['red', 'green', 'blue', 'alpha', 'luma'];
 export function pictureCalls(node, pictures, { whole = false } = {}) {
     const out = pictureCall(node, pictures);
     if (!whole) return out;
-    // The whole colour: a bare picture, or a geometry read, keeps its alpha — transparent outside the picture.
+    // The whole color: a bare picture, or a geometry read, keeps its alpha — transparent outside the picture.
     if (out.type === 'symbol' && pictures.has(out.value)) return { ...out, value: `mz_px_${out.value}` };
     if (out.type === 'op' && out.op.startsWith(`${CUSTOM_PREFIX}mz_at_`)) return { ...out, op: out.op.replace('mz_at_', 'mz_sample_') };
     return out;
@@ -549,17 +557,17 @@ function pictureCall(node, pictures) {
 }
 export const FILTER_NAMES = [...FILTER_VALUES, ...FILTER_FUNCTIONS];
 
-/** How far the neighbourhood functions reach, in pixels: GLSL loops need fixed bounds. */
+/** How far the neighborhood functions reach, in pixels: GLSL loops need fixed bounds. */
 export const REACH = { square: 8, line: 24 };
 
 /**
- * The neighbourhood functions. Colour-valued ones return a vec3 (like
+ * The neighborhood functions. Colour-valued ones return a vec3 (like
  * `rgb`) and ignore alpha; the edge detectors work on brightness and
  * return a float. `gaussian(sigma)` samples a square of ±REACH.square
  * pixels, so for a wide blur chain `gaussianx(sigma)` then
  * `gaussiany(sigma)` (±REACH.line, and 2n taps instead of n²).
  */
-function neighbourhoodGlsl(sample) {
+function neighborhoodGlsl(sample) {
     // GLSL loops need fixed bounds, so these run from -reach to +reach — but stop as soon as
     // they pass the radius actually asked for, so blur(2) costs 25 taps, not 289.
     const square = (limit, body) => `
@@ -590,7 +598,7 @@ function neighbourhoodGlsl(sample) {
     vec3 sum = vec3(0.0); float total = 0.0;${line(axis, '3.0 * sigma', 'if (abs(fi) > 3.0 * sigma) continue;\n        float w = mz_gauss(fi * fi, sigma);\n        sum += w * mz_tap(dx, dy).rgb; total += w;')}
     return sum / total;
 }`;
-    return `// ---- neighbourhood: the pixels around this one (dy runs downwards, like py) ----
+    return `// ---- neighborhood: the pixels around this one (dy runs downwards, like py) ----
 vec4 mz_tap(float dx, float dy) { return ${sample}(image, (gl_FragCoord.xy + vec2(dx, -dy)) / resolution); }
 float mz_luma_at(float dx, float dy) { return dot(mz_tap(dx, dy).rgb, vec3(0.299, 0.587, 0.114)); }
 float mz_gauss(float d2, float sigma) { return exp(-d2 / (2.0 * sigma * sigma)); }
@@ -638,15 +646,15 @@ vec3 convolve(float k00, float k01, float k02, float k10, float k11, float k12, 
 }`;
 }
 
-/** Neighbourhood calls allowed in one filter pass (see filterShader). */
-export const MAX_NEIGHBOURHOOD = 24;
+/** Neighborhood calls allowed in one filter pass (see filterShader). */
+export const MAX_NEIGHBORHOOD = 24;
 
 export function filterShader(spec, options = {}) {
     const es3 = options.version === 300;
     const parse = options.parse;
     if (!parse) throw new Error('filterShader needs options.parse (use the one from src/index.js)');
     const space = options.space && options.space !== 'srgb' ? options.space : null;
-    if (space && !COLOUR_SPACES.includes(space)) throw new Error(`Unknown colour space "${space}": ${COLOUR_SPACES.join(', ')}`);
+    if (space && !COLOR_SPACES.includes(space)) throw new Error(`Unknown color space "${space}": ${COLOR_SPACES.join(', ')}`);
     const placements = Array.isArray(options.images) ? Object.fromEntries(options.images.map((n) => [n, {}])) : { ...(options.images ?? {}) };
     const images = Object.keys(placements);
     // names and types the caller passes go into the shader's text: GLSL identifiers and types only
@@ -656,14 +664,14 @@ export function filterShader(spec, options = {}) {
         if (!ident.test(n) || !/^(?:float|int|bool|[biu]?vec[234]|mat[234]|sampler2D)$/.test(String(t))) throw new Error(`Uniform ${JSON.stringify(n)}: a GLSL name and type, not ${JSON.stringify(t)}`);
     }
     const pictures = new Set([...images, ...IMPLICIT_PICTURES]);
-    // each neighbourhood call samples many pixels per pixel (gaussian(8): 17 × 17): past a budget a frame
+    // each neighborhood call samples many pixels per pixel (gaussian(8): 17 × 17): past a budget a frame
     // could outlast the GPU's watchdog and lose the WebGL context
-    let neighbourhood = 0;
+    let neighborhood = 0;
     const budget = (tree) => {
         (function walk(n) {
             const name = n.type === 'op' ? n.op.replace(/^\\:/, '') : n.value;
-            if (NEIGHBOURHOOD.includes(name) && ++neighbourhood > MAX_NEIGHBOURHOOD) {
-                throw new Error(`At most ${MAX_NEIGHBOURHOOD} neighbourhood functions (blur, gaussian, sobel …) in a filter pass`);
+            if (NEIGHBORHOOD.includes(name) && ++neighborhood > MAX_NEIGHBORHOOD) {
+                throw new Error(`At most ${MAX_NEIGHBORHOOD} neighborhood functions (blur, gaussian, sobel …) in a filter pass`);
             }
             if (n.type === 'op') n.args.forEach(walk);
         })(tree);
@@ -679,13 +687,13 @@ export function filterShader(spec, options = {}) {
 
     const sample = es3 ? 'texture' : 'texture2D';
     const declared = Object.entries(options.uniforms ?? {}).map(([name, type]) => `uniform ${type} ${name};`);
-    const usesNeighbourhood = new RegExp(`\\b(${NEIGHBOURHOOD.join('|')})\\(`).test(lines.join('\n'));
+    const usesNeighborhood = new RegExp(`\\b(${NEIGHBORHOOD.join('|')})\\(`).test(lines.join('\n'));
     if (!images.includes('source') && /\b(source|mz_at_source|mz_px_source|mz_sample_source)\b/.test(lines.join('\n'))) images.push('source');
     if (!images.includes('selection') && /\b(selected|selection|mz_at_selection|mz_px_selection|mz_sample_selection)\b/.test(lines.join('\n'))) images.push('selection');
     const uv = 'vec2((px + 0.5) / resolution.x, 1.0 - (py + 0.5) / resolution.y)';
     const usesGeometry = /\bmz_(zoom|shift|rotate|crop|tile|flipx|flipy|at_image|sample_image)\(/.test(lines.join('\n'));
-    const usesColour = space || new RegExp(`\\b(${COLOUR_FUNCTIONS.join('|')})\\(`).test(lines.join('\n'));
-    // A channel expression may come out as a number, a comparison, or a colour; a colour gives that channel.
+    const usesColor = space || new RegExp(`\\b(${COLOR_FUNCTIONS.join('|')})\\(`).test(lines.join('\n'));
+    // A channel expression may come out as a number, a comparison, or a color; a color gives that channel.
     const channel = (ch) => [
         `float mz_ch_${ch}(float v) { return v; }`,
         `float mz_ch_${ch}(bool v) { return v ? 1.0 : 0.0; }`,
@@ -710,18 +718,18 @@ export function filterShader(spec, options = {}) {
         'float blue(float px, float py) { return pixel(px, py).b; }',
         'float alpha(float px, float py) { return pixel(px, py).a; }',
         'float luma(float px, float py) { return dot(pixel(px, py).rgb, vec3(0.299, 0.587, 0.114)); }',
-        // The same channels of a colour: red(overlay), alpha(overlay), luma(rgb * 2)
+        // The same channels of a color: red(overlay), alpha(overlay), luma(rgb * 2)
         'float red(vec4 v) { return v.r; }', 'float red(vec3 v) { return v.r; }',
         'float green(vec4 v) { return v.g; }', 'float green(vec3 v) { return v.g; }',
         'float blue(vec4 v) { return v.b; }', 'float blue(vec3 v) { return v.b; }',
         'float alpha(vec4 v) { return v.a; }', 'float alpha(vec3 v) { return 1.0; }',
         'float luma(vec4 v) { return dot(v.rgb, vec3(0.299, 0.587, 0.114)); }', 'float luma(vec3 v) { return dot(v, vec3(0.299, 0.587, 0.114)); }',
         'vec2 mz_p() { return vec2(gl_FragCoord.x - 0.5, resolution.y - gl_FragCoord.y - 0.5); }   // (px, py)',
-        ...(usesColour ? colourGlsl() : []),
+        ...(usesColor ? colorGlsl() : []),
         ...images.flatMap((name) => pictureGlsl(name, placements[name]?.place, sample, space)),
         ...(usesGeometry ? geometryGlsl(sample) : []),
-        usesNeighbourhood ? neighbourhoodGlsl(sample) : '',
-        // A colour expression may come out as a number, a comparison, or a vector; these accept any.
+        usesNeighborhood ? neighborhoodGlsl(sample) : '',
+        // A color expression may come out as a number, a comparison, or a vector; these accept any.
         ...channel('r'), ...channel('g'), ...channel('b'), ...channel('a'),
         'vec3 mz_rgb(float v) { return vec3(v); }',
         'vec3 mz_rgb(bool v) { return vec3(v ? 1.0 : 0.0); }',
@@ -764,15 +772,15 @@ export function filterShader(spec, options = {}) {
 }
 
 /**
- * Reading a named picture: `mz_sample_<name>(p)` is its colour and alpha
+ * Reading a named picture: `mz_sample_<name>(p)` is its color and alpha
  * at frame pixel p, placed over the frame by its own size (`cover` fills
  * keeping the aspect ratio, `fit` shows all of it, `stretch` ignores the
  * ratio, `tile` repeats it at its own size), then zoomed about and
- * centred at (x, y) and turned by angle — transparent outside. The
+ * centered at (x, y) and turned by angle — transparent outside. The
  * picture a chain started from (`source`) is the frame's size already.
  */
 function pictureGlsl(name, place, sample, space = null) {
-    // In a colour space, a picture is converted as it is read, so the expression sees one space everywhere (a selection is a mask, not a colour).
+    // In a color space, a picture is converted as it is read, so the expression sees one space everywhere (a selection is a mask, not a color).
     const converted = space && name !== 'selection';
     const convert = converted ? [`vec4 mz_sample_${name}(vec2 p) { vec4 v = mz_raw_${name}(p); v.rgb = to${space}(v.rgb); return v; }`] : [];
     const raw = converted ? `mz_raw_${name}` : `mz_sample_${name}`;

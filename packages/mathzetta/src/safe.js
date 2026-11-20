@@ -14,7 +14,8 @@
  *   - member access only to listed members: Math.<function or constant>,
  *     Number.isInteger / isFinite, .includes, .reduce — never a
  *     computed member (`x["constructor"]`), never .constructor / __proto__;
- *   - operators and brackets.
+ *   - operators and brackets; an assignment only where statements are allowed (not `keywords: false`),
+ *     and never to a member (`Math.abs = …` would change the page's Math for everyone).
  * Anything else — an unknown name like `alert` or `fetch`, `import(…)`, a
  * backtick, a single quote, a backslash outside a string — is refused.
  *
@@ -41,6 +42,8 @@ const KEYWORDS = new Set(['let', 'for', 'if', 'return']);
 const HELPER_SOURCES = Object.values(JS_HELPERS).sort((a, b) => b.length - a.length);
 const PUNCT = ['===', '!==', '**=', '...', '=>', '==', '!=', '<=', '>=', '&&', '||', '??', '**', '++', '--', '+=', '-=', '*=', '/=', '%=',
     '(', ')', '[', ']', '{', '}', ',', ';', '?', ':', '.', '+', '-', '*', '/', '%', '!', '=', '<', '>', '&', '|', '^', '~'];
+/** Writing to something: a formula (`keywords: false`) has none, and no code writes to a member (`Math.abs = …`). */
+const ASSIGNMENTS = new Set(['=', '+=', '-=', '*=', '/=', '%=', '**=', '++', '--']);
 
 /**
  * @param {string} code generated JavaScript (an expression, or helper-bodied code from render/code.js)
@@ -95,12 +98,16 @@ export function checkGeneratedJs(code, o = {}) {
                 const allowed = owner && OBJECTS[owner] ? OBJECTS[owner].has(name) : MEMBERS.has(name) && !MATH.has(name);
                 if (!allowed) fail(`.${name}`);
             } else if (!BUILTIN.has(name) && !(keywords && KEYWORDS.has(name)) && !isVar(name)) fail(`the name "${name}"`);
-            prev = { type: 'id', value: name };
+            prev = { type: 'id', value: name, member: Boolean(prev && prev.type === 'p' && prev.value === '.') };
             i += name.length;
             continue;
         }
         const p = PUNCT.find((t) => rest.startsWith(t));
         if (!p) fail(`"${rest[0]}"`);
+        if (ASSIGNMENTS.has(p)) {
+            if (!keywords) fail(`an assignment ("${p}")`);
+            if (prev && prev.type === 'id' && prev.member) fail(`an assignment to .${prev.value}`);
+        }
         if (p === '[' && endsValue() && !(indexable && prev.type === 'id' && isVar(prev.value) && indexable.test(prev.value))) fail('indexing with [ ]');
         const tok = { type: 'p', value: p };
         if (p === '.') {
