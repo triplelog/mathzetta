@@ -65,7 +65,7 @@ const INFIX_FUNCTIONS = new Set(['\\comb', '\\perm', 'comb', 'perm']);
 const TWO_GROUPS = { frac: '/', '\\binom': '\\binom' };
 
 /** The raw tokens at the top of an expression that is true or false: comparisons, and, or, not, membership. */
-const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '==', '===', '≠', '≠=', '!=', '!==', '&', '|', '\\not', '\\xor', '∈', '∉', 'true', 'false']);
+const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '==', '===', '≠', '≠=', '!=', '!==', '&', '|', '\\not', '\\xor', '\\implies', '\\iff', '∈', '∉', 'true', 'false']);
 
 /** Words the parser renames once it has finished. */
 const RENAMES = { '\\comb': 'comb', '\\perm': 'perm', 'deg': '°', 'π': 'pi', '∨': '|' };

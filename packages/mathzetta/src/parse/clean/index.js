@@ -47,7 +47,7 @@ const PHASES = [
 ];
 
 
-const refuseBar = () => { throw new Error('An evaluation bar (\\left. … \\right|_{x = a}) is read only after a derivative: \\left.\\frac{d}{dx} f\\right|_{x=a}'); };
+const refuseBar = () => { throw new Error('A bar with one limit (\\left. … \\right|_{x = a}) is read only after a derivative, \\left.\\frac{d}{dx} f\\right|_{x=a}; with two, \\left. F \\right|_a^b, it is F at b minus F at a'); };
 
 /**
  * Before the derivatives are read: what an evaluation bar holds is fenced, BAR_OPEN … |_ → BAR_OPEN(…)|_, so
@@ -137,7 +137,10 @@ function squeeze(text) {
         const before = text[at - 1] ?? '';
         const after = text[at + space.length] ?? '';
         if (before === 'Δ') return '';   // Δ x is the one quantity Δx
-        return /[A-Za-z\u0370-\u03FF′]/.test(before) && /[A-Za-z\u0370-\u03FF]/.test(after) ? ' ' : '';
+        if (/[A-Za-z\u0370-\u03FF′]/.test(before) && /[A-Za-z\u0370-\u03FF]/.test(after)) return ' ';
+        // a name, a space, a number: two factors (n 3^n is n·3ⁿ, not a name n3), except after a command (\frac 1 2)
+        if (/[A-Za-z\u0370-\u03FF′]/.test(before) && /\d/.test(after) && !/\\[A-Za-z]+$/.test(text.slice(0, at))) return ' ';
+        return '';
     });
 }
 

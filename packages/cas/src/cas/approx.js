@@ -247,6 +247,9 @@ const FUNCTIONS = {
   arcsin: (F, x) => F.asin(x),
   arccos: (F, x) => F.pi / 2n - F.asin(x),
   arctan: (F, x) => F.atan(x),
+  arcsec: (F, x) => { if (babs(x) < F.S) throw new CasError('arcsec of a number between -1 and 1 is not real'); return F.pi / 2n - F.asin(F.div(F.S, x)); },
+  arccsc: (F, x) => { if (babs(x) < F.S) throw new CasError('arccsc of a number between -1 and 1 is not real'); return F.asin(F.div(F.S, x)); },
+  arccot: (F, x) => F.pi / 2n - F.atan(x),   // 0 to π
   sinh: (F, x) => (F.exp(x) - F.exp(-x)) / 2n,
   cosh: (F, x) => (F.exp(x) + F.exp(-x)) / 2n,
   tanh: (F, x) => { const a = F.exp(x); const b = F.exp(-x); return F.div(a - b, a + b); },

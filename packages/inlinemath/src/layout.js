@@ -39,7 +39,7 @@ const OP_CLASS = {
     '+': 'add', '-': 'sub', '*': 'mul', '/': 'frac', '^': 'pow', '_': 'subscript', 'neg': 'neg', 'pm': 'pm',
     '!': 'factorial', '=': 'eq', '===': 'eq', '≠': 'neq', '≠=': 'neq', '<': 'lt', '>': 'gt', '≤': 'le', '≥': 'ge',
     '≈': 'approx', '≡': 'equiv', '∈': 'in', '∉': 'notin', '∪': 'union', '∩': 'intersect', '→': 'to', '±': 'pm',
-    '&': 'and', '|': 'or', '\\not': 'not', '\\xor': 'xor', '\\nand': 'nand', '\\nor': 'nor', '?:': 'cases',
+    '&': 'and', '|': 'or', '\\not': 'not', '\\xor': 'xor', '\\nand': 'nand', '\\nor': 'nor', '\\implies': 'implies', '\\iff': 'iff', '?:': 'cases',
     '()': 'tuple', '[]': 'list', '{}': 'set', '(]': 'interval', '[)': 'interval',
     '\\sumidx': 'sum', '\\prodidx': 'prod', 'mod': 'mod', 'pmod': 'pmod',
     pmatrix: 'matrix', bmatrix: 'matrix', vmatrix: 'matrix',
@@ -48,12 +48,12 @@ const OP_CLASS = {
 const RELATIONS = {
     '=': '=', '===': '=', '≠': '≠', '≠=': '≠', '<': '<', '>': '>', '≤': '≤', '≥': '≥',
     '∈': '∈', '∉': '∉', '→': '→', '≈': '≈', '≡': '≡',
-    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓',
+    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓', '\\implies': '⇒', '\\iff': '⇔',
 };
 const BINARY = { '±': '±', '∪': '∪', '∩': '∩', 'mod': 'mod' };
 
 const TRIG = ['sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'sinh', 'cosh', 'tanh'];
-const INVERSE = { arcsin: 'sin', arccos: 'cos', arctan: 'tan', arcsinh: 'sinh', arccosh: 'cosh', arctanh: 'tanh' };
+const INVERSE = { arcsin: 'sin', arccos: 'cos', arctan: 'tan', arcsec: 'sec', arccsc: 'csc', arccot: 'cot', arcsinh: 'sinh', arccosh: 'cosh', arctanh: 'tanh' };
 /** Functions written with a name and, when the argument is simple, no brackets: sin x, ln x. */
 const NAMED = [...TRIG, ...Object.keys(INVERSE), 'ln', 'det'];
 /** Functions always written with brackets: max(a, b). */
@@ -191,6 +191,18 @@ class Layout {
     }
 
     number(node) {
+        // a repeating decimal, 0.166.. (read from 0.1\overline{6}): the block drawn once, with a bar over it
+        const repeating = /^(-?\d*\.)(\d*)\.\.$/.exec(node.value);
+        if (repeating) {
+            const [, head, frac] = repeating;
+            let L = 1;
+            for (let k = 1; 2 * k <= frac.length; k++) if (frac.slice(-k) === frac.slice(-2 * k, -k)) { L = k; break; }
+            let prefix = frac;
+            while (prefix.endsWith(frac.slice(-L)) && prefix.length >= L) prefix = prefix.slice(0, -L);
+            const first = this.text('num', (head + prefix).replace(/^-/, MINUS));
+            const block = this.text('num', frac.slice(-L));
+            return this.wrap(node, ['number'], row(first, box(this.el('over', block.html), block.h + 0.14, block.d)));
+        }
         return this.wrap(node, ['number'], this.text('num', node.value.replace(/^-/, MINUS)));
     }
 
@@ -202,6 +214,7 @@ class Layout {
         if (/^[A-Za-z]$/.test(v) || /^[α-ω]$/.test(v)) return this.text('var', v);
         if (/^[A-Za-z]′+$/.test(v)) return box(this.el('var', escape(v[0])) + this.el('prime', escape(v.slice(1))));
         if (/^Δ[A-Za-z]$/.test(v)) return box(this.el('ord', 'Δ') + this.el('var', v[1]));
+        if (/^d[A-Za-zα-ω]$/.test(v)) return box(this.el('ord', 'd') + this.el('var', v[1]));   // a differential: dx, dθ (the d upright)
         if (v.endsWith('⁻¹')) return this.script(this.symbol(v.slice(0, -2)), this.text('num', MINUS + '1'), { level: 0 });
         if (/^\\[A-Za-z]+$/.test(v)) return this.text('name', v.slice(1));
         if (/^[A-Za-z]{2,}$/.test(v)) return this.text('name', v);   // upright, like \mathrm
@@ -223,6 +236,7 @@ class Layout {
         if (isCustomFunction(op)) return wrap(this.custom(node, ctx));
         const rows = matrixRows(node);   // pmatrix, bmatrix, vmatrix, and [[1, 2], [3, 4]]
         if (rows) return wrap(this.matrix(node, rows, ctx));
+        if (op === '{}' && !args.length) return wrap(this.text('op', '∅'));   // the empty set
         if (GROUPS[op]) return wrap(this.fence(this.list(args, ctx), ...GROUPS[op]));
         // a choice of equations or inequalities (a CAS's solutions) reads in words: x = 2 or x = 3
         if ((op === '|' || op === '&') && args.length >= 2 && args.every(isStatement)) {
@@ -291,6 +305,12 @@ class Layout {
                 const parent = { op: op === 'sum' ? '+' : '*' };
                 const term = (n, i) => (needsBrackets(parent, n, i ? 'right' : 'left') ? this.fence(r(n)) : r(n));
                 return wrap(row(args.map((n, i) => (i ? [this.bin(op === 'sum' ? '+' : '·'), term(n, i)] : [term(n, i)])).flat()));
+            }
+            case 'setbuilder':   // {x | x > 2}
+                return wrap(this.fence(row(r(a), this.bin('|'), r(b)), '{', '}'));
+            case 'evaluated': {   // [F]_a^b: F in square brackets, the limits on the right (the variable isn't drawn)
+                const limit = (n) => this.render(n, { ...ctx, level: ctx.level + 1 });
+                return wrap(this.script(this.fence(r(a), '[', ']'), limit(args[3]), ctx, limit(args[2])));
             }
             case 'der':
                 return wrap(this.derivative(node, ctx));

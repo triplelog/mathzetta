@@ -89,6 +89,15 @@ test('a derivative at a point: the bar, the point below it, no id twice; the CAS
     assert.equal(text(toHTML('{{diff(x^3, x = 2, 2)}}', { blocks: casBlocksAtPoint() })), '12');
 });
 
+test('scope values reach CAS blocks, except the variable a call works in', () => {
+    const blocks = casBlocksAtPoint();
+    assert.equal(text(toHTML('{{diff(x^3, x = a)}}', { blocks, scope: { a: 2 } })), '12');
+    assert.equal(text(toHTML('{{diff(x^3, x)}}', { blocks, scope: { x: 2 } })), '3x2', 'x is bound: still a variable');
+    assert.equal(text(toHTML('{{diff(a x^2, x)}}', { blocks, scope: { a: 5, x: 2 } })), '10x');
+    assert.match(text(toHTML('{{solve(x^2 = a, x)}}', { blocks, scope: { a: 9 } })), /x=−3orx=3|x=±3/);
+    assert.equal(text(toHTML('{{simplify(x^2 + 1)}}', { blocks, scope: { x: '1/2' } })), '54');
+});
+
 test('a choice of equations reads in words; other logic keeps its signs', () => {
     assert.equal(text(toHTML('x = 2 | x = 3')), 'x=2orx=3');
     assert.ok(has(toHTML('x = 2 | x = 3'), 'conj'));
@@ -792,6 +801,56 @@ test('View.set: an expression that cannot be drawn leaves the view as it was', a
     assert.throws(() => view.set({ type: 'op', op: 'nosuchop', args: [{ type: 'symbol', value: 'q' }] }));
     assert.equal(view.tree, tree);
     assert.equal(element.innerHTML, html);
+});
+
+// ---- the Calculus II survey (2026-11-20) ---------------------------------------------------
+
+test('the empty set draws as ∅; a repeating decimal draws its block once, with a bar', () => {
+    assert.equal(text(toHTML('x \\in \\emptyset')), 'x∈∅');
+    const repeating = toHTML('0.1\\overline{6}');
+    assert.equal(text(repeating), '0.16');
+    assert.ok(repeating.includes('mv-over'), 'the 6 has its bar');
+    assert.equal(text(toHTML('1.333..')), '1.3');
+    assert.ok(!toHTML('0.5').includes('mv-over'));
+});
+
+test('an evaluation bar: the brackets, both limits, and every part addressable', () => {
+    const html = toHTML('\\left[ \\frac{x^3}{3} \\right]_0^1');
+    assert.equal(text(html), 'x3310');
+    assert.ok(html.includes('mv-lbrack') && html.includes('mv-rbrack'), 'square brackets');
+    const ids = [...html.matchAll(/data-node="(\d+)"/g)].map((m) => Number(m[1]));
+    for (const id of [0, 1, 2, 3, 4, 6, 7, 8]) assert.ok(ids.includes(id), `node ${id} is drawn`);
+    assert.equal(new Set(ids).size, ids.length, 'no id twice');
+});
+
+test('arcsec, arccsc and arccot draw like arcsin, or as sec⁻¹ when asked', () => {
+    assert.equal(text(toHTML('\\sec^{-1} x')), 'arcsecx');
+    assert.equal(text(toHTML('arccot(2x)')), 'arccot2x');
+    assert.ok(text(toHTML('arccsc(x)', { inverseTrig: 'power' })).startsWith('csc−1'));
+});
+
+test('CAS blocks work out limits, written as \\lim or as limit(f, x, a), and improper integrals', async () => {
+    const { casBlocks } = await import('../src/cas.js');
+    const { parse } = await import('mathzetta');
+    const blocks = casBlocks();
+    const at = (s) => parse(s, { blocks }).join(' ');
+    assert.equal(at('{{\\lim_{x \\to 0} \\frac{\\sin x}{x}}}'), '1');
+    assert.equal(at('{{limit(sin(x)/x, x, 0)}}'), '1');
+    assert.equal(at('{{\\lim_{x\\to\\infty} \\left(1 + \\frac{1}{x}\\right)^x}}'), 'e');
+    assert.equal(at('{{\\lim_{x \\to 0^+} \\frac{1}{x}}}'), '∞');
+    assert.equal(at('{{\\lim_{x \\to 0} \\frac{1}{x}}}'), '"does not exist"');
+    assert.equal(at('{{\\int_1^{\\infty} \\frac{1}{x^2} dx}}'), '1');
+});
+
+test('CAS block calls read with LaTeX in them: the call names are kept whole (they were letters side by side)', async () => {
+    const { casBlocks } = await import('../src/cas.js');
+    const { parse } = await import('mathzetta');
+    const blocks = casBlocks();
+    const at = (s) => parse(s, { blocks }).join(' ');
+    assert.equal(at('{{simplify(\\sec^2 x - \\tan^2 x)}}'), '1');
+    assert.equal(at('{{diff(\\sin x, x)}}'), 'x cos');
+    assert.equal(at('{{integrate(\\frac{1}{x^2+4}, x)}}'), 'x 2 / arctan 2 /');
+    assert.equal(at('\\frac{d}{dx} x^3 = {{diff(x^3, x)}}'), 'x 3 ^ x der 3 x 2 ^ * =');
 });
 
 // ---- report -------------------------------------------------------------------------

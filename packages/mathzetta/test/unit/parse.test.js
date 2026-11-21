@@ -2,7 +2,7 @@
  * Reading: the pipeline from text to postfix (clean → tokenize → parse → tree), the postfix format, the tree tools, edge cases, conditionals, strings and {{blocks}}.
  */
 import { suite, test, eq, throws } from '../harness.js';
-import { parse, parseSteps, clean, toSpeech, toText, toJavaScript, toGLSL, toPython, evaluate, toLaTeX } from '../../src/all.js';
+import { parse, parseSteps, clean, toSpeech, toText, toJavaScript, toGLSL, toPython, evaluate, toLaTeX, calculate, toSQL } from '../../src/all.js';
 import { tokenize } from '../../src/parse/tokenize.js';
 import { toRawPostfix } from '../../src/parse/parser.js';
 import { fromPostfix, toPostfix, firstVariable } from '../../src/tree.js';
@@ -83,6 +83,11 @@ suite('unchanged: the value of a case nobody wrote', () => {
 
 suite('strings and {{blocks}}', () => {
     test('quoted strings are kept whole', () => eq(parse('x = "2+2<5"'), ['x', '"2+2<5"', '=']));
+    test('the CAS call words are kept whole, in LaTeX too', () => {
+        eq(parse('\\frac{1}{2} + diff(x^3, x)'), ['1', '2', '/', 'x', '3', '^', 'x', '2', '\\:diff', '+']);
+        eq(parse('\\sin x + simplify(x)'), ['x', 'sin', 'x', '1', '\\:simplify', '+']);
+        eq(parse('solve(x^2 = 4, x)'), ['x', '2', '^', '4', '=', 'x', '2', '\\:solve']);
+    });
     test('ten or more strings restore correctly', () => {
         const input = Array.from({ length: 12 }, (_, i) => `"s${i}"`).join('+');
         eq(parse(input).filter((t) => t.startsWith('"')), Array.from({ length: 12 }, (_, i) => `"s${i}"`));
@@ -113,7 +118,8 @@ suite('strings and {{blocks}}', () => {
         eq(P('\\left.\\frac{d}{dx} x^3\\right|_2'), 'x 3 ^ x 2 = der', 'a bare point is the variable\'s');
         eq(P('\\left.\\frac{dy}{dx}\\right|_{x=0}'), 'y x 0 = der');
         eq(P('\\left.\\frac{d}{dx}(x^2+1)\\right|_{x=a} + 1'), 'x 2 ^ 1 + x a = der 1 +');
-        throws(() => parse('\\left. x^2 \\right|_0^1'));   // a bar after anything else is refused, by name
+        throws(() => parse('\\left. x^2 \\right|_{x=0}'));   // one limit after anything else is refused, by name
+        eq(P('\\left. x^2 \\right|_0^1'), 'x 2 ^ x 0 1 evaluated', 'two limits: an evaluation bar')
         eq(P('x \\le 3'), 'x 3 ≤', '\\le is still ≤');
     });
     test('an escaped \\{ is a brace, not the start of a block', () => eq(parse('\\{{{1+1}}, 3\\}'), ['2', '3', '2', '{}']));
@@ -573,7 +579,7 @@ suite('reading: \\sqrt without braces', () => {
 suite('reading: one letter set upright, \\cfrac, 1e5, ∫ dx', () => {
     test('\\mathrm{e}, \\operatorname{f}: a single letter is that letter', () => {
         eq(P('\\mathrm{e}^x'), 'e x ^');
-        eq(P('\\mathrm{d}x'), 'd x *');
+        eq(P('\\mathrm{d}x'), 'dx', 'an upright d: a differential');
         eq(P('\\operatorname{f}(x)'), 'x 1 \\:f');
         eq(P('\\mathit{x}+1'), 'x 1 +');
         eq(P('\\text{a}+1'), 'a 1 +');
@@ -703,5 +709,287 @@ suite('reading: mixed numbers', () => {
         eq(P(toLaTeX(['2', '1', '3', '/', '*'])), '2 1 3 / *');
         eq(P(toLaTeX('2\\frac{1}{3}')), '2 1 3 / +');     // the mixed number, written as a sum, is read as that sum
         eq(P(toText('1½')), '1 1 2 / +');
+    });
+});
+
+// ---- the Calculus II survey (2026-11-20): notation that was misread or refused ----
+const V = (s, scope = {}) => evaluate(s, scope);
+const C = (s, scope = {}) => calculate(s, scope).text;
+
+suite('reading: a name, a space, a number', () => {
+    test('two factors: n 3^n is n·3ⁿ (it was a name n3)', () => {
+        eq(P('n 3^n'), 'n 3 n ^ *');
+        eq(P('\\frac{(x-2)^n}{n 3^n}'), 'x 2 - n ^ n 3 n ^ * /');
+        eq(P('a 2'), 'a 2 *');
+        eq(P('x 1/2'), 'x 1 * 2 /');
+        eq(P('k 10'), 'k 10 *');
+    });
+    test('…but a name written with its digits is still one name, digits still group, and a command takes its digits', () => {
+        eq(P('x2'), 'x2');
+        eq(P('n3'), 'n3');
+        eq(P('2 3'), '23');
+        eq(P('1 000'), '1000');
+        eq(P('\\frac 1 2'), '1 2 /');
+        eq(P('log 7'), '7 ln');
+        eq(P('sin 2x'), '2 x * sin');
+    });
+});
+
+suite('reading: arcsec, arccsc, arccot', () => {
+    test('sec⁻¹, csc⁻¹ and cot⁻¹ are inverses, as sin⁻¹ is (they were read as 1/sec x)', () => {
+        eq(P('\\sec^{-1} x'), 'x arcsec');
+        eq(P('\\csc^{-1}(2)'), '2 arccsc');
+        eq(P('\\cot^{-1} x'), 'x arccot');
+        eq(P('sec^-1(x)'), 'x arcsec');
+        eq(P('\\sin^{-1} x'), 'x arcsin');
+    });
+    test('every other spelling', () => {
+        for (const s of ['arcsec(x)', 'asec(x)', '\\operatorname{arcsec}(x)', '\\text{arcsec}(x)', 'arcsecant of x']) eq(P(s), 'x arcsec', s);
+        eq(P('\\operatorname{arccot} x'), 'x arccot');
+        eq(P('acsc(x)'), 'x arccsc');
+    });
+    test('a power of sec is still a power, and (sec x)⁻¹ the reciprocal', () => {
+        eq(P('\\sec^2 x'), 'x sec 2 ^');
+        eq(P('(\\sec x)^{-1}'), 'x sec -1 ^');
+    });
+    test('values: arccot runs from 0 to π, as in calculus books', () => {
+        eq(C('arcsec(2)'), 'pi/3');
+        eq(C('arccsc(2)'), 'pi/6');
+        eq(C('arccot(1)'), 'pi/4');
+        eq(C('arccot(-1)'), '(3*pi)/4');
+        eq(C('arcsec(-2)'), '(2*pi)/3');
+        eq(Math.abs(V('arccot(-1)') - 3 * Math.PI / 4) < 1e-12, true);
+        throws(() => calculate('arcsec(0.5)'), /not a real number/);
+    });
+    test('every output: code writes acos(1/u), asin(1/u), π/2 − atan u', () => {
+        eq(toLaTeX('\\sec^{-1} x'), '\\operatorname{arcsec}\\left(x\\right)');
+        eq(toJavaScript('arcsec(x)'), '(Math.acos(1 / x))');
+        eq(toJavaScript('arccot(x)'), '(Math.PI / 2 - Math.atan(x))');
+        eq(toSpeech('arccsc(x)'), 'inverse cosecant of x');
+        eq(P(toLaTeX('arccot(x+1)')), 'x 1 + arccot');
+        eq(P(toText('arcsec(x)')), 'x arcsec');
+    });
+});
+
+suite('reading: degrees', () => {
+    test('30^\\circ, 30^{\\circ}, \\degree and ° are degrees, and have a value', () => {
+        for (const s of ['30^\\circ', '30^{\\circ}', '30\\degree', '30°']) eq(P(s), '30 ° *', s);
+        eq(C('\\sin(30^\\circ)'), '1/2');
+        eq(C('\\cos 60°'), '1/2');
+        eq(Math.abs(V('\\sin(30^\\circ)') - 0.5) < 1e-12, true);
+        eq(toLaTeX('30°'), '30^{\\circ}');
+        eq(P('radians(30.0)'), '30.0 ° *');     // what GLSL writes reads back
+    });
+    test('\\circ on its own is not a degree', () => {
+        eq(P('(f \\circ g)(x)'), 'x 1 \\:g 1 \\:f');
+    });
+});
+
+suite('reading: sizes, cases with commas, systems', () => {
+    test('\\big, \\Big, \\bigg, \\Bigg (and l/r/m) only size a bracket', () => {
+        eq(P('\\Big( x \\Big)'), 'x');
+        eq(P('\\bigg[ x + 1 \\bigg]'), 'x 1 +');
+        eq(P('\\bigl( x \\bigr)^2'), 'x 2 ^');
+        eq(P('\\Big| x \\Big|'), P('|x|'));
+    });
+    test('a case written with a comma before its condition', () => {
+        eq(P('f(x) = \\begin{cases} x^2, & \\text{if } x < 0 \\\\ 2x, & \\text{otherwise} \\end{cases}'), 'x 1 \\:f x 0 < x 2 ^ 2 x * ?: =');
+        eq(P('f(x) = \\begin{cases} x^2 & x < 0 \\\\ 2x & x \\ge 0 \\end{cases}'), 'x 1 \\:f x 0 < x 2 ^ x 0 ≥ 2 x * unchanged ?: ?: =');
+    });
+    test('a brace of equations is a system: all of them hold', () => {
+        eq(P('\\begin{cases} x + y = 3 \\\\ x - y = 1 \\end{cases}'), 'x y + 3 = x y - 1 = &');
+        eq(P('\\begin{cases} x + y = 3, \\\\ 2x - y \\le 1. \\end{cases}'), 'x y + 3 = 2 x * y - 1 ≤ &');
+        eq(V('\\begin{cases} x + y = 3 \\\\ x - y = 1 \\end{cases}', { x: 2, y: 1 }), true);
+        eq(P('\\begin{cases} 1 & x > 0 \\\\ 0 \\end{cases}'), 'x 0 > 1 0 ?:');   // a value and a condition: still a case
+    });
+});
+
+suite('reading: evaluation bars', () => {
+    const want = 'x 3 ^ 3 / x 0 1 evaluated';
+    test('[F]_a^b in every way it is written', () => {
+        for (const s of ['\\left[ \\frac{x^3}{3} \\right]_0^1', '\\left. \\frac{x^3}{3} \\right|_0^1', '\\frac{x^3}{3} \\Big|_0^1', '\\frac{x^3}{3}\\bigg|_{0}^{1}',
+            '\\Big[ \\frac{x^3}{3} \\Big]_0^1', '\\left[ \\frac{x^3}{3} \\right]^1_0', 'evaluated(x^3/3, 0, 1)', 'evaluated(x^3/3, x, 0, 1)']) eq(P(s), want, s);
+        eq(P('\\left[x^2 + t\\right]_{x=1}^{x=2}'), 'x 2 ^ t + x 1 2 evaluated', 'the limits name the variable');
+        eq(P('evaluated(t^2, t, 0, 1)'), 't 2 ^ t 0 1 evaluated');
+    });
+    test('after an integral, the bar takes the term before it', () => {
+        eq(P('\\int_0^1 x^2\\,dx = \\frac{x^3}{3}\\Big|_0^1 = \\frac{1}{3}'), 'x 2 ^ x 0 1 4 int x 3 ^ 3 / x 0 1 evaluated = 1 3 / =');
+        eq(P('2\\left[x^2\\right]_0^1'), '2 x 2 ^ x 0 1 evaluated *');
+    });
+    test('values: F at b minus F at a, exactly', () => {
+        eq(C('\\left[ \\frac{x^3}{3} \\right]_0^1'), '1/3');
+        eq(C('\\left[ -\\cos x \\right]_0^{\\pi}'), '2');
+        eq(C('\\left[ \\ln|x| \\right]_1^e'), '1');
+        eq(C('\\int_0^1 x^2\\,dx = \\frac{x^3}{3}\\Big|_0^1'), 'true');
+        eq(V('\\left[x\\right]_0^1', { x: 99 }), 1, 'x is bound: the scope\'s x is not used');
+    });
+    test('every output: code writes the difference; text and LaTeX read back', () => {
+        eq(toJavaScript('\\left[ x^2 + c \\right]_0^2'), '(Math.pow(2, 2) + c - (Math.pow(0, 2) + c))');
+        eq(toLaTeX('\\left[ x^2 \\right]_0^1'), '\\left[x^2\\right]_{0}^{1}');
+        eq(toSpeech('\\left[ x^2 \\right]_0^1'), 'x squared, evaluated from 0 to 1');
+        eq(P(toText('\\left[ x^2 \\right]_0^1')), 'x 2 ^ x 0 1 evaluated');
+        eq(P(toLaTeX('\\left[ x^2 \\right]_{x=0}^{x=1}')), 'x 2 ^ x 0 1 evaluated');
+    });
+    test('what is not a bar stays as it was', () => {
+        eq(P('\\left[x+1\\right]^2'), 'x 1 + 2 ^');                   // one script: a power
+        eq(P('\\left|x\\right|'), 'x abs');
+        eq(P('\\left(x+1\\right)_0^1'), 'x 1 + 0 _ 1 ^');               // round brackets
+        eq(P('x_0^1'), 'x 0 _ 1 ^');
+        eq(P('\\left.\\frac{d}{dx} x^3\\right|_{x=2}'), 'x 3 ^ x 2 = der');   // one limit after a derivative: at a point
+    });
+});
+
+suite('reading: ⋯, ∅, ₙCᵣ, f⁽⁴⁾, repeating decimals, f ∘ g', () => {
+    test('\\cdots, \\ldots, \\dots and ... are ⋯, which code refuses by name', () => {
+        for (const s of ['1 + x + \\cdots', '1 + x + \\ldots', '1 + x + \\dots', '1 + x + ...']) eq(P(s), '1 x + ⋯ +', s);
+        eq(toLaTeX('1 + \\cdots'), '1 + \\cdots');
+        throws(() => toJavaScript('1 + \\cdots'), /^No JavaScript for ⋯/);
+        eq(P('a === b'), 'a b ===');             // === is not three dots
+        eq(P('1.333..'), '1.333..');             // nor is a repeating decimal
+    });
+    test('the empty set: \\emptyset, \\varnothing, ∅, \\{\\}', () => {
+        for (const s of ['\\emptyset', '\\varnothing', '∅', '\\{\\}', '{}']) eq(P(s), '0 {}', s);
+        eq(V('x \\in \\emptyset', { x: 1 }), false);
+        eq(C('x \\notin \\emptyset', { x: 1 }), 'true');
+        eq(toSQL('x \\in \\emptyset'), 'FALSE');
+        eq(toSpeech('\\emptyset'), 'the empty set');
+        throws(() => parse('()'), /Empty brackets/);     // other empty brackets are still refused
+        eq(P('f()'), '0 \\:f');
+    });
+    test('n choose r and n permute r written with subscripts', () => {
+        for (const s of ['_5C_2', '{}_5C_2', '{}_{5}\\mathrm{C}_{2}']) eq(P(s), '5 2 comb', s);
+        eq(P('{}_{n}C_{r}'), 'n r comb');
+        eq(P('_nP_r'), 'n r perm');
+        eq(P('x_5C_2'), 'x 5 _ C 2 _ *', 'after a name: subscripts');
+    });
+    test('f^{(4)}(x) is the fourth derivative of f, as f′′′′(x) is', () => {
+        eq(P('f^{(4)}(x)'), 'x 1 \\:f′′′′');
+        eq(P('f⁽⁴⁾(x)'), 'x 1 \\:f′′′′');
+        eq(P('x^{(2)}'), 'x 2 ^', 'no call after it: a power');
+    });
+    test('repeating decimals with \\overline, and their value in every output', () => {
+        eq(P('0.\\overline{3}'), '0.33..');
+        eq(P('0.1\\overline{6}'), '0.166..');
+        eq(C('0.\\overline{142857}'), '1/7');
+        eq(V('0.1\\overline{6}'), 1 / 6);
+        eq(V('1.333..'), 4 / 3);
+        eq(toJavaScript('0.\\overline{3}'), '0.33333333333333333');   // not 0.33
+        eq(toLaTeX('0.1\\overline{6}'), '0.1\\overline{6}');
+    });
+    test('(f \\circ g)(x) is f(g(x))', () => eq(P('(f \\circ g)(x)'), P('f(g(x))')));
+});
+
+suite('calculate: what underflows inside a limit or an integral is 0 there', () => {
+    test('limits and improper integrals of e^-x', () => {
+        eq(C('\\lim_{x\\to -\\infty} e^x'), '0');
+        eq(C('\\lim_{x\\to\\infty} x e^{-x}'), '0');
+        eq(C('\\int_0^{\\infty} e^{-x} dx'), '1');
+        eq(Math.abs(calculate('\\int_{-\\infty}^{\\infty} e^{-x^2} dx').value - Math.sqrt(Math.PI)) < 1e-9, true);
+    });
+    test('…and a number typed too small is still refused', () => throws(() => calculate('10^{-50000}'), /too small/));
+});
+
+// ---- the second Calculus II pass (2026-11-20) ----
+suite('reading: trig functions by their names', () => {
+    test('sine(x), arcsine(x) (it was arcsin times e), cotangent x', () => {
+        eq(P('arcsine(x)'), 'x arcsin');
+        eq(P('arccosine(x)'), 'x arccos');
+        eq(P('arcsecant(x)'), 'x arcsec');
+        eq(P('sine(x)'), 'x sin');
+        eq(P('Cosine(2x)'), '2 x * cos');
+        eq(P('sine x'), 'x sin');
+        eq(P('sine \\theta'), 'θ sin');
+        eq(P('the sine of x'), 'x sin');
+    });
+    test('a name with no argument after it is still a word', () => {
+        eq(P('tangent'), 'tangent');
+        eq(P('the tangent line'), 'the tangent * line *');
+        eq(P('cosines(x)'), 'x 1 \\:cosines');
+    });
+});
+
+suite('reading: differentials', () => {
+    test('dy, dx, dθ as one quantity each, where they are clearly differentials', () => {
+        eq(P("dy = f'(x)\\,dx"), 'dy x 1 \\:f′ dx * =');
+        eq(P('du = 2x\\,dx'), 'du 2 x * dx * =');
+        eq(P('dA = 2\\pi r\\,dr'), 'dA 2 pi * r * dr * =');
+        eq(P('ds = \\sqrt{dx^2 + dy^2}'), 'ds dx 2 ^ dy 2 ^ + sqrt =');
+        eq(P('x\\,dy - y\\,dx'), 'x dy * y dx * -');     // was the name xdy
+        eq(P('r\\,d\\theta'), 'r dθ *');
+        eq(P('\\mathrm{d}x'), 'dx');
+        eq(P('dy = 2x dx'), 'dy 2 x * dx * =');
+    });
+    test('…and where they are not: one bare d x is a product; integrals and derivatives read their own', () => {
+        eq(P('dx'), 'd x *');
+        eq(P('d x'), 'd x *');
+        eq(P('x d y'), 'x d * y *');
+        eq(P('d(x)'), 'x 1 \\:d');
+        eq(P('dog'), 'dog');
+        eq(P('\\int x\\,dx'), 'x x 2 int');
+        eq(P('\\frac{dy}{dx}'), 'y x der');
+        eq(P('dy/dx'), 'y x der');
+        eq(P('\\frac{d}{dx} x^2'), 'x 2 ^ x der');
+        eq(P('\\left.\\frac{\\mathrm{d}^{2}}{\\mathrm{d}x^{2}} x^3\\right|_{x=2}'), 'x 3 ^ x der x 2 = der');
+    });
+    test('written as differentials', () => {
+        eq(toLaTeX("dy = f'(x)\\,dx"), "\\mathrm{d}y = f'\\left(x\\right)\\,\\mathrm{d}x");
+        eq(P(toLaTeX('dA = 2\\pi r\\,dr')), 'dA 2 pi * r * dr * =');
+        eq(P(toLaTeX('x\\,dy - y\\,dx')), 'x dy * y dx * -');
+        eq(toSpeech('r\\,d\\theta'), 'r d theta');
+        eq(P(toLaTeX("dy = f'(x)\\,dx")), 'dy x 1 \\:f′ dx * =');
+    });
+});
+
+suite('reading: equations listed side by side, implies and iff', () => {
+    test('x = t^2, y = t^3: each holds', () => {
+        eq(P('x = t^2, y = t^3'), 'x t 2 ^ = y t 3 ^ = &');
+        eq(P('x = \\cos t, y = \\sin t, z = t'), 'x t cos = y t sin = & z t = &');
+        eq(P('x > 0, y > 0'), 'x 0 > y 0 > &');
+        throws(() => parse('1, 2'), /needs brackets/);      // a list of values still needs its brackets
+        eq(P('(1, 2)'), '1 2 2 ()');
+    });
+    test('⇒ and ⇔ in every spelling', () => {
+        for (const s of ['p \\Rightarrow q', 'p \\implies q', 'p ⇒ q', 'p \\Longrightarrow q']) eq(P(s), 'p q \\implies', s);
+        for (const s of ['p \\iff q', 'p \\Leftrightarrow q', 'p ⇔ q']) eq(P(s), 'p q \\iff', s);
+        eq(P('x > 0 \\Rightarrow x^2 > 0'), 'x 0 > x 2 ^ 0 > \\implies');
+        eq(P('p \\land q \\Rightarrow r'), 'p q & r \\implies', 'looser than and');
+        eq(P('x \\rightarrow 0'), 'x 0 →', 'a single arrow is still "tends to"');
+    });
+    test('truth tables and outputs', () => {
+        for (const [p, q, implies, iff] of [[1, 1, true, true], [1, 0, false, false], [0, 1, true, false], [0, 0, true, true]]) {
+            eq(evaluate('p \\implies q', { p, q }), implies);
+            eq(evaluate('p \\iff q', { p, q }), iff);
+            eq(calculate('p \\iff q', { p: Boolean(p), q: Boolean(q) }).text, String(iff));
+        }
+        eq(toLaTeX('p \\implies q'), 'p \\Rightarrow q');
+        eq(toJavaScript('p \\implies q'), '(!(p) || q)');
+        eq(toSpeech('p \\iff q'), 'p if and only if q');
+        eq(P(toText('p \\iff q')), 'p q \\iff');
+    });
+});
+
+suite('reading: set-builder notation', () => {
+    test('\\{x \\mid P\\}, \\{x : P\\}, \\middle|, {x : P}', () => {
+        for (const s of ['\\{x \\mid x > 2\\}', '\\{x : x > 2\\}', '\\left\\{ x \\middle| x > 2 \\right\\}', '{x : x > 2}', '\\{x | x > 2\\}']) eq(P(s), 'x x 2 > setbuilder', s);
+        eq(P('\\{x \\in \\mathbb{R} : x \\ne 0\\}'), 'x ℝ ∈ x 0 ≠ setbuilder');
+        eq(P('\\{ |x| \\mid x < 0 \\}'), 'x abs x 0 < setbuilder', 'a written \\mid wins over an absolute value\'s bar');
+        eq(P('\\{x \\mid |x - 1| < 2\\}'), 'x x 1 - abs 2 < setbuilder');
+    });
+    test('…and sets of values, blocks and the empty set are as they were', () => {
+        eq(P('\\{1, 2, 3\\}'), '1 2 3 3 {}');
+        eq(P('{1, 2}'), '1 2 2 {}');
+        eq(P('\\{\\}'), '0 {}');
+        eq(P('{{1+1}}'), '2');
+    });
+    test('membership is the condition, in every output; the set alone is refused by code', () => {
+        const s = 'y \\in \\{x \\in \\mathbb{R} \\mid x^2 < 4\\}';
+        eq(evaluate(s, { y: 1 }), true);
+        eq(evaluate(s, { y: 3 }), false);
+        eq(calculate('3 \\notin \\{x \\mid x > 2\\}').text, 'false');
+        eq(toJavaScript(s), '((Number.isFinite(y) && Math.pow(y, 2) < 4))');
+        eq(toLaTeX('\\{x \\mid x > 2\\}'), '\\left\\{ x \\mid x > 2 \\right\\}');
+        eq(toSpeech('\\{x \\in \\mathbb{R} \\mid x^2 < 4\\}'), 'the set of x in the real numbers such that x squared is less than 4');
+        eq(P(toText('\\{x \\mid x > 2\\}')), 'x x 2 > setbuilder');
+        throws(() => toJavaScript('\\{x \\mid x > 2\\}'), /^No JavaScript for a set described by a condition/);
     });
 });

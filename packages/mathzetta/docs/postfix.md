@@ -40,7 +40,7 @@ highlight exactly the part an explanation is talking about.
 
 Names can carry primes: `y′′` is the symbol for y″, and `\:f′` is the
 function f′, as in `x 1 \:f′` = f′(x). The inverse of f is `\:f⁻¹`.
-`Δx` is a single symbol.
+`Δx` is a single symbol, and so is a differential, `dx` (`dθ`): read from `\mathrm{d}x`, a `d` after a thin space (`\,dx`), or two or more side by side (`dy = 2x\,dx`) — outside integrals and d/dx, whose own readers take their d. A bare `d x` is still d times x.
 
 ## Operators
 
@@ -66,11 +66,14 @@ Fixed arity — no count token:
 | `sin` `cos` `tan` `csc` `sec` `cot` | 1 | | `x sin` |
 | `sinh` `cosh` `tanh` | 1 | | |
 | `arcsin` `arccos` `arctan` `arcsinh` `arccosh` `arctanh` | 1 | inverses | |
+| `arcsec` `arccsc` `arccot` | 1 | inverses of sec, csc, cot: arccos(1/x), arcsin(1/x), and π/2 − arctan x (values 0 to π). Read from `\sec^{-1} x`, `arcsec(x)`, `asec(x)`; code outputs write those formulas | `x arcsec` |
 | `atan2` | 2 | y, x | `y x atan2` |
 | `round` | 2 | value, decimal places; a half goes away from zero (`round(-2.5)` is −3) in every output | `x 0 round` |
 | `fixed` | 2 | value, decimal places: rounded, then written with exactly that many decimals — a text (`2.500`); code outputs give a string, GLSL rounds | `x 2 fixed` |
 | `perm` `comb` | 2 | ⁿPₖ, (n choose k) | `5 2 comb` |
 | `random` | 0 | | `random` |
+| `setbuilder` | 2 | set-builder notation: the element (a name, or `x ∈ S`) and the condition. Read from `\{x \mid P\}`, `\{x : P\}`, `\left\{ … \middle\| … \right\}`, and `{x : P}` in plain text, which is what text writes. `y ∈ {x \| P}` is P with y for x in every output; the set alone has nothing to list, so code outputs refuse it | `x x 2 > setbuilder` = {x \| x > 2} |
+| `evaluated` | 4 | an evaluation bar: expression, variable, lower, upper — F at x = upper minus F at x = lower. Read from `\left[F\right]_a^b`, `\left.F\right|_a^b`, `F\Big|_a^b` (any size), `_{x=a}^{x=b}`, and `evaluated(F, a, b)` (the variable is F's first) or `evaluated(F, x, a, b)`, which is what text writes. Code outputs write the difference, F with b put in for x minus F with a | `x 3 ^ 3 / x 0 1 evaluated` = [x³/3]₀¹ |
 | `der` | 2 | derivative: expression, variable — or, at a point, expression and `x = a` (an `=` node, as `lim` takes `x → a`): `x 3 ^ x 2 = der` is d/dx x³ at x = 2, drawn with a bar \|ₓ₌₂ and read from `der(f, x = a)` or `\left.\frac{d}{dx} f\right|_{x=a}`. `calculate` works out the point form, and a plain `der(f, x)` only where an enclosing ∫, ∑, lim or d/dx varies x (a value the caller gives x makes it a constant). Drawn and spoken everywhere; worked out by `calculate` (at a point) and SymPy. JavaScript, numeric Python, SQL, GLSL and spreadsheets refuse it by name, as they refuse `int` (without numeric bounds in Python), `lim` and, in SQL and GLSL, indexed sums and products | `x 2 ^ x der` = d/dx x² |
 | `=` `≠` `<` `>` `≤` `≥` | 2 | comparison | |
 | `===` `≠=` | 2 | strict (in)equality, from `===` and `!==` | |
@@ -79,6 +82,7 @@ Fixed arity — no count token:
 | `≈` | 2 | approximately equal | `x 1.414 ≈` |
 | `∪` `∩` | 2 | union, intersection | `-∞ 0 2 () 0 ∞ 2 () ∪` |
 | `&` `\|` `\not` `\xor` `\nand` `\nor` | 2 (`\not`: 1) | logic | |
+| `\implies` `\iff` | 2 | p ⇒ q (not p, or q) and p ⇔ q (both or neither), looser than every other logic operator. Read from `\Rightarrow`, `\implies`, `⇒`, `\iff`, `\Leftrightarrow`, `⇔` | `p q \implies` |
 | `?:` | 3 | condition, then, else | `c a b ?:` |
 
 `=` binds tighter than `?:`, so `x = 1 ? a : b` tests x = 1 (`x 1 = a b ?:`). One exception reads a definition: when

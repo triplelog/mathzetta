@@ -385,6 +385,55 @@ rules:
     explain: "cosh²{u} - sinh²{u} = 1."
     tags: [identity]
 
+  # ---- trigonometry: shifts by π/2 and π, written with an unknown angle ----------
+  - { id: sin-plus-quarter, name: sin(u + π/2), pattern: u =pi 2 / + sin, commutative: true, output: u cos, tags: [symmetry], explain: "Shifting sine by a quarter turn gives cosine: sin({u} + π/2) = cos {u}." }
+  - { id: cos-plus-quarter, name: cos(u + π/2), pattern: u =pi 2 / + cos, commutative: true, output: u sin neg, tags: [symmetry], explain: "cos({u} + π/2) = -sin {u}." }
+  - { id: sin-minus-quarter, name: sin(u − π/2), pattern: u =pi 2 / - sin, output: u cos neg, tags: [symmetry], explain: "sin({u} - π/2) = -cos {u}." }
+  - { id: cos-minus-quarter, name: cos(u − π/2), pattern: u =pi 2 / - cos, output: u sin, tags: [symmetry], explain: "cos({u} - π/2) = sin {u}." }
+  - { id: sin-cofunction, name: sin(π/2 − u), pattern: u neg =pi 2 / + sin, commutative: true, output: u cos, tags: [symmetry], explain: "Sine of the complement is cosine: sin(π/2 - {u}) = cos {u}." }
+  - { id: cos-cofunction, name: cos(π/2 − u), pattern: u neg =pi 2 / + cos, commutative: true, output: u sin, tags: [symmetry], explain: "Cosine of the complement is sine: cos(π/2 - {u}) = sin {u}." }
+  - { id: tan-cofunction, name: tan(π/2 − u), pattern: u neg =pi 2 / + tan, commutative: true, output: u cot, tags: [symmetry], explain: "tan(π/2 - {u}) = cot {u}." }
+  - { id: sin-supplement, name: sin(π − u), pattern: u neg =pi + sin, commutative: true, output: u sin, tags: [symmetry], explain: "sin(π - {u}) = sin {u}." }
+  - { id: cos-supplement, name: cos(π − u), pattern: u neg =pi + cos, commutative: true, output: u cos neg, tags: [symmetry], explain: "cos(π - {u}) = -cos {u}." }
+  - { id: sin-plus-half, name: sin(u + π), pattern: u =pi + sin, commutative: true, output: u sin neg, tags: [symmetry], explain: "Half a turn changes the sign: sin({u} + π) = -sin {u}." }
+  - { id: cos-plus-half, name: cos(u + π), pattern: u =pi + cos, commutative: true, output: u cos neg, tags: [symmetry], explain: "Half a turn changes the sign: cos({u} + π) = -cos {u}." }
+  - { id: tan-plus-half, name: tan(u + π), pattern: u =pi + tan, commutative: true, output: u tan, tags: [symmetry], explain: "Tangent repeats every π: tan({u} + π) = tan {u}." }
+  - { id: sin-minus-half, name: sin(u − π), pattern: u =pi - sin, output: u sin neg, tags: [symmetry], explain: "sin({u} - π) = -sin {u}." }
+  - { id: cos-minus-half, name: cos(u − π), pattern: u =pi - cos, output: u cos neg, tags: [symmetry], explain: "cos({u} - π) = -cos {u}." }
+
+  # ---- trigonometry: more exact values (15°, 75°, 22.5°, 67.5°) -------------------
+  - { id: sin-pi-12, name: Sine of π/12, pattern: =pi 12 / sin, output: 6 sqrt 2 sqrt - 4 /, tags: [value], explain: "sin(π/12) = sin(π/3 - π/4) = (√6 - √2)/4." }
+  - { id: cos-pi-12, name: Cosine of π/12, pattern: =pi 12 / cos, output: 6 sqrt 2 sqrt + 4 /, tags: [value], explain: "cos(π/12) = cos(π/3 - π/4) = (√6 + √2)/4." }
+  - { id: tan-pi-12, name: Tangent of π/12, pattern: =pi 12 / tan, output: 2 3 sqrt -, tags: [value], explain: "tan(π/12) = 2 - √3." }
+  - { id: sin-5pi-12, name: Sine of 5π/12, pattern: 5 =pi * 12 / sin, output: 6 sqrt 2 sqrt + 4 /, tags: [value], explain: "sin(5π/12) = sin(π/4 + π/6) = (√6 + √2)/4." }
+  - { id: cos-5pi-12, name: Cosine of 5π/12, pattern: 5 =pi * 12 / cos, output: 6 sqrt 2 sqrt - 4 /, tags: [value], explain: "cos(5π/12) = cos(π/4 + π/6) = (√6 - √2)/4." }
+  - { id: tan-5pi-12, name: Tangent of 5π/12, pattern: 5 =pi * 12 / tan, output: 2 3 sqrt +, tags: [value], explain: "tan(5π/12) = 2 + √3." }
+  - { id: sin-pi-8, name: Sine of π/8, pattern: =pi 8 / sin, output: 2 2 sqrt - sqrt 2 /, tags: [value], explain: "By the half-angle formula, sin(π/8) = √(2 - √2)/2." }
+  - { id: cos-pi-8, name: Cosine of π/8, pattern: =pi 8 / cos, output: 2 2 sqrt + sqrt 2 /, tags: [value], explain: "By the half-angle formula, cos(π/8) = √(2 + √2)/2." }
+  - { id: tan-pi-8, name: Tangent of π/8, pattern: =pi 8 / tan, output: 2 sqrt 1 -, tags: [value], explain: "tan(π/8) = √2 - 1." }
+  - { id: sin-3pi-8, name: Sine of 3π/8, pattern: 3 =pi * 8 / sin, output: 2 2 sqrt + sqrt 2 /, tags: [value], explain: "sin(3π/8) = cos(π/8) = √(2 + √2)/2." }
+  - { id: cos-3pi-8, name: Cosine of 3π/8, pattern: 3 =pi * 8 / cos, output: 2 2 sqrt - sqrt 2 /, tags: [value], explain: "cos(3π/8) = sin(π/8) = √(2 - √2)/2." }
+  - { id: tan-3pi-8, name: Tangent of 3π/8, pattern: 3 =pi * 8 / tan, output: 2 sqrt 1 +, tags: [value], explain: "tan(3π/8) = √2 + 1." }
+
+  # ---- trigonometry: a function of an inverse function (a right triangle) -----------
+  - { id: sin-arccos, name: sin(arccos u), pattern: u arccos sin, output: u 2 ^ neg 1 + sqrt, tags: [inverse], explain: "In a right triangle with cos θ = {u}, the other side is √(1 - {u}²): sin(arccos {u}) = √(1 - {u}²)." }
+  - { id: cos-arcsin, name: cos(arcsin u), pattern: u arcsin cos, output: u 2 ^ neg 1 + sqrt, tags: [inverse], explain: "In a right triangle with sin θ = {u}, cos θ = √(1 - {u}²)." }
+  - { id: tan-arcsin, name: tan(arcsin u), pattern: u arcsin tan, output: u u 2 ^ neg 1 + sqrt /, tags: [inverse], explain: "tan(arcsin {u}) = {u}/√(1 - {u}²)." }
+  - { id: tan-arccos, name: tan(arccos u), pattern: u arccos tan, output: u 2 ^ neg 1 + sqrt u /, tags: [inverse], explain: "tan(arccos {u}) = √(1 - {u}²)/{u}." }
+  - { id: sin-arctan, name: sin(arctan u), pattern: u arctan sin, output: u u 2 ^ 1 + sqrt /, tags: [inverse], explain: "In a right triangle with tan θ = {u}, the long side is √(1 + {u}²): sin(arctan {u}) = {u}/√(1 + {u}²)." }
+  - { id: cos-arctan, name: cos(arctan u), pattern: u arctan cos, output: 1 u 2 ^ 1 + sqrt /, tags: [inverse], explain: "cos(arctan {u}) = 1/√(1 + {u}²)." }
+  - { id: sec-arctan, name: sec(arctan u), pattern: u arctan sec, output: u 2 ^ 1 + sqrt, tags: [inverse], explain: "sec(arctan {u}) = √(1 + {u}²)." }
+  - { id: cos-arcsec, name: cos(arcsec u), pattern: u arcsec cos, output: 1 u /, tags: [inverse], explain: "arcsec {u} is the angle whose cosine is 1/{u}." }
+  - { id: sin-arccsc, name: sin(arccsc u), pattern: u arccsc sin, output: 1 u /, tags: [inverse], explain: "arccsc {u} is the angle whose sine is 1/{u}." }
+  - { id: tan-arccot, name: tan(arccot u), pattern: u arccot tan, output: 1 u /, tags: [inverse], explain: "arccot {u} is the angle whose tangent is 1/{u}." }
+
+  # ---- trigonometry: the angle-sum formulas, read backward -------------------------
+  - { id: sin-sum, name: sin(u + v), pattern: u sin v cos * u cos v sin * +, commutative: true, output: u v + sin, tags: [identity], explain: "sin {u} cos {v} + cos {u} sin {v} = sin({u} + {v})." }
+  - { id: sin-difference, name: sin(u − v), pattern: u sin v cos * u cos v sin * -, commutative: true, output: u v - sin, tags: [identity], explain: "sin {u} cos {v} - cos {u} sin {v} = sin({u} - {v})." }
+  - { id: sin-difference-led-by-minus, name: sin(u − v), pattern: u cos v sin * neg u sin v cos * +, commutative: true, output: u v - sin, tags: [identity], explain: "sin {u} cos {v} - cos {u} sin {v} = sin({u} - {v})." }
+  - { id: cos-sum, name: cos(u + v), pattern: u cos v cos * u sin v sin * -, commutative: true, output: u v + cos, tags: [identity], explain: "cos {u} cos {v} - sin {u} sin {v} = cos({u} + {v})." }
+  - { id: cos-difference, name: cos(u − v), pattern: u cos v cos * u sin v sin * +, commutative: true, output: u v - cos, tags: [identity], explain: "cos {u} cos {v} + sin {u} sin {v} = cos({u} - {v})." }
+
   # ---- logs: opt-in rewrites (run with cas.rewrite(x, 'expand-log') or 'combine-log') ----
   - id: ln-product
     name: Log of a product

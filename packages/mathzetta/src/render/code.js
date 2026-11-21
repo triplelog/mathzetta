@@ -11,7 +11,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets } from '../common.js';
+import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { JS_HELPERS } from '../js-helpers.js';
 
@@ -163,6 +163,8 @@ const NP = {
         gcd: (xs) => chain('np.gcd', xs),
         '\\xor': ([a, b]) => `np.logical_xor(${a}, ${b})`,
         '\\nand': ([a, b]) => `np.logical_not(np.logical_and(${a}, ${b}))`,
+        '\\implies': ([a, b]) => `np.logical_or(np.logical_not(${a}), ${b})`,
+        '\\iff': ([a, b]) => `np.logical_not(np.logical_xor(${a}, ${b}))`,
         '\\nor': ([a, b]) => `np.logical_not(np.logical_or(${a}, ${b}))`,
     },
 };
@@ -209,6 +211,7 @@ export function boundVariables(node) {
             if (second?.type === 'op' && second.op === '→') out.push(second.args[0].value);
             else out.push(n.args.length === 2 ? firstVariable(f) || 'x' : second?.value);
         }
+        else if (n.op === 'evaluated' && second?.type === 'symbol') out.push(second.value);
         else if (n.op === 'int') out.push(n.args.length >= 2 && isVariable(second) ? second.value : firstVariable(f) || 'x');
         else if ((n.op === '\\sumidx' || n.op === '\\prodidx') && second?.type === 'op' && second.op === '=' && second.args[0].type === 'symbol') out.push(second.args[0].value);
         n.args.forEach(visit);
@@ -295,6 +298,8 @@ const SY = {
         '\\not': (parts) => `sympy.Not(${parts[0]})`,
         '\\xor': (parts) => `sympy.Xor(${parts.join(', ')})`,
         '\\nand': (parts) => `sympy.Nand(${parts.join(', ')})`,
+        '\\implies': (parts) => `sympy.Implies(${parts.join(', ')})`,
+        '\\iff': (parts) => `sympy.Equivalent(${parts.join(', ')})`,
         '\\nor': (parts) => `sympy.Nor(${parts.join(', ')})`,
         '?:': (parts) => `sympy.Piecewise((${parts[1]}, ${parts[0]}), (${parts[2]}, True))`,
         '∈': (parts, node, render) => `sympy.Contains(${parts[0]}, ${symSet(node.args[1], render)})`,
@@ -352,6 +357,9 @@ export function toCode(node, language = 'javascript') {
     const written = new Map();
     const render = (n) => {
         let text = written.get(n);
+        if (text === undefined && n.type === 'op' && n.op === 'setbuilder') throw new Error(`No ${lang.title} for a set described by a condition (only a test of membership in one)`);
+        const test = text === undefined ? setCondition(n) : null;   // y ∈ {x | P}: P with y for x
+        if (test) written.set(n, text = `(${render(test)})`);
         if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, lang) : leaf(n, lang)));
         return text;
     };
@@ -363,13 +371,14 @@ function leaf(node, lang) {
     const percent = node.type === 'symbol' && percentDecimal(v);
     if (percent) return leaf({ type: 'number', value: percent }, lang);   // 50% is 0.5
     if (node.type === 'number') {
-        const n = v.endsWith('..') ? v.replace(/\.+$/, '') : v;
+        const n = v.endsWith('..') ? repeatingDecimal(v) : v;   // 0.33.. is a third, not 0.33
         return lang.exactNumber ? lang.exactNumber(n) : n;
     }
     // Re-quoted as a JSON literal ("…", escaped): a template literal or a stray quote in the
     // user's text could otherwise become code. Valid JavaScript and Python alike.
     if (node.type === 'string' && lang.noStrings) throw new Error(`No SymPy for text (${v}): SymPy compares numbers and symbols, not strings`);
     if (node.type === 'string') return JSON.stringify(/^(["'`]).*\1$/s.test(v) ? v.slice(1, -1) : v);
+    if (v === '⋯') throw new Error(`No ${lang.python ? 'Python' : 'JavaScript'} for ⋯: a sum written out with "and so on" has no value to work out (write it with ∑)`);
     switch (v) {
         case 'pi': case 'π': return lang.pi;
         case 'e': return lang.e;
@@ -407,10 +416,10 @@ export const pythonName = (name) => identifier(name, PY);
  * math: a small factorial is written out as a product, csc x as 1 / sin x,
  * and some operators already come wrapped in their own brackets.
  */
-const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '?:', 'mean', 'log']);
+const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff', '?:', 'mean', 'log']);
 
 /** What SymPy always writes as a call (sympy.factorial(n), sympy.Eq(a, b)): never bracketed again. */
-const SY_CALLS = new Set(['!', 'perm', 'comb', 'mod', 'pmod', '=', '===', '≡', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor',
+const SY_CALLS = new Set(['!', 'perm', 'comb', 'mod', 'pmod', '=', '===', '≡', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff',
     '?:', '∈', '∉', '∪', '∩', 'der', 'int', 'lim', '\\sumidx', '\\prodidx', 'floor', 'ceil', 'ln', 'log', 'loglog', 'logloglog', 'root', 'max', 'min', 'gcd', 'csc', 'sec', 'cot', '{}', 'pmatrix', 'bmatrix', 'vmatrix']);
 
 function codeBracketOp(node, lang = JS) {
@@ -504,6 +513,8 @@ function operation(node, render, lang) {
 
     const special = lang.ops?.[op]?.(args.map(render), node, render);
     if (special != null) return special;
+    const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
+    if (inverse) return `(${render(inverse)})`;   // arcsec u: acos(1 / u)
     if (MATH_FUNCTIONS[op]) return `${lang.math(MATH_FUNCTIONS[op])}(${list()})`;
     if (RECIPROCALS[op]) return `1 / ${lang.math(RECIPROCALS[op])}(${render(a)})`;
     if (op === 'det') {   // det([[1, 2], [3, 4]]): the list of rows written as the language's matrix (sympy.Matrix(…).det())
@@ -619,6 +630,15 @@ function operation(node, render, lang) {
         }
         case '\\nand':
             return lang.not(lang.both(side(a, 'left'), side(b, 'right')));
+        case '\\implies': {   // not p, or q
+            const l = side(a, 'left');
+            return lang.either(lang.not(`(${l})`), side(b, 'right'));
+        }
+        case '\\iff': {   // both, or neither
+            const l = side(a, 'left');
+            const r = side(b, 'right');
+            return lang.either(lang.both(l, r), lang.both(lang.not(`(${l})`), lang.not(`(${r})`)));
+        }
         case '\\nor':
             return lang.not(lang.either(side(a, 'left'), side(b, 'right')));
         case '?:':

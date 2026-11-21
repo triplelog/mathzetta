@@ -25,7 +25,7 @@ const INFIX = {
     '+': '+', '-': '-', '*': '*', '/': '/', '^': '^', mod: 'mod', '±': '±',
     '=': '=', '===': '===', '≠': '≠', '≠=': '≠', '<': '<', '>': '>', '≤': '≤', '≥': '≥',
     '∈': '∈', '∉': '∉', '→': '→', '≈': '≈', '∪': '∪', '∩': '∩', '≡': '≡',
-    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓',
+    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓', '\\implies': '⇒', '\\iff': '⇔',
 };
 
 const GROUPS = { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ']'], '[)': ['[', ')'] };
@@ -76,6 +76,10 @@ function operation(node, render) {
         // each term bracketed as + and * would bracket it: prod(a + b, c) is (a + b) * c
         case 'sum': return args.map((x, i) => (needsParens('+', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' + ');
         case 'prod': return args.map((x, i) => (needsParens('*', bracketOp(x), i ? 'right' : 'left') ? `(${render(x)})` : render(x))).join(' * ');
+        case 'setbuilder':   // {x : x > 2}, read back as written
+            return `{${args.map(render).join(' : ')}}`;
+        case 'evaluated':   // read back as written
+            return `evaluated(${args.map(render).join(', ')})`;
         case 'der': {
             const { n, body, by, at, variable } = derivativeOrder(node);
             // at a point: der(f, x = 2), and der(f, x = 2, n) for the nth derivative (both read back)

@@ -33,6 +33,7 @@ Object.setPrototypeOf(ORDINALS, null);
 // named functions as speech says them (sine of x, the natural log of x), longest first
 const FUNCTION_WORDS = Object.entries({ sine: 'sin', cosine: 'cos', tangent: 'tan', secant: 'sec', cosecant: 'csc', cotangent: 'cot',
     'natural log': 'ln', 'natural logarithm': 'ln', 'arcsine': 'arcsin', 'arccosine': 'arccos', 'arctangent': 'arctan',
+    'arcsecant': 'arcsec', 'arccosecant': 'arccsc', 'arccotangent': 'arccot',
     'hyperbolic sine': 'sinh', 'hyperbolic cosine': 'cosh', 'hyperbolic tangent': 'tanh', floor: 'floor', ceiling: 'ceil' })
     .sort((a, b) => b[0].length - a[0].length);
 

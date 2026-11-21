@@ -20,7 +20,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal } from '../common.js';
+import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -37,6 +37,9 @@ export function toExcelFormula(node, options = {}) {
     const written = new Map();
     const render = (n) => {
         let text = written.get(n);
+        if (text === undefined && n.type === 'op' && n.op === 'setbuilder') throw new Error(`No spreadsheet formula for a set described by a condition (only a test of membership in one)`);
+        const test = text === undefined ? setCondition(n) : null;   // y ∈ {x | P}: P with y for x
+        if (test) written.set(n, text = `(${render(test)})`);
         if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts)));
         return text;
     };
@@ -50,7 +53,8 @@ const CONSTANTS = { pi: 'PI()', 'π': 'PI()', e: 'EXP(1)', tau: '(2*PI())', 'τ'
 
 function leaf(node, opts) {
     const v = node.value;
-    if (node.type === 'number') return v.endsWith('..') ? v.replace(/\.+$/, '') : v;
+    if (node.type === 'number') return v.endsWith('..') ? repeatingDecimal(v) : v;
+    if (v === '⋯') throw new Error(`No spreadsheet formula for ⋯: a sum written out with "and so on" has no value to work out (write it with ∑)`);
     if (node.type === 'string') {
         const quoted = /^(["'`]).*\1$/s.test(v);
         // its quotes as typed (\" in code, "" in a spreadsheet), then doubled once, as a spreadsheet writes them
@@ -94,7 +98,7 @@ function excelBracketOp(node) {
     if (node.op === 'pmod' && node.args[0].type === 'op' && ['≡', '='].includes(node.args[0].op)) return '=';
     if (node.op === '∈' && node.args[1].type === 'symbol' && node.args[1].value === 'ℤ') return '=';
     if (FUNCTIONS[node.op] || AGGREGATES[node.op] || isCustomFunction(node.op) || operator(node.op)?.group) return null;
-    if (['root', 'log', 'mod', 'max', 'min', 'gcd', 'atan2', 'random', 'expm1', 'loglog', 'logloglog', '?:', '≈', '∈', '∉', 'pmod', '\\nand', '\\nor', '\\xor'].includes(node.op)) return null;
+    if (['root', 'log', 'mod', 'max', 'min', 'gcd', 'atan2', 'random', 'expm1', 'loglog', 'logloglog', '?:', '≈', '∈', '∉', 'pmod', '\\nand', '\\nor', '\\xor', '\\implies', '\\iff'].includes(node.op)) return null;
     if (RECIPROCALS[node.op]) return '/';
     if (node.op === 'ceil') return 'neg';
     return bracketOp(node);
@@ -132,6 +136,8 @@ function operation(node, render, opts) {
         if (op === 'sum' || op === 'prod' || op === 'mean' || op === 'max' || op === 'min') return a.type === 'op' ? `(${render(a)})` : render(a);   // max(a+b)*2: (a+b)*2
     }
     if (op === '+' && isText(node)) return `${render(a)}&${render(b)}`;   // joining text
+    const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
+    if (inverse) return `(${render(inverse)})`;   // arcsec u: ACOS(1/u)
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (RECIPROCALS[op]) return `1/${RECIPROCALS[op]}(${render(a)})`;
     if (COMPARE[op]) return `${side(a, 'left')}${COMPARE[op]}${side(b, 'right')}`;
@@ -207,6 +213,10 @@ function operation(node, render, opts) {
             return `(NOT(${render(a)})<>NOT(${render(b)}))`;
         case '\\nand':
             return `NOT(AND(${list()}))`;
+        case '\\implies':
+            return `OR(NOT(${render(a)}),${render(b)})`;
+        case '\\iff':   // NOT makes each side true or false first, as for xor
+            return `(NOT(${render(a)})=NOT(${render(b)}))`;
         case '\\nor':
             return `NOT(OR(${list()}))`;
         case '?:':
@@ -238,6 +248,7 @@ function membership(x, set, render) {
         const [lo, hi] = set.args.map(render);
         return `AND(${v}${set.op[0] === '[' ? '>=' : '>'}${lo}, ${v}${set.op[1] === ']' ? '<=' : '<'}${hi})`;
     }
+    if (set.type === 'op' && set.op === '{}' && !set.args.length) return 'FALSE';   // the empty set: OR() is an error
     if (set.type === 'op' && operator(set.op)?.group) return `OR(${set.args.map((item) => `${v}=${render(item)}`).join(', ')})`;
     return fail('∈ a set that is not written out');
 }

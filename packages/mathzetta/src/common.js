@@ -23,6 +23,95 @@ export function firstLeaf(node) {
 }
 
 /**
+ * F x a b evaluated, [F]_a^b, as the difference it stands for: F with x = b minus F with x = a (copies of F;
+ * a binding inside F of the same name, ∫ … dx, keeps its own x). Code outputs write this; null for other nodes.
+ */
+export function evaluationDifference(node) {
+    if (node.type !== 'op' || node.op !== 'evaluated') return null;
+    const [body, variable, lo, hi] = node.args;
+    return { type: 'op', op: '-', args: [substitute(body, variable.value, hi), substitute(body, variable.value, lo)] };
+}
+
+/** A copy of `tree` with `value` for the name (where nothing inside binds it again: ∫ … dx keeps its own x). */
+export function substitute(tree, name, value) {
+    const put = (n) => {
+        if (n.type === 'symbol') return n.value === name ? value : n;
+        if (n.type !== 'op') return n;
+        if (['der', 'int', 'lim', '\\sumidx', '\\prodidx', 'evaluated', 'setbuilder'].includes(n.op) && bindsName(n, name)) return n;
+        return { ...n, id: undefined, args: n.args.map(put) };
+    };
+    return put(tree);
+}
+
+/**
+ * y ∈ {x | P}, set-builder notation, as the test it stands for: P with y for x (and y ∈ S too, for {x ∈ S | P}).
+ * null for anything else. What code outputs and evaluate() work out; a set by a condition alone has nothing to list.
+ */
+export function setCondition(node) {
+    if (node.type !== 'op' || (node.op !== '∈' && node.op !== '∉')) return null;
+    const [y, set] = node.args;
+    if (set.type !== 'op' || set.op !== 'setbuilder') return null;
+    let [element, condition] = set.args;
+    let domain = null;
+    if (element.type === 'op' && element.op === '∈' && element.args[0].type === 'symbol') [element, domain] = element.args;
+    if (element.type !== 'symbol') return null;
+    const put = substitute(condition, element.value, y);
+    const test = domain ? { type: 'op', op: '&', args: [{ type: 'op', op: '∈', args: [y, domain] }, put] } : put;
+    return node.op === '∉' ? { type: 'op', op: '\\not', args: [test] } : test;
+}
+
+/** Does a calculus node bind `name` (∫ … dx, ∑_{x=…}, lim_{x→…}, d/dx, [ ]_x)? */
+function bindsName(n, name) {
+    if (n.op === 'setbuilder') {   // {x | P} and {x ∈ S | P} bind x
+        const element = n.args[0];
+        return (element.type === 'symbol' ? element.value : element.args?.[0]?.value) === name;
+    }
+    const second = n.args[1];
+    if (second?.type === 'symbol') return second.value === name;
+    return second?.type === 'op' && ['=', '→'].includes(second.op) && second.args[0]?.type === 'symbol' && second.args[0].value === name;
+}
+
+/**
+ * arcsec, arccsc and arccot in the functions every language has: arccos(1/u), arcsin(1/u) and π/2 − arctan(u)
+ * (arccot's values run from 0 to π, as in calculus books; SymPy's acot and a spreadsheet's ACOT differ for u < 0).
+ * null for any other node. Code outputs write the result in brackets, so it binds as the call did.
+ */
+export function inverseReciprocal(node) {
+    if (node.type !== 'op' || !['arcsec', 'arccsc', 'arccot'].includes(node.op)) return null;
+    const [u] = node.args;
+    const reciprocal = { type: 'op', op: '/', args: [{ type: 'number', value: '1' }, u] };
+    if (node.op === 'arcsec') return { type: 'op', op: 'arccos', args: [reciprocal] };
+    if (node.op === 'arccsc') return { type: 'op', op: 'arcsin', args: [reciprocal] };
+    return { type: 'op', op: '-', args: [{ type: 'op', op: '/', args: [{ type: 'symbol', value: 'pi' }, { type: 'number', value: '2' }] }, { type: 'op', op: 'arctan', args: [u] }] };
+}
+
+/**
+ * A repeating decimal, '1.333..' or '0.1212..' (MathZetta's own spelling: the repeating block ends the digits, twice
+ * if it is longer than one), written out as far as a double holds: '1.3333333333333333'. Code has no such literal, and
+ * cutting it at the dots (1.333) would change the value. The block is found as calculate() finds it.
+ */
+export function repeatingDecimal(text) {
+    const parts = repeatingParts(text);
+    if (!parts) return text.replace(/\.+$/, '');
+    const { sign, whole, prefix, block } = parts;
+    const digits = (prefix + block.repeat(Math.ceil(20 / block.length) + 1)).slice(0, Math.max(prefix.length + block.length, 17));
+    return `${sign}${whole}.${digits}`;
+}
+
+/** '0.1666..' → { sign: '', whole: '0', prefix: '1', block: '6' }: what repeats, written once; null without decimals. */
+export function repeatingParts(text) {
+    const m = /^(-?)(\d*)\.(\d+)\.\.$/.exec(text);
+    if (!m) return null;
+    const [, sign, whole, frac] = m;
+    let L = 1;
+    for (let k = 1; 2 * k <= frac.length; k++) if (frac.slice(-k) === frac.slice(-2 * k, -k)) { L = k; break; }
+    const block = frac.slice(-L);
+    let prefix = frac;
+    while (prefix.endsWith(block)) prefix = prefix.slice(0, -L);
+    return { sign, whole: whole || '0', prefix, block };
+}
+
+/**
  * A percentage leaf ("20%", "12.5%") as the decimal it stands for ("0.2", "0.125"), the point moved two
  * places so no double rounding creeps in; null for anything else. Code has no % literal (JavaScript reads
  * 50% as a syntax error, SQL as a name), so the code outputs and evaluate() write and read this.
@@ -110,9 +199,9 @@ export function isImplicitProduct(left, right, bracketed = {}) {
     return true;
 }
 
-/** One-letter variables, Greek letters, Δx, f′, π, e: names that can sit side by side. */
+/** One-letter variables, Greek letters, Δx, a differential dx, f′, π, e: names that can sit side by side (f′(x) dx). */
 function isShortName(value) {
-    return value.length === 1 || Boolean(GREEK[value]) || /^Δ.$/.test(value) || /^.′+$/.test(value);
+    return value.length === 1 || Boolean(GREEK[value]) || /^Δ.$/.test(value) || /^d[A-Za-z\u03B1-\u03C9]$/.test(value) || /^.′+$/.test(value);
 }
 
 /** Drawn as a bracket at its edges when it is a factor: x + 1 inside a product. */
@@ -227,7 +316,7 @@ export function piecewise(node) {
     return branches;
 }
 
-const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '===', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor', '∈', '∉', '≈', '≡']);
+const TRUE_OR_FALSE = new Set(['<', '>', '≤', '≥', '=', '===', '≠', '≠=', '&', '|', '\\not', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff', '∈', '∉', '≈', '≡']);
 const isTrueOrFalse = (n) => (n.type === 'op' && TRUE_OR_FALSE.has(n.op)) || (n.type === 'symbol' && (n.value === 'true' || n.value === 'false'));
 
 /**

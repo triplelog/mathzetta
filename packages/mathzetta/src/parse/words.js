@@ -59,7 +59,10 @@ const WORD_LIST = `
 /** Words that are never split. */
 // `unchanged` is MathZetta's own: the value of a case nobody wrote (if … then with no else, \begin{cases} with no
 // otherwise row, IF(c, a)); the rewrites insert it into input that may be LaTeX, where it must not become u·n·c·h·a·n·g·e·d.
-const WHOLE = new Set([...NAMES, ...WORD_LIST, 'true', 'false', 'null', 'undefined', 'unchanged', 'deg', 'mod', 'pmod', 'NaN', 'Infinity']);
+// the CAS's block calls (Inline Math's casBlocks) are words in LaTeX too: a block left as written,
+// \frac{1}{2} + {{diff(x^3, x)}} without the CAS, reads as the call diff(…), not d·i·f·f
+const CALL_WORDS = ['simplify', 'expand', 'factor', 'cancel', 'diff', 'integrate', 'solve', 'approx', 'limit'];
+const WHOLE = new Set([...NAMES, ...WORD_LIST, ...CALL_WORDS, 'true', 'false', 'null', 'undefined', 'unchanged', 'deg', 'mod', 'pmod', 'NaN', 'Infinity']);
 
 const LETTER = /^[a-zA-ZͰ-Ͽ]$/;
 export const isLetters = (text) => text.length > 0 && [...text].every((c) => LETTER.test(c));

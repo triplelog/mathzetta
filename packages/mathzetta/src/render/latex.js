@@ -2,7 +2,7 @@
  * Tree → LaTeX (KaTeX-compatible).
  */
 
-import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, bracketOp, derivativeOrder, bracketedSides, piecewise, MATRICES, matrixRows } from '../common.js';
+import { GREEK, needsBrackets, unaryNeedsBrackets, isMinusOneTimes, isImplicitProduct, isVariable, firstLeaf, customName, bracketOp, derivativeOrder, bracketedSides, piecewise, MATRICES, matrixRows, repeatingParts } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { isCustomFunction, precedenceOf } from '../operators.js';
 
@@ -34,11 +34,17 @@ const BLACKBOARD = { 'ℝ': 'R', 'ℕ': 'N', 'ℤ': 'Z', 'ℚ': 'Q', 'ℂ': 'C' 
 function leaf(node) {
     const v = node.value;
     if (node.type === 'string') return `\\text{${textEscape(v)}}`;   // typed text: it must not close the \text{} or start a command
-    if (node.type === 'number') return v;
+    if (node.type === 'number') {
+        const r = repeatingParts(v);   // 0.166.. → 0.1\overline{6}
+        return r ? `${r.sign}${r.whole}.${r.prefix}\\overline{${r.block}}` : v;
+    }
     if (GREEK[v]) return '\\' + v;
     if (GREEK_NAMES[v]) return '\\' + GREEK_NAMES[v];
     if (v === '\\+' || v === '\\-') return v[1];
     if (v === '∞' || v === '-∞') return v.replace('∞', '\\infty');
+    if (v === '°') return '^{\\circ}';
+    if (/^d[A-Za-z\u03B1-\u03C9]$/.test(v)) return `\\mathrm{d}${leaf({ type: 'symbol', value: v[1] })}`;   // a differential: \mathrm{d}x, \mathrm{d}\theta
+    if (v === '⋯') return '\\cdots';
     if (BLACKBOARD[v]) return `\\mathbb{${BLACKBOARD[v]}}`;
     return name(v);
 }
@@ -69,6 +75,7 @@ const COMPARISONS = {
     '=': '=', '===': '=', '≠': '\\neq', '≠=': '\\neq', '<': '<', '>': '>', '≤': '\\leq', '≥': '\\geq',
     '∈': '\\in', '∉': '\\notin', '±': '\\pm', '≈': '\\approx', '∪': '\\cup', '∩': '\\cap', '≡': '\\equiv',
     '&': '\\land', '|': '\\lor', '\\xor': '\\oplus', '\\nand': '\\barwedge', '\\nor': '\\downarrow',
+    '\\implies': '\\Rightarrow', '\\iff': '\\iff',
 };
 
 /** Functions written as a named operator applied to bracketed arguments. */
@@ -76,6 +83,7 @@ const NAMED = {
     sin: '\\sin', cos: '\\cos', tan: '\\tan', csc: '\\csc', sec: '\\sec', cot: '\\cot',
     sinh: '\\sinh', cosh: '\\cosh', tanh: '\\tanh',
     arcsin: '\\arcsin', arccos: '\\arccos', arctan: '\\arctan',
+    arcsec: '\\operatorname{arcsec}', arccsc: '\\operatorname{arccsc}', arccot: '\\operatorname{arccot}',
     arcsinh: '\\sinh^{-1}', arccosh: '\\cosh^{-1}', arctanh: '\\tanh^{-1}',
     ln: '\\ln', max: '\\max', min: '\\min', gcd: '\\gcd', det: '\\det',
     round: '\\text{round}', fixed: '\\text{fixed}', atan2: '\\text{atan2}',
@@ -116,6 +124,7 @@ function operation(node, render) {
             const r = side(b, 'right');
             if (node.written) return `${l} ${node.written === 'cross' ? '\\times' : '\\cdot'} ${r}`;   // as typed: · or ×
             if (!isImplicitProduct(a, b, bracketedSides(node))) return `${l} \\cdot ${r}`;
+            if (r.startsWith('\\mathrm{d}')) return `${l}\\,${r}`;   // a differential: f'(x)\,\mathrm{d}x
             // \pi followed by a letter would read as one command: \pir
             return /\\[a-zA-Z]+$/.test(l) && /^[a-zA-Z]/.test(r) ? `${l} ${r}` : l + r;
         }
@@ -188,6 +197,10 @@ function operation(node, render) {
                 : `\\frac{\\mathrm{d}${power}}{\\mathrm{d}${render(by)}${power}}${inner}`;
             return at ? `\\left.${d}\\right|_{${render(by)}=${render(at)}}` : d;
         }
+        case 'setbuilder':   // {x | x > 2}
+            return `\\left\\{ ${render(a)} \\mid ${render(b)} \\right\\}`;
+        case 'evaluated':   // [F]_a^b
+            return `\\left[${render(a)}\\right]_{${render(args[2])}}^{${render(args[3])}}`;
         case 'int':
             return integral(args, render);
         case 'lim':

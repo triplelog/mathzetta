@@ -21,7 +21,7 @@
 import { operator, isCustomFunction, VARIADIC } from '../operators.js';
 import { PARSE_PRECEDENCE, WRITTEN_TIMES } from './vocabulary.js';
 import { EMPTY_LIST } from './parser.js';
-import { leaf, op, num, sym } from '../tree.js';
+import { leaf, op, num, sym, firstVariable } from '../tree.js';
 
 const GROUPS = new Set(['()', '[]', '{}', '(]', '[)']);
 
@@ -71,8 +71,8 @@ export function buildTree(raw) {
         }
         if (GROUPS.has(token)) {
             const members = items(pop(token));
-            // Empty brackets only mean something as a call's argument list: f().
-            if (!members.length && !isFunction(raw[index + 1])) throw new Error('Empty brackets');
+            // Empty brackets only mean something as a call's argument list, f(), or as the empty set, {} (\emptyset, ∅)
+            if (!members.length && token !== '{}' && !isFunction(raw[index + 1])) throw new Error('Empty brackets');
             stack.push(op(token, members));
             return;
         }
@@ -104,6 +104,12 @@ export function buildTree(raw) {
     if (stack.length !== 1) {
         throw new Error(stack.length ? 'Some values are not connected by an operator' : 'Empty expression');
     }
+    // x = t^2, y = t^3: equations listed side by side, each one holding (as a brace of equations is read)
+    const RELATIONS = ['=', '<', '>', '≤', '≥', '≠', '≈', '≡', '∈', '∉'];
+    const top = stack[0];
+    if (top.list && top.list.length > 1 && top.list.every((n) => n.type === 'op' && RELATIONS.includes(n.op))) {
+        return top.list.reduce((all, n) => op('&', [all, n]));
+    }
     return node(stack[0], 'end');
 }
 
@@ -125,6 +131,9 @@ function normalize(name, args) {
             }
             break;
         }
+        case 'evaluated':   // evaluated(F, a, b): the variable is F's first (x when it has none)
+            if (args.length === 3) return op('evaluated', [args[0], sym(firstVariable(args[0]) || 'x'), args[1], args[2]]);
+            break;
         case 'det':     // det([[1, 2], [3, 4]]): the call's brackets took the list's, so its rows arrive one by one
             if (args.length > 1 && args.every((a) => a.type === 'op' && a.op === '[]')) return op('det', [op('[]', args)]);
             break;
@@ -155,14 +164,21 @@ function normalize(name, args) {
  */
 const SIDES = { '\\+': 'r', '\\-': 'l' };   // a^+ and a^-: the side a limit is taken from
 function oneSided(args) {
-    const side = (n) => (n.type === 'op' && n.op === '^' && n.args[1].type === 'symbol'
-        ? SIDES[n.args[1].value] : undefined);
+    // the marker ends the point as written, so it belongs to all of it: π/2^- is (π/2)^-, -1^+ is (-1)^+
+    const peel = (n) => {
+        if (n.type !== 'op') return null;
+        if (n.op === '^' && n.args[1].type === 'symbol' && SIDES[n.args[1].value]) return { point: n.args[0], side: SIDES[n.args[1].value] };
+        const inner = n.args.length ? peel(n.args[n.args.length - 1]) : null;
+        return inner && { point: { ...n, args: [...n.args.slice(0, -1), inner.point] }, side: inner.side };
+    };
     const [f, second, third] = args;
-    if (args.length === 2 && second.type === 'op' && second.op === '→' && side(second.args[1])) {
+    if (args.length === 2 && second.type === 'op' && second.op === '→') {
         const [x, a] = second.args;
-        return [f, x, a.args[0], sym(side(a))];
+        const p = peel(a);
+        if (p) return [f, x, p.point, sym(p.side)];
     }
-    if (args.length === 3 && side(third)) return [f, second, third.args[0], sym(side(third))];
+    const p = args.length === 3 && peel(third);
+    if (p) return [f, second, p.point, sym(p.side)];
     return args;
 }
 

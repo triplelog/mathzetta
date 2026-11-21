@@ -244,6 +244,30 @@ rules:
     explain: "The derivative of {u}, over 1 plus {u} squared."
     tags: [chain, trig]
 
+  - id: d-arcsec
+    name: Derivative of arcsecant
+    mode: differentiate
+    pattern: u arcsec v der
+    output: u v der u abs u 2 ^ 1 - sqrt * /
+    explain: "The derivative of {u}, over the absolute value of {u} times the square root of {u} squared minus 1."
+    tags: [chain, trig]
+
+  - id: d-arccsc
+    name: Derivative of arccosecant
+    mode: differentiate
+    pattern: u arccsc v der
+    output: u v der u abs u 2 ^ 1 - sqrt * / neg
+    explain: "Minus the derivative of {u}, over the absolute value of {u} times the square root of {u} squared minus 1."
+    tags: [chain, trig]
+
+  - id: d-arccot
+    name: Derivative of arccotangent
+    mode: differentiate
+    pattern: u arccot v der
+    output: u v der 1 u 2 ^ + / neg
+    explain: "Minus the derivative of {u}, over 1 plus {u} squared."
+    tags: [chain, trig]
+
   - id: d-sinh
     name: Derivative of hyperbolic sine
     mode: differentiate

@@ -32,12 +32,13 @@ written by `format`), and takes `{ steps, approximate }` (below).
 
 | call | gives |
 | --- | --- |
-| `simplify(x)` | the normal form, then the simplify rules to a fixed point; then canceled, multiplied out or factored if that is shorter |
+| `simplify(x)` | the normal form, then the simplify rules to a fixed point; then canceled, multiplied out, factored or rewritten with the trig identities if that is shorter (see below) |
 | `expand(x)`, `factor(x)`, `cancel(x)` | multiplied out; factored over the rationals; one fraction with common factors canceled |
 | `diff(x, v, { order })` | the differentiate rules (rules/calculus.yaml + rules/cas/derivatives.yaml), then simplify |
-| `integrate(x, v, { from, to, constant })` | the integrate rules, then (when no rule fits) multiplying out, taking a number out, polynomial division and partial fractions, a linear substitution, integration by parts. `from`/`to` (or an `int` with limits) gives F(b) − F(a), refused when the integrand has no value between the limits |
-| `solve(eq, v)` | `{ solutions, result, text, steps, unsolved, always }` — see below |
+| `integrate(x, v, { from, to, constant })` | the integrate rules, then (when no rule fits) multiplying out, taking a number out, a linear substitution, polynomial division and partial fractions (linear factors and one irreducible quadratic, by completing the square: ln and arctan), odd powers of sin and cos, the reduction formula for secⁿ and cscⁿ, eᵃˣ·sin bx (by parts twice), sin A cos B (product to sum), √(c − kx²) (a trig substitution), u-substitution (∫ f(g)·g′: x e^(x²), ln x / x, x/(x² + 1)), integration by parts (also ∫ arctan x, arcsin x alone). `from`/`to` (or an `int` with limits) gives F(b) − F(a), refused when the integrand has no value between the limits |
+| `solve(eq, v)` | `{ solutions, result, text, steps, unsolved, always }` — see below; an inequality (`<` `>` `≤` `≥`, or a chain `-1 < 2x + 1 < 5`) gives `{ pieces, intervals, text }`: `'x < -2 or x > 2'`, `'(-∞, -2) ∪ (2, ∞)'` |
 | `solveSystem(eqs, vars)` | linear equations, exact elimination: `{ solution: { x, y }, status: 'one' \| 'none' \| 'many' }` |
+| `limit(x, v, to, { side })` | the limit as v → to (a number, `\\infty`, `-\\infty`; or a written `\\lim_{x \\to a} …`, one-sided `a^+`): a number, `∞`, `-∞`, or `does not exist` (`exists: false`, `reason`) — see below |
 | `substitute(x, { x: 2, y: 'z + 1' })` | put values in, simplify |
 | `equivalent(a, b)` | `{ equal, how: 'exact' \| 'numeric' }` |
 | `approximate(x, { digits, scope })` | a decimal to `digits` significant figures (15; any number) |
@@ -54,6 +55,50 @@ the original equation, and one that doesn't fit is dropped with a step saying
 why. `{ approximate: true }` finds real roots numerically when there is no
 exact method (x⁵ + x + 1 = 0). Trigonometric equations give the solutions in one
 turn, and the explanation says to add 2πk.
+
+**Trigonometric identities.** Besides the rules (exact values at multiples of π/12 and π/8, shifts by π/2 and π, the
+cofunctions, the angle sums read backward, sin(arccos x) and the other right-triangle compositions), `simplify` tries
+three more shapes and keeps the shortest: everything in sin and cos, one fraction, sin² + cos² = 1 used one way, the
+other way, or not at all, canceled, with the double angles both ways, and tan, sec, csc, cot named where they are left.
+A trig function of an inverse one is written out even when that is a little longer. `equivalent(a, b)` proves an
+identity exactly when a − b simplifies to 0.
+
+```js
+cas.simplify('sec(x)^2 - tan(x)^2').text                   // '1'
+cas.simplify('sin(2x)/(2 sin(x))').text                    // 'cos(x)'
+cas.simplify('sin(x)^4 - cos(x)^4').text                   // '-cos(2x)'
+cas.simplify('sin(x)/(1 + cos(x)) + (1 + cos(x))/sin(x)').text   // '2csc(x)'
+cas.simplify('sin(2 arcsin(x))').text                      // '2x·sqrt(-x^2 + 1)'
+cas.equivalent('tan(x) + cot(x)', 'sec(x) csc(x)')          // { equal: true, how: 'exact' }
+```
+
+**Limits** go as a calculus course does: put the point in where the function is continuous; otherwise each part's
+limit with ±∞ tracked, and for an indeterminate form — 0/0 (cancel a common factor, else L'Hôpital), ∞/∞ (the leading
+terms of a fraction of polynomials, dividing by the highest power, else L'Hôpital), 0·∞ (a quotient), ∞ − ∞ (one
+fraction, or the conjugate of a root), 1^∞, 0^0, ∞^0 (e^(g·ln f)). c/0 is ±∞ by the sign on each side; sides that
+differ, or something that keeps swinging, have no limit; sin and cos of such stay bounded (times 0, or over ∞: 0, the
+squeeze theorem). Each answer is held to numbers near the point, and refused rather than given if they disagree.
+Integrals to ±∞ take F's limit at that end, and diverge when it is infinite or there is none.
+
+```js
+cas.limit('\\lim_{x \\to 0} \\frac{\\sin x}{x}').text                         // '1'   (L'Hôpital, as a step)
+cas.limit('(1 + 1/x)^x', 'x', '\\infty').text                             // 'e'
+cas.limit('\\lim_{x \\to 0} \\frac{1}{x}')                                       // { exists: false, reason: 'from the left it goes to -∞, from the right to ∞' }
+cas.limit('1/x', 'x', 0, { side: 'right' }).text                          // '∞'
+cas.integrate('\\int_1^{\\infty} \\frac{1}{x^2} dx').text                       // '1'
+```
+
+**Inequalities** are solved with a sign chart: the points where one side minus the other is 0 (found by the
+equation solver), has no value (a zero denominator) or starts to have one (a root's or a log's argument at 0) cut
+the line into intervals, and one number in each, and each point, is tested.
+
+```js
+cas.solve('x^2 - 4 > 0').text                 // 'x < -2 or x > 2'     .intervals: '(-∞, -2) ∪ (2, ∞)'
+cas.solve('|2x + 1| < 5').text                // '-3 < x < 2'
+cas.solve('(x - 1)/(x + 2) >= 0').intervals   // '(-∞, -2) ∪ [1, ∞)'
+cas.solve('3 <= 1 - 2x < 7').text             // '-3 < x ≤ -1'
+cas.solve('sqrt(x - 1) < 2').text             // '1 ≤ x < 5'
+```
 
 ## Exact, unless you ask
 
@@ -190,8 +235,8 @@ Relations: `sameAs`, `freeOf`, `dependsOn`, `differs`.
 
 ## Not (yet) here
 
-Limits and infinite integrals; integration beyond the table, linear
-substitution, parts and partial fractions with distinct rational roots;
+Integration beyond the methods above (repeated factors with a quadratic,
+even powers of sin·cos together, other trig substitutions); trigonometric inequalities (infinitely many intervals);
 factoring over the rationals only (x² − 2 stays) and multivariate factoring
 beyond common factors and a² − b², a³ ± b³; trig solutions beyond one turn;
 complex unknowns (in complex mode unknowns are real) and complex calculus;

@@ -7,7 +7,7 @@
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex } from '../common.js';
+import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -35,6 +35,9 @@ export function toSqlCode(node, options = {}) {
     const written = new Map();
     const render = (n) => {
         let text = written.get(n);
+        if (text === undefined && n.type === 'op' && n.op === 'setbuilder') throw new Error(`No ${opts.sqlite ? 'SQLite SQL' : 'SQL'} for a set described by a condition (only a test of membership in one)`);
+        const test = text === undefined ? setCondition(n) : null;   // y ∈ {x | P}: P with y for x
+        if (test) written.set(n, text = `(${render(test)})`);
         if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, opts) : leaf(n, opts)));
         return text;
     };
@@ -55,7 +58,8 @@ const SQLITE_CONSTANTS = { ...CONSTANTS, '∞': '9e999', '-∞': '-9e999', tau: 
 
 function leaf(node, options) {
     const v = node.value;
-    if (node.type === 'number') return v.endsWith('..') ? v.replace(/\.+$/, '') : v;
+    if (node.type === 'number') return v.endsWith('..') ? repeatingDecimal(v) : v;
+    if (v === '⋯') throw new Error(`No SQL for ⋯: a sum written out with "and so on" has no value to work out (write it with ∑)`);
     if (node.type === 'string') {
         // by default the quote it was typed with; either way the text is re-escaped SQL's way (a quote doubled),
         // since SQL reads no backslash escapes: 'x\' OR 1=1 --' written as typed would end at x\ and run the rest
@@ -136,6 +140,8 @@ function operation(node, render, options) {
     if (op === '/' && a.type === 'number' && /^-?\d+$/.test(a.value)) return `${render(a)}.0 / ${side(b, 'right')}`;
     if (INFIX[op]) return `${side(a, 'left')} ${INFIX[op]} ${side(b, 'right')}`;
     if (NO_SQL[op]) throw new Error(`No SQL for ${NO_SQL[op]}`);
+    const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
+    if (inverse) return `(${render(inverse)})`;   // arcsec u: ACOS(1.0 / u)
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
     if (MATRICES[op]) return `ARRAY[${matrixRows(node).map((r) => `ARRAY[${r.map(render).join(', ')}]`).join(', ')}]`;
@@ -212,6 +218,10 @@ function operation(node, render, options) {
             return `((${side(a, 'left')} AND NOT (${side(b, 'right')})) OR (NOT (${side(a, 'left')}) AND ${side(b, 'right')}))`;
         case '\\nand':
             return `NOT (${side(a, 'left')} AND ${side(b, 'right')})`;
+        case '\\implies':
+            return `(NOT (${side(a, 'left')}) OR ${side(b, 'right')})`;
+        case '\\iff':
+            return `((${render(a)}) = (${render(b)}))`;
         case '\\nor':
             return `NOT (${side(a, 'left')} OR ${side(b, 'right')})`;
         case '?:':
@@ -302,7 +312,7 @@ function sqliteNumberSet(node, render) {
     return node.op === '∈' ? test : `NOT ${test}`;
 }
 
-const SELF_BRACKETED = new Set(['&', '|', '\\xor', 'mean']);
+const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\implies', '\\iff', 'mean']);
 
 function sqlBracketOp(node) {
     if (node.type !== 'op' || SELF_BRACKETED.has(node.op) || FUNCTIONS[node.op]) return null;
@@ -322,6 +332,7 @@ function membership(node, render) {
     const [x, set] = node.args;
     const v = render(x);
     const negate = node.op === '∉';
+    if (set.type === 'op' && set.op === '{}' && !set.args.length) return negate ? 'TRUE' : 'FALSE';   // the empty set: IN () is no SQL
     const numbers = set.type === 'symbol' && POSTGRES_NUMBER_SETS[set.value];
     if (numbers) return negate ? `NOT ${numbers(v)}` : numbers(v);
     if (set.type === 'op' && ['()', '[]', '(]', '[)'].includes(set.op) && set.args.length === 2) {

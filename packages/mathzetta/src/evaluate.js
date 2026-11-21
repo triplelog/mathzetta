@@ -9,7 +9,7 @@
 
 import { treeOf } from './input.js';
 import { firstVariable } from './tree.js';
-import { expandChain, percentDecimal } from './common.js';
+import { expandChain, percentDecimal, repeatingDecimal, setCondition } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 
 // ---- matrices (lists of equally long lists): the matrix product, powers, determinants -----------
@@ -75,6 +75,7 @@ const rowsOf = (node, scope) => node.args.map((r) => (r.type === 'op' && r.op ==
 const CONSTANTS = {
     pi: Math.PI, 'π': Math.PI, e: Math.E, tau: 2 * Math.PI, 'τ': 2 * Math.PI,
     '∞': Infinity, '-∞': -Infinity, true: true, false: false,
+    '°': Math.PI / 180,   // 30° is 30 · π/180
 };
 
 const factorial = (n) => {
@@ -120,6 +121,7 @@ const ONE = {
     csc: (a) => 1 / Math.sin(a), sec: (a) => 1 / Math.cos(a), cot: (a) => 1 / Math.tan(a),
     sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
     arcsin: Math.asin, arccos: Math.acos, arctan: Math.atan,
+    arcsec: (x) => Math.acos(1 / x), arccsc: (x) => Math.asin(1 / x), arccot: (x) => Math.PI / 2 - Math.atan(x),   // arccot: 0 to π
     arcsinh: Math.asinh, arccosh: Math.acosh, arctanh: Math.atanh,
 };
 
@@ -148,6 +150,7 @@ const TWO = {
     '<': (a, b) => a < b, '>': (a, b) => a > b, '≤': (a, b) => a <= b, '≥': (a, b) => a >= b,
     '&': (a, b) => a && b, '|': (a, b) => a || b,
     '\\xor': (a, b) => Boolean(a) !== Boolean(b), '\\nor': (a, b) => !(a || b), '\\nand': (a, b) => !(a && b),
+    '\\implies': (a, b) => !a || Boolean(b), '\\iff': (a, b) => Boolean(a) === Boolean(b),
 };
 
 const MANY = {
@@ -178,7 +181,7 @@ function value(node, scope) {
     if (++steps > STEPS) throw new Error('Too much to work out');
     switch (node.type) {
         case 'number':
-            return Number(node.value);
+            return node.value.endsWith('..') ? Number(repeatingDecimal(node.value)) : Number(node.value);
         case 'string':
             return node.value.slice(1, -1);
         case 'symbol':
@@ -192,8 +195,15 @@ function value(node, scope) {
     if (chained) return value(chained, scope);
     const { op, args } = node;
     if (op === '?:') return value(args[0], scope) ? value(args[1], scope) : value(args[2], scope);
+    if (op === 'setbuilder') throw new Error('A set described by a condition has no list of values (test membership in it: y ∈ {x | P})');
+    if ((op === '∈' || op === '∉') && setCondition(node)) return value(setCondition(node), scope);
     if (op === '∈' || op === '∉') return membership(node, scope);
     if (op === 'random') return Math.random();
+    if (op === 'evaluated') {   // [F]_a^b: F with x = b, minus F with x = a
+        const [body, variable, lo, hi] = args;
+        const at = (point) => value(body, { ...scope, [variable.value]: value(point, scope) });
+        return at(hi) - at(lo);
+    }
     if ((op === '\\sumidx' || op === '\\prodidx') && args.length === 3) {
         // ∑ from i = a to b, a whole number of steps (at most a million); ∑_0^3 i^2 names no index: the body's variable
         const named = args[1].type === 'op' && args[1].op === '=' && args[1].args[0].type === 'symbol';

@@ -131,6 +131,9 @@ export const SYMBOL_REPLACEMENTS = [
     ["asinh(", "arcsinh("],
     ["acosh(", "arccosh("],
     ["atanh(", "arctanh("],
+    ["asec(", "arcsec("],
+    ["acsc(", "arccsc("],
+    ["acot(", "arccot("],
     ["\\sqrt*", "sqrt"],
     ["Log", "log"],
     ["Max", "max"],
@@ -193,6 +196,16 @@ export const SYMBOL_REPLACEMENTS = [
     ["\\nor", " \\nor "],
     ["\\xor", " \\xor "],
     ["\\nand", " \\nand "],
+    ["\\Longrightarrow", " \\implies "],
+    ["\\Rightarrow", " \\implies "],
+    ["\\implies", " \\implies "],
+    ["⇒", " \\implies "],
+    ["⟹", " \\implies "],
+    ["\\Longleftrightarrow", " \\iff "],
+    ["\\Leftrightarrow", " \\iff "],
+    ["\\iff", " \\iff "],
+    ["⇔", " \\iff "],
+    ["⟺", " \\iff "],
     ["\\uparrow", " \\nand "],
     ["\\downarrow", " \\nor "],
     ["\\oplus", " \\xor "],
@@ -342,8 +355,8 @@ export function trigReplacements() {
     };
     for (const t of ['sin', 'cos', 'tan', 'cot', 'csc', 'sec']) {
         out.push(['Math.' + t + '(', t + '('], ['\\' + t + '(', t + '('], ['\\' + t, t]);
-        if (!['sin', 'cos', 'tan'].includes(t)) continue;
-        for (const h of ['', 'h']) {
+        // sec, csc and cot have inverses too (sec^{-1} x is arcsec x, not 1/sec x), and no hyperbolic forms here
+        for (const h of ['sin', 'cos', 'tan'].includes(t) ? ['', 'h'] : ['']) {
             const fn = t + h, inv = 'arc' + t + h;
             if (h) {
                 variants('Math.' + fn, fn);

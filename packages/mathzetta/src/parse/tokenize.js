@@ -66,6 +66,14 @@ export function tokenize(input, mode = 'plain') {
             continue;
         }
 
+        // A differential, marked ⅆ by the cleaner: ⅆx is the one name dx (as Δx is Δx)
+        if (char === 'ⅆ' && /[A-Za-z\u0370-\u03FF]/.test(input[i + 1] ?? '')) {
+            if (word) flush(char);
+            word = '';
+            tokens.push('d' + input[i + 1]);
+            i += 1;
+            continue;
+        }
         // Letters gather into a run, read as a whole when it ends.
         // atan2, log10: an operator name with digits in it stays whole.
         if (isLetterRun(word) && /[0-9]/.test(char) && isOperatorWord(word + char)) {

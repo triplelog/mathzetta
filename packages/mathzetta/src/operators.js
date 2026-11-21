@@ -42,6 +42,7 @@ const table = {
     'sin': fn(1), 'cos': fn(1), 'tan': fn(1), 'csc': fn(1), 'sec': fn(1), 'cot': fn(1),
     'sinh': fn(1), 'cosh': fn(1), 'tanh': fn(1),
     'arcsin': fn(1), 'arccos': fn(1), 'arctan': fn(1),
+    'arcsec': fn(1), 'arccsc': fn(1), 'arccot': fn(1),   // arccos(1/x), arcsin(1/x), π/2 − arctan x (values 0 to π)
     'arcsinh': fn(1), 'arccosh': fn(1), 'arctanh': fn(1),
 
     // ---- named functions with a fixed number of arguments -------------------
@@ -54,6 +55,8 @@ const table = {
     'perm':  fn(2),     // n k perm        nPk
     'comb':  fn(2),     // n k comb        n choose k
     'der':   fn(2),     // f x der         d/dx f
+    'evaluated': fn(4), // F x a b evaluated   [F]_a^b: F at x = b minus F at x = a
+    'setbuilder': fn(2), // x P setbuilder     {x | P}: the set of x for which P holds (x may be x ∈ S)
 
     // ---- named functions with any number of arguments -----------------------
     'max': fn(VARIADIC), 'min': fn(VARIADIC), 'gcd': fn(VARIADIC), 'mean': fn(VARIADIC),
@@ -97,6 +100,8 @@ const table = {
     '|':      { prec: 18, assoc: 'left', arity: 2, fixity: 'infix' },
     '\\nor':  { prec: 17, assoc: 'left', arity: 2, fixity: 'infix' },
     '\\nand': { prec: 17, assoc: 'left', arity: 2, fixity: 'infix' },
+    '\\implies': { prec: 15, assoc: 'right', arity: 2, fixity: 'infix' },   // p ⇒ q: not p, or q
+    '\\iff':     { prec: 14, assoc: 'left', arity: 2, fixity: 'infix' },    // p ⇔ q: both true or both false
     '?:':     { prec: 10, assoc: 'right', arity: 3, fixity: 'infix' }, // cond a b ?:
 };
 

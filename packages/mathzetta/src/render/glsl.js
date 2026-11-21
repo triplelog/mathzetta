@@ -30,7 +30,7 @@
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, CUSTOM_PREFIX } from '../operators.js';
-import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex, conditionNeedsBrackets } from '../common.js';
+import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -48,6 +48,9 @@ export function toGlsl(node, options = {}) {
     const written = new Map();
     const render = (n) => {
         let text = written.get(n);
+        if (text === undefined && n.type === 'op' && n.op === 'setbuilder') throw new Error(`No GLSL for a set described by a condition (only a test of membership in one)`);
+        const test = text === undefined ? setCondition(n) : null;   // y ∈ {x | P}: P with y for x
+        if (test) written.set(n, text = `(${render(test)})`);
         if (text === undefined) written.set(n, text = guardLength(n.type === 'op' ? operation(n, render, es3, options.filter) : leaf(n)));
         return text;
     };
@@ -62,9 +65,9 @@ const CONSTANTS = {
     '∞': 'MZ_INFINITY', '-∞': '(-MZ_INFINITY)', true: 'true', false: 'false',
 };
 
-/** A number token as a float literal: 2 → 2.0, .5 → 0.5, 1.333.. → 1.333. */
+/** A number token as a float literal: 2 → 2.0, .5 → 0.5, 1.333.. → 1.3333333333333333. */
 function float(text) {
-    let v = text.replace(/\.+$/, '');
+    let v = text.endsWith('..') ? repeatingDecimal(text) : text.replace(/\.+$/, '');
     if (v.startsWith('.')) v = '0' + v;
     if (v.startsWith('-.')) v = '-0' + v.slice(1);
     if (!v.includes('.')) v += '.0';
@@ -77,6 +80,7 @@ function leaf(node) {
     const percent = node.type === 'symbol' && percentDecimal(v);
     if (percent) return float(percent);   // 50% is 0.5
     if (node.type === 'string') throw new Error('No GLSL for text: a shader has numbers and vectors only');   // never spliced into shader source
+    if (v === '⋯') throw new Error(`No GLSL for ⋯: a sum written out with "and so on" has no value to work out (write it with ∑)`);
     if (CONSTANTS[v] !== undefined) return CONSTANTS[v];
     if (v === '\\+' || v === '\\-') return v[1];
     return identifier(v);
@@ -107,7 +111,7 @@ const RECIPROCALS = { csc: 'sin', sec: 'cos', cot: 'tan' };
 const COMPARISONS = { '=': '==', '===': '==', '≠': '!=', '≠=': '!=', '<': '<', '>': '>', '≤': '<=', '≥': '>=' };
 
 /** Operators that come out already wrapped in brackets or as a call, so never need more. */
-const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '?:', 'mean', 'log', '≈', '∈', '∉']);
+const SELF_BRACKETED = new Set(['&', '|', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff', '?:', 'mean', 'log', '≈', '∈', '∉']);
 
 /** The operator that decides brackets, where GLSL writes something differently from the math. */
 function glslBracketOp(node) {
@@ -153,6 +157,8 @@ function operation(node, render, es3, filter = false) {
 
     // det([[1, 2], [3, 4]]): a list of rows is no GLSL matrix; written out as |1 2; 3 4| is
     if (op === 'det' && a && matrixRows(a)) return operation({ ...node, op: 'vmatrix', args: a.args }, render, es3, filter);
+    const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
+    if (inverse) return `(${render(inverse)})`;   // arcsec u: acos(1.0 / u)
     if (BUILTIN[op]) return `${BUILTIN[op]}(${list()})`;
     if (ES3_ONLY[op] && op !== 'round') return `${es3 ? ES3_ONLY[op] : 'mz_' + ES3_ONLY[op]}(${list()})`;
     if (RECIPROCALS[op]) return `1.0 / ${RECIPROCALS[op]}(${render(a)})`;
@@ -235,6 +241,10 @@ function operation(node, render, es3, filter = false) {
             return `(${render(a)} ^^ ${render(b)})`;
         case '\\nand':
             return `!(${render(a)} && ${render(b)})`;
+        case '\\implies':
+            return `(!(${render(a)}) || ${render(b)})`;
+        case '\\iff':
+            return `((${render(a)}) == (${render(b)}))`;
         case '\\nor':
             return `!(${render(a)} || ${render(b)})`;
         case '\\not':
@@ -339,6 +349,7 @@ function membership(node, render) {
         const test = `(${v} ${set.op[0] === '[' ? '>=' : '>'} ${lo} && ${v} ${set.op[1] === ']' ? '<=' : '<'} ${hi})`;
         return negate ? `!${test}` : test;
     }
+    if (set.type === 'op' && set.op === '{}' && !set.args.length) return negate ? 'true' : 'false';   // the empty set
     if (set.type === 'op' && set.op === '{}') {
         const test = `(${set.args.map((item) => `${v} == ${render(item)}`).join(' || ')})`;
         return negate ? `!${test}` : test;

@@ -2,6 +2,85 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
+## Unreleased (after mathzetta 1.2.0, @mathzetta/inlinemath 0.3.0, @mathzetta/cas 0.2.0)
+
+Calculus II notation that was misread or refused (a survey of precalculus through Calculus II inputs).
+
+### mathzetta
+
+- **New operators** (docs/postfix.md): `arcsec`, `arccsc`, `arccot` (values of arccot from 0 to π), and `evaluated`,
+  an evaluation bar: `F x a b evaluated` is F at x = b minus F at x = a. Every output has them; code writes
+  `acos(1/x)`, `asin(1/x)`, `π/2 − atan(x)` and the difference with the limits put in.
+- **Read now:** `\sec^{-1} x`, `\csc^{-1}`, `\cot^{-1}` (1.2 read them as 1/sec x), `arcsec(x)`, `asec(x)`;
+  evaluation bars `\left[F\right]_a^b`, `\left.F\right|_a^b`, `F\Big|_a^b` (any size), `_{x=a}^{x=b}`,
+  `evaluated(F, a, b)`; degrees `30^\circ`, `30^{\circ}`, `\degree`, with a value in `evaluate` and `calculate`
+  (`sin(30°)` is 1/2); `\big`, `\Big`, `\bigg`, `\Bigg`; `\cdots`, `\ldots`, `...` as ⋯ (code refuses it by
+  name); the empty set `\emptyset`, `\varnothing`, `∅`, `\{\}`; `_5C_2`, `{}_nC_r`, `_nP_r`; `f^{(4)}(x)` as
+  f′′′′(x); repeating decimals `0.1\overline{6}`; `(f \circ g)(x)`; `cases` rows with a comma before the
+  condition; a brace of equations as a system (all hold).
+- **Misreads fixed:** a name, a space and a number are two factors (`n 3^n` was a name `n3`).
+- **`calculate` does complex numbers and polynomials.** `i` is the imaginary unit (unless the scope or a ∑ gives
+  it a value): `(3 + 2i)(1 - i)` is `5 - i` (value `{ re: 5, im: -1 }`), `e^{i\pi} + 1 = 0` is true, `|3 + 4i|` is 5;
+  with an i in the input or `{ complex: true }`, `\sqrt{-4}` is `2*i` and `\ln(-1)` is `pi*i` (odd roots of
+  negatives stay real). Unknowns that are only added, multiplied, raised to whole powers or divided exactly stay
+  as a polynomial: `(x+1)^2` is `x^2 + 2*x + 1`, `(x^2-1)/(x-1)` is `x + 1`, a determinant of letters is
+  `a*d - b*c`, `(x+1)^2 = x^2 + 2x + 1` is true. **Behavior change:** `calculate('x + 1')` returns `x + 1`
+  where it threw "no value for 'x'"; anything that needs a value (`sin x`, `x < 3`, `x^2 = 4`) still throws that.
+- **More notation:** differentials `dy = f'(x)\,dx`, `du = 2x\,dx`, `r\,d\theta`, `\mathrm{d}x` as one quantity each
+  (written `\mathrm{d}x`, with a thin space before it); `arcsine(x)`, `sine(x)`, `cotangent x` (`arcsine(x)` was
+  arcsin times e); `x = t^2, y = t^3` (equations side by side: each holds); new operators `\implies` and `\iff`
+  (`\Rightarrow`, `⇒`, `\iff`, `\Leftrightarrow`) and `setbuilder` (`\{x \mid x > 2\}`, `\{x \in \mathbb{R} : P\}`;
+  `y ∈ {x | P}` is P with y for x in every output).
+- **Values:** a repeating decimal keeps its value in every code output (`0.33..` was written `0.33`) and in
+  `evaluate` (it was NaN); `calculate` takes a sample that underflows to 0 as 0 inside limits and integrals
+  (`\lim_{x\to-\infty} e^x` is 0, ∫ e^(−x²) over ℝ is √π; both were "too small to calculate").
+- LaTeX writes `30^{\circ}`, `\cdots` and `0.1\overline{6}`; the GLSL reader reads `radians(x)` and `degrees(x)`.
+
+### @mathzetta/cas
+
+- `arcsec`, `arccsc`, `arccot` and `evaluated` in the operator table; derivative rules and approximations for the
+  three inverses.
+- **Integration:** u-substitution (∫ f(g)·g′: `x e^(x^2)`, `ln(x)/x`, `x/(x^2 + 1)`, `sin x cos x`); partial
+  fractions with an irreducible quadratic, by completing the square (`1/(x^2 + 4)`, `(x + 3)/(x^2 + 2x + 5)`,
+  `1/(x(x^2 + 1))`); odd powers of sin and cos; secⁿ and cscⁿ by reduction; `sec`, `csc`, `cot`, `sec·tan`,
+  `csc·cot` in the table; `e^(ax) sin(bx)` (by parts twice); `sin A cos B` (product to sum); `√(c − kx²)` and
+  `1/√(c − kx²)` (a trig substitution); `arctan x` and `arcsin x` alone by parts. Each new method has a step.
+  `npm run check:sympy` covers the new integrals (142/142 agree).
+- **Inequalities:** `solve` takes `<`, `>`, `≤`, `≥` and chains (`-1 < 2x + 1 < 5`) by a sign chart, with roots,
+  logs, fractions and absolute values; the answer as conditions (`x < -2 or x > 2`) and as `intervals`
+  (`(-∞, -2) ∪ (2, ∞)`), with `pieces` for code. Trig inequalities are left unsolved.
+- `solve('1/x = 0')` says "no solution" (it crashed).
+- **Limits:** `cas.limit(…)`, from a written `\lim_{x \to a} f` (one-sided `a^+`, `a^-`) or `limit(f, 'x', a, { side })`:
+  substitution where continuous; for 0/0, ∞/∞, 0·∞, ∞ − ∞, 1^∞, 0^0 and ∞^0, cancelling, leading terms, dividing by the
+  highest power, the conjugate of a root, one fraction, e^(g·ln f) and L'Hôpital's rule, each a step; ±∞ by the
+  sign on each side; "does not exist" with the reason (sides that differ, swinging); the squeeze theorem for a
+  bounded factor. Every answer is checked against numbers near the point and refused rather than given wrong.
+  28 limits in `npm run check:sympy` (170/170 agree).
+- **Trigonometric identities in `simplify`:** a trig shape (everything in sin and cos, sin² + cos² = 1 used either
+  way or not at all, canceled, the double angles both ways, tan/sec/csc/cot named) kept when shorter:
+  `tan x cos x → sin x`, `sec²x − tan²x → 1`, `sin 2x/(2 sin x) → cos x`, `sin⁴x − cos⁴x → −cos 2x`,
+  `sin x/(1 + cos x) + (1 + cos x)/sin x → 2 csc x`, `cos 2x/(cos x − sin x) → cos x + sin x`; rules for shifts by π/2
+  and π and the cofunctions, the angle sums read backward (`sin x cos y + cos x sin y → sin(x + y)`), exact values at
+  π/12 and π/8, and sin(arccos x) and the other right-triangle compositions (`sin(2 arcsin x) → 2x√(1 − x²)`).
+  `equivalent` proves such identities exactly. 22 identities in `npm run check:sympy` (192/192 agree).
+- **Improper integrals:** an integral to ±∞ takes the antiderivative's limit at that end
+  (`\int_1^{\infty} 1/x^2 dx = 1`, `\int_{-\infty}^{\infty} 1/(1+x^2) dx = π`), and diverges when it is infinite or has none.
+
+### mathzetta (more)
+
+- `\lim_{x \to \pi/2^-}`: the side marker belongs to the whole point (it was read as π/(2^-)).
+- The CAS call words (`simplify`, `expand`, `factor`, `cancel`, `diff`, `integrate`, `solve`, `approx`, `limit`) are
+  read whole next to LaTeX: `\frac{1}{2} + diff(x^3, x)` was d·i·f·f(…).
+
+### @mathzetta/inlinemath
+
+- CAS blocks read calls with LaTeX in them (`{{simplify(\sec^2 x - \tan^2 x)}}`): the call names are kept whole.
+- Scope values reach CAS blocks, except the variable a call works in: with `a = 2`, `{{diff(x^3, x = a)}}` is 12
+  (it was 3a²) and `{{solve(x^2 = a, x)}}` is x = ±√2, while with `x = 2` the x of `{{diff(x^3, x)}}` stays a variable.
+- CAS blocks work out limits (`{{\lim_{x \to 0} \frac{\sin x}{x}}}`, `{{limit(f, x, a)}}`): a number, ∞, or "does not exist".
+- Draws evaluation bars (`[F]` with both limits), the empty set as ∅, a repeating decimal with a bar over its
+  block, and the new inverses (as sec⁻¹ with `inverseTrig: 'power'`).
+
 ## mathzetta 1.2.0, @mathzetta/inlinemath 0.3.0, @mathzetta/cas 0.2.0
 
 ### Changes in behavior

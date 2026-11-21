@@ -55,12 +55,13 @@ export function render(node) {
 const SYMBOLS = {
     '=': '=', '===': '=', '≠': '≠', '≠=': '≠', '<': '&lt;', '>': '&gt;', '≤': '≤', '≥': '≥',   // strict equality is a code distinction: math writes =
     '∈': '∈', '∉': '∉', '→': '→', '±': '±', 'mod': 'mod', '≈': '≈', '∪': '∪', '∩': '∩', '≡': '≡',
-    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓',
+    '&': '∧', '|': '∨', '\\xor': '⊕', '\\nand': '↑', '\\nor': '↓', '\\implies': '⇒', '\\iff': '⇔',
 };
 
 const NAMED = {
     sin: 'sin', cos: 'cos', tan: 'tan', csc: 'csc', sec: 'sec', cot: 'cot',
     sinh: 'sinh', cosh: 'cosh', tanh: 'tanh', arcsin: 'arcsin', arccos: 'arccos', arctan: 'arctan',
+    arcsec: 'arcsec', arccsc: 'arccsc', arccot: 'arccot',
     arcsinh: 'arcsinh', arccosh: 'arccosh', arctanh: 'arctanh', atan2: 'atan2',
     ln: 'ln', max: 'max', min: 'min', gcd: 'gcd', det: 'det', mean: 'mean', round: 'round', fixed: 'fixed', random: 'random',
 };
@@ -162,6 +163,10 @@ function operation(node) {
             if (at) return el('msub', node, row(drawn + '<mo stretchy="true">|</mo>') + row(render(by).replace(/ id="[^"]*"/g, '') + mo('=') + render(at)));
             return variable ? el('mfrac', node, row(d + render(body)) + dx) : el('mrow', node, drawn);
         }
+        case 'setbuilder':   // {x | x > 2}
+            return el('mrow', node, mo('{') + render(args[0]) + mo('|') + render(args[1]) + mo('}'));
+        case 'evaluated':   // [F]_a^b: the brackets, the limits on their right
+            return el('msubsup', node, row(mo('[') + render(args[0]) + mo(']')) + render(args[2]) + render(args[3]));
         // Big operators are drawn display-size, as they would be on their own line.
         case 'int':
             return el('mrow', node, integral(args), DISPLAY);

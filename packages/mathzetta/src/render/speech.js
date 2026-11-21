@@ -55,7 +55,7 @@ const isVector = (node) => node.type === 'op' && isCustomFunction(node.op) && ['
 /** The connecting words. Override any of them with the `words` option. */
 export const WORDS = {
     plus: 'plus', minus: 'minus', times: 'times', over: 'over', negative: 'negative', plusOrMinus: 'plus or minus',
-    quantity: 'the quantity', of: 'of', and: 'and', or: 'or', not: 'not', xor: 'exclusive or', nand: 'nand', nor: 'nor',
+    quantity: 'the quantity', of: 'of', and: 'and', or: 'or', not: 'not', xor: 'exclusive or', nand: 'nand', nor: 'nor', implies: 'implies', iff: 'if and only if',
     squared: 'squared', cubed: 'cubed', toThe: 'to the', toThePowerOf: 'to the power of', power: 'power',
     sub: 'sub', factorial: 'factorial', prime: 'prime', doublePrime: 'double prime', triplePrime: 'triple prime',
     inverse: 'inverse', mod: 'mod', percent: 'percent', degrees: 'degrees',
@@ -70,7 +70,7 @@ export const WORDS = {
     logBase: 'log base', naturalLog: 'the natural log of', choose: 'choose', permute: 'permute',
     derivative: 'the derivative', secondDerivative: 'the second derivative',
     nthDerivative: (n) => `the ${n} derivative`, withRespectTo: 'with respect to', d: 'd',
-    integralOf: 'the integral of', integralFrom: 'the integral from', to: 'to',
+    integralOf: 'the integral of', integralFrom: 'the integral from', to: 'to', evaluatedFrom: 'evaluated from', setOf: 'the set of', suchThat: 'such that',
     limitAs: 'the limit as', fromTheRight: 'from the right', fromTheLeft: 'from the left',
     sumFrom: 'the sum from', sumOver: 'the sum over', sumOf: 'the sum of',
     productFrom: 'the product from', productOver: 'the product over', productOf: 'the product of',
@@ -81,7 +81,7 @@ export const WORDS = {
     rounded: 'rounded to', decimalPlaces: 'decimal places', nearestWholeNumber: 'the nearest whole number',
     writtenTo: 'written to', asWholeNumber: 'written as a whole number',
     reals: 'the real numbers', integers: 'the integers', naturals: 'the natural numbers', rationals: 'the rational numbers',
-    complexes: 'the complex numbers', repeating: 'repeating', eToThe: 'e to the',
+    complexes: 'the complex numbers', repeating: 'repeating', andSoOn: 'dot dot dot', emptySet: 'the empty set', eToThe: 'e to the',
     // where a group ends, said by toAudioSpeech() only (and dropped at the end of the expression)
     endQuantity: 'end quantity', endFraction: 'end fraction', endRoot: 'end root', endExponent: 'end exponent',
     endSub: 'end sub', endAbsoluteValue: 'end absolute value', endFloor: 'end floor', endCeiling: 'end ceiling',
@@ -97,6 +97,7 @@ export const NAMES = {
     sin: 'sine', cos: 'cosine', tan: 'tangent', csc: 'cosecant', sec: 'secant', cot: 'cotangent',
     sinh: 'hyperbolic sine', cosh: 'hyperbolic cosine', tanh: 'hyperbolic tangent',
     arcsin: 'inverse sine', arccos: 'inverse cosine', arctan: 'inverse tangent',
+    arcsec: 'inverse secant', arccsc: 'inverse cosecant', arccot: 'inverse cotangent',
     arcsinh: 'inverse hyperbolic sine', arccosh: 'inverse hyperbolic cosine', arctanh: 'inverse hyperbolic tangent',
     ln: 'the natural log', log: 'log', loglog: 'the log of the log', logloglog: 'the log of the log of the log',
     expm1: 'e to the power, minus 1, of', max: 'the maximum', min: 'the minimum', gcd: 'the greatest common divisor',
@@ -176,7 +177,7 @@ const COMPARISONS = {
     '=': 'equals', '===': 'equals', '≠': 'notEqual', '≠=': 'notEqual', '<': 'lessThan', '>': 'greaterThan',
     '≤': 'lessOrEqual', '≥': 'greaterOrEqual', '≈': 'approx', '≡': 'congruent', '→': 'tendsTo',
     '∈': 'isIn', '∉': 'isNotIn', '∪': 'union', '∩': 'intersect', '±': 'plusOrMinus',
-    '&': 'and', '|': 'or', '\\xor': 'xor', '\\nand': 'nand', '\\nor': 'nor',
+    '&': 'and', '|': 'or', '\\xor': 'xor', '\\nand': 'nand', '\\nor': 'nor', '\\implies': 'implies', '\\iff': 'iff',
 };
 
 const SETS = { 'ℝ': 'reals', 'ℤ': 'integers', 'ℕ': 'naturals', 'ℚ': 'rationals', 'ℂ': 'complexes' };
@@ -219,9 +220,11 @@ class Speaker {
         if (v === '\\+') return w.plus;
         if (v === '\\-') return w.minus;
         if (v === '°') return w.degrees;
+        if (v === '⋯') return w.andSoOn;
         if (SETS[v]) return w[SETS[v]];
         if (GREEK_NAMES[v]) return GREEK_NAMES[v].toLowerCase();
         if (/^Δ.+$/.test(v)) return `${w.delta} ${this.symbol(v.slice(1))}`;
+        if (/^d[A-Za-z\u03B1-\u03C9]$/.test(v)) return `d ${this.symbol(v[1])}`;   // a differential: d x, d theta
         const primes = /′+$/.exec(v);
         if (primes) return `${this.symbol(v.slice(0, -primes[0].length))} ${this.primes(primes[0].length)}`;
         if (v.endsWith('⁻¹')) return `${this.symbol(v.slice(0, -2))} ${w.inverse}`;
@@ -389,7 +392,13 @@ class Speaker {
             case '(]': case '[)':
                 return [me(w.halfOpenInterval), ...this.speak(a), me(w.to), ...this.speak(b)];
             case '{}':
+                if (!args.length) return [me(w.emptySet)];
                 return [me(w.theSet), ...list()];
+            case 'setbuilder':   // the set of x such that x is greater than 2
+                return [me(w.setOf), ...(args[0].type === 'op' && args[0].op === '∈'   // the set of x in the real numbers such that …
+                    ? [...this.speak(args[0].args[0]), me('in'), ...this.speak(args[0].args[1])] : this.speak(args[0])), me(w.suchThat), ...this.speak(args[1])];
+            case 'evaluated':   // x cubed over 3, evaluated from 0 to 1
+                return [...this.speak(args[0]), me(`${w.comma} ${w.evaluatedFrom}`), ...this.speak(args[2]), me(w.to), ...this.speak(args[3])];
             case 'der':
                 return this.derivative(node);
             case 'int':

@@ -93,7 +93,8 @@ suite('calculate: no answer, or none yet', () => {
         for (const s of ['1/0', 'sqrt(-1)', '0^0', 'ln(0)', '(-1)!', 'tan(pi/2)', 'arcsin(2)']) throws(() => calculate(s), MathError);
     });
     test('what cannot be worked out throws UnknownError', () => {
-        throws(() => calculate('x + 1'), UnknownError);
+        throws(() => calculate('\\sin x'), UnknownError);   // an unset variable where its value is needed
+        eq(calculate('x + 1').text, 'x + 1');                  // (only polynomial arithmetic: the polynomial)
         throws(() => calculate('\\int x^2 dx'), UnknownError);
         throws(() => calculate('der(x^2, x)'), UnknownError);
     });
@@ -260,4 +261,74 @@ suite('calculate: matrices', () => {
         eq(calculateBlock(`${A}^2`), '(bmatrix([7, 10], [15, 22]))');
         eq(parse(calculateBlock(`${A}^2`)).at(-1), 'bmatrix');
     });
+});
+
+suite('calculate: complex numbers', () => {
+    test('i is the imaginary unit: arithmetic, powers, division, exactly', () => {
+        eq(T('(3 + 2i)(1 - i)'), '5 - i');
+        eq(T('i^2'), '-1');
+        eq(T('i^{10}'), '-1');
+        eq(T('(2+i)^3'), '2 + 11*i');
+        eq(T('(1+i)/(1-i)'), 'i');
+        eq(T('1/i'), '-i');
+        eq(calculate('(3 + 2i)(1 - i)').value, { re: 5, im: -1 });
+        eq(calculate('(3 + 2i)(1 - i)').exact, true);
+    });
+    test('modulus, Euler, roots and logs', () => {
+        eq(T('|3 + 4i|'), '5');
+        eq(T('e^{i\\pi} + 1 = 0'), 'true');
+        eq(T('e^{i\\pi/3}'), '1/2 + (sqrt(3)/2)*i');
+        eq(T('\\sqrt{i}'), 'sqrt(2)/2 + (sqrt(2)/2)*i');
+        eq(T('\\sqrt{-4}', {}, { complex: true }), '2*i');
+        eq(T('\\sqrt{-4} = 2i'), 'true', 'an i in the input: complex results');
+        eq(T('\\ln(-1) = i\\pi'), 'true');
+    });
+    test('without i, real as before: √−4 has no real value, and an odd root of a negative is real', () => {
+        throws(() => calculate('\\sqrt{-4}'), MathError);
+        eq(T('\\sqrt[3]{-8}'), '-2');
+        eq(T('\\sqrt[3]{-8} + 0i'), '-2');
+    });
+    test('i with a value, or an index, is that value', () => {
+        eq(T('i + 1', { i: 2 }), '3');
+        eq(T('\\sum_{i=1}^{3} i'), '6');
+    });
+    test('complex numbers have no order, and no real value where one is needed', () => {
+        throws(() => calculate('i < 1'), UnknownError);
+        throws(() => calculate('\\sin(i)'), UnknownError);
+    });
+});
+
+suite('calculate: polynomials', () => {
+    test('unknowns are kept where they are only added, multiplied and raised to whole powers', () => {
+        eq(T('(x+1)^2'), 'x^2 + 2*x + 1');
+        eq(T('(x+1)(x-1)'), 'x^2 - 1');
+        eq(T('(x+y)^3'), 'x^3 + 3*x^2*y + 3*x*y^2 + y^3');
+        eq(T('x + x'), '2*x');
+        eq(T('2x - 3 + x/2'), '5*x/2 - 3');
+        eq(T('3/4 x^2'), '3*x^2/4');
+        eq(T('(\\pi x)^2'), 'pi^2*x^2');
+        eq(T('(x+i)^2'), 'x^2 + (2*i)*x - 1');
+        eq(calculate('(x+1)^2').value, 'x^2 + 2*x + 1');
+    });
+    test('division that is exact; an identity is true', () => {
+        eq(T('(x^2-1)/(x-1)'), 'x + 1');
+        eq(T('(x^3 - 8)/(x - 2)'), 'x^2 + 2*x + 4');
+        throws(() => calculate('(x^2+1)/(x-1)'), UnknownError);   // a remainder: not worked out here
+        eq(T('(x+1)^2 = x^2 + 2x + 1'), 'true');
+        throws(() => calculate('x^2 = 4'), UnknownError);         // an equation has no one answer
+    });
+    test('a determinant of letters', () => eq(T('\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'), 'a*d - b*c'));
+    test('what needs a value still says so; values still win', () => {
+        const message = (f) => { try { f(); } catch (e) { return `${e.constructor.name}: ${e.message}`; } return 'no error'; };
+        eq(message(() => calculate('\\sin x')), "UnknownError: no value for 'x'");
+        eq(message(() => calculate('x^{-1}')), "UnknownError: no value for 'x'");
+        eq(message(() => calculate('\\sum_{k=1}^{n} k')), "UnknownError: no value for 'n'");
+        eq(T('x^2', { x: 3 }), '9');
+        eq(T('(x+1)^2', { x: 2 }), '9');
+    });
+    test('{{…}} blocks', () => {
+        eq(parse('{{(x+1)^2}}').join(' '), 'x 2 ^ 2 x * + 1 +');
+        eq(parse('{{a/b}}').join(' '), 'a b /', 'a fraction of unknowns is left as written');
+    });
+    test('a polynomial too big to write is refused', () => throws(() => calculate('(a+b+c+d+e+f)^40'), UnknownError));
 });

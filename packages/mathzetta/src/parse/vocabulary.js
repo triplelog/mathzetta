@@ -36,7 +36,8 @@ export const PARSE_PRECEDENCE = {
     'pmatrix': FUNCTION, 'bmatrix': FUNCTION, 'vmatrix': FUNCTION, 'det': FUNCTION,
     'sin': FUNCTION, 'cos': FUNCTION, 'tan': FUNCTION, 'csc': FUNCTION, 'sec': FUNCTION, 'cot': FUNCTION,
     'sinh': FUNCTION, 'cosh': FUNCTION, 'tanh': FUNCTION,
-    'arcsin': FUNCTION, 'arccos': FUNCTION, 'arctan': FUNCTION,
+    'evaluated': FUNCTION, 'setbuilder': FUNCTION,
+    'arcsin': FUNCTION, 'arccos': FUNCTION, 'arctan': FUNCTION, 'arcsec': FUNCTION, 'arccsc': FUNCTION, 'arccot': FUNCTION,
     'arcsinh': FUNCTION, 'arccosh': FUNCTION, 'arctanh': FUNCTION, 'atan2': FUNCTION,
     '_': FUNCTION,
 
@@ -57,6 +58,7 @@ export const PARSE_PRECEDENCE = {
     '\\xor': 19,
     '|': 18, '∨': 18,   // ∨ is "or" written so it can't be mistaken for an absolute value bar
     '\\nor': 17, '\\nand': 17,
+    '\\implies': 15, '\\iff': 14,
     '?:': 10,
     '?': 9,
     ',': 5,

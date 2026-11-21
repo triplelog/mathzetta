@@ -97,6 +97,8 @@ export function defineDefaultOperators() {
   // the engine evaluates: `u v der` is d(u)/dv, and rules rewrite it away one
   // step at a time. It never folds. (Integrals and limits likewise.)
   defineOperator({ symbol: 'der', arity: 2, label: 'derivative' });
+  defineOperator({ symbol: 'evaluated', arity: 4, label: 'evaluated from a to b' });   // [F]_a^b
+  defineOperator({ symbol: 'setbuilder', arity: 2, label: 'the set of … such that' });   // {x | P}
   defineOperator({ symbol: 'int', arity: VARIADIC, label: 'integral' });
   defineOperator({ symbol: 'lim', arity: VARIADIC, label: 'limit' });
   defineOperator({ symbol: '\\sumidx', arity: VARIADIC, label: 'sum over an index' });
@@ -111,7 +113,7 @@ export function defineDefaultOperators() {
   // Transcendental results are irrational almost everywhere; never fold them.
   // There is no `exp`: e to a power is `e u ^`, as MathZetta writes it.
   for (const name of ['sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'sinh', 'cosh', 'tanh',
-    'arcsin', 'arccos', 'arctan', 'arcsinh', 'arccosh', 'arctanh', 'ln', 'loglog', 'logloglog', 'expm1']) {
+    'arcsin', 'arccos', 'arctan', 'arcsec', 'arccsc', 'arccot', 'arcsinh', 'arccosh', 'arctanh', 'ln', 'loglog', 'logloglog', 'expm1']) {
     defineOperator({ symbol: name, arity: 1, label: name });
   }
   defineOperator({ symbol: 'log', arity: 2, label: 'log to a base' });
@@ -127,7 +129,7 @@ export function defineDefaultOperators() {
   defineOperator({ symbol: 'det', arity: 1, label: 'determinant' });
   // Comparisons, sets and logic are carried, not evaluated.
   for (const name of ['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '∈', '∉', '∪', '∩', '≈', '≡', '→', 'pmod',
-    '&', '|', '\\xor', '\\nand', '\\nor']) {
+    '&', '|', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff']) {
     defineOperator({ symbol: name, arity: 2, label: name });
   }
   defineOperator({ symbol: '\\not', arity: 1, label: 'not' });

@@ -9,7 +9,7 @@
  *   toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })   // x = 2 or x = 3
  *   stepsHTML(mathCAS().diff('x^2 sin x', 'x', { steps: 'brief' }).steps)
  *
- * Block functions: simplify, expand, factor, cancel, diff(f, x[, n]) (or der, derivative,
+ * Block functions: simplify, expand, factor, cancel, limit(f, x, a) (and \lim_{x \to a} as written), diff(f, x[, n]) (or der, derivative,
  * differentiate), integrate(f, x[, a, b]) (or integral), solve(equation, x), approx(expr[, digits]);
  * d/dx … and ∫ … without limits go to the CAS too. In Markdown, saved variables ($_f := x^3$)
  * stand for their expressions: {{diff(f, x)}}. Everything else is MathZetta's calculator (calculateBlock), as without this.
@@ -19,7 +19,7 @@
 
 import { createCAS, toText as plainText } from '@mathzetta/cas';
 import { parse as parsePostfix } from '@mathzetta/cas/engine';
-import { parse, operator } from './mathzetta.js';
+import { parse, operator, fromPostfix, walk } from './mathzetta.js';
 import { calculateBlock } from './calculator.js';
 // Only this entry needs MathZetta's text writer (so only pages using inlinemath/cas map 'mathzetta/text').
 import { toText } from 'mathzetta/text';
@@ -51,6 +51,37 @@ export function tokensOf(node) {
   return out;
 }
 
+/** The names a call works in: diff(f, x), diff(f, x = a), integrate(f, x …), solve(eq, x), limit(f, x, a); d/dx, ∫ … dx, lim_{x→a}. */
+function boundNames(tokens) {
+  let tree;
+  try { tree = fromPostfix(tokens); } catch { return new Set(); }
+  const name = (n) => (n?.type === 'symbol' ? n.value : n?.type === 'op' && ['=', '→'].includes(n.op) && n.args[0].type === 'symbol' ? n.args[0].value : null);
+  const out = new Set();
+  walk(tree, (n) => {
+    if (n.type !== 'op' || n.args.length < 2) return;
+    const call = n.op.startsWith('\\:') ? n.op.slice(2) : n.op;
+    if (['der', 'int', 'lim', 'diff', 'derivative', 'differentiate', 'integrate', 'integral', 'solve', 'limit'].includes(call) && name(n.args[1])) out.add(name(n.args[1]));
+  });
+  return out;
+}
+
+/** Postfix with the scope's numbers (and number-like text: '1/3') put in for its names, but not for the names a call binds. */
+function withValues(tokens, scope) {
+  if (!scope) return tokens;
+  const values = new Map();
+  for (const [k, v] of Object.entries(scope)) {
+    if (typeof v === 'number' ? !Number.isFinite(v) : typeof v !== 'bigint' && typeof v !== 'string') continue;
+    try { values.set(k, parse(String(v))); } catch { /* not a value: left as the name */ }
+  }
+  if (!values.size) return tokens;
+  const bound = boundNames(tokens);
+  return tokens.flatMap((t) => (values.has(t) && !bound.has(t) ? values.get(t) : [t]));
+}
+
+const CALLS = new Set(['simplify', 'expand', 'factor', 'cancel', 'diff', 'integrate', 'solve', 'approx', 'limit']);
+// other names people write for them
+const ALIASES = { integral: 'integrate', differentiate: 'diff', approximate: 'approx', simp: 'simplify' };
+
 /**
  * A CAS that reads and writes MathZetta text. Options go to @mathzetta/cas's createCAS
  * (rules: your rule files; complex: true for i = √-1); `names` are functions of your
@@ -60,10 +91,11 @@ export function tokensOf(node) {
 export function mathCAS(options = {}) {
   const key = options.rules || options.names ? null : options.complex ? 'complex' : 'default';
   if (key && shared.has(key)) return shared.get(key);
-  const names = [...(options.names ?? []), ...(options.complex ? COMPLEX_NAMES : [])];
+  // the block calls are names too: in LaTeX ({{simplify(\sec^2 x - \tan^2 x)}}) a word is otherwise letters side by side
+  const names = [...(options.names ?? []), ...(options.complex ? COMPLEX_NAMES : []), ...CALLS, ...Object.keys(ALIASES)];
   const cas = createCAS({
     ...options,
-    read: (text) => parse(text, names.length ? { names } : {}),
+    read: (text) => parse(text, { names }),
     // explanations read "3x^2", "sin(3x)"; a block's answer is MathZetta text, so it is read back exactly
     format: plainText,
   });
@@ -71,9 +103,6 @@ export function mathCAS(options = {}) {
   return cas;
 }
 
-const CALLS = new Set(['simplify', 'expand', 'factor', 'cancel', 'diff', 'integrate', 'solve', 'approx']);
-// other names people write for them
-const ALIASES = { integral: 'integrate', differentiate: 'diff', approximate: 'approx', simp: 'simplify' };
 
 /**
  * A `{{…}}` handler: pass it as toHTML(input, { blocks: casBlocks() }).
@@ -93,11 +122,14 @@ export function casBlocks(options = {}) {
     // saved variables ($_f := x^3$ in Markdown) stand for their expressions: {{diff(f, x)}}
     const saved = scope && scope[EXPRESSIONS];
     if (saved) tokens = tokens.flatMap((t) => (Object.hasOwn(saved, t) ? saved[t] : [t]));
+    // values for every name but the one the call works in: with a = 2, {{diff(x^3, x = a)}} is 12 and {{solve(x^2 = a, x)}}
+    // is x = ±√2, while the x of diff(…, x) stays a variable
+    tokens = withValues(tokens, scope);
     const head = tokens[tokens.length - 1];
     const name = head?.startsWith('\\:') ? (ALIASES[head.slice(2)] ?? head.slice(2)) : null;
     const symbolic = name && CALLS.has(name);
-    // d/dx …, ∫ … dx and ∫ from a to b … dx (MathZetta writes the limits as int's 3rd and 4th operands)
-    const calculus = head === 'der' || head === 'int';
+    // d/dx …, ∫ … dx and ∫ from a to b … dx (MathZetta writes the limits as int's 3rd and 4th operands), lim
+    const calculus = head === 'der' || head === 'int' || head === 'lim';
     if (!symbolic && !calculus) return calculateBlock(text, scope);
     const node = cas.node(tokens);
     // the CAS works a derivative at a point out as it reads it (der(f, x = a)): what arrives is the answer's expression
@@ -114,7 +146,7 @@ export function casBlocks(options = {}) {
     };
     let r;
     try {
-      switch (worked ? 'simplify-read' : symbolic ? name : head === 'der' ? 'derivative' : 'antiderivative') {
+      switch (worked ? 'simplify-read' : symbolic ? name : head === 'der' ? 'derivative' : head === 'lim' ? 'lim' : 'antiderivative') {
         case 'simplify-read': r = cas.simplify(node, how); break;
         case 'simplify': r = cas.simplify(args[0], how); break;
         case 'expand': r = cas.expand(args[0], how); break;
@@ -123,6 +155,8 @@ export function casBlocks(options = {}) {
         case 'diff': r = derivative(args[0], args[1], args[2] ? Number(args[2].s) : 1); break;
         case 'integrate': r = cas.integrate(args[0], word(args[1]), { ...how, ...(args[3] ? { from: args[2].s, to: args[3].s } : {}) }); break;
         case 'solve': r = cas.solve(args[0], word(args[1]), how); break;
+        case 'lim': r = cas.limit(node, undefined, undefined, how); break;
+        case 'limit': r = cas.limit(args[0], word(args[1]), args[2] ?? undefined, how); break;
         case 'approx': r = cas.approximate(args[0], { ...how, digits: args[1] ? Number(args[1].s) : 15 }); break;
         case 'derivative': r = derivative(node.args[0], node.args[1], 1); break;
         default: r = cas.integrate(node, undefined, how); break;

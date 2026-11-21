@@ -10,19 +10,19 @@ suite('operator table', () => {
         if (['pmatrix', 'bmatrix', 'vmatrix'].includes(name)) return op(name, [op('[]', [sym('a'), sym('b')]), op('[]', [sym('c'), sym('d')])]);
         const { arity } = operator(name);
         const count = arity === VARIADIC ? 3 : arity;
-        return op(name, ['a', 'b', 'c'].slice(0, count).map(sym));
+        return op(name, ['a', 'b', 'c', 'd'].slice(0, count).map(sym));
     };
 
     const formats = { toLaTeX, toMathML, toJavaScript, toPython, toSQL, toText, toSpeech, toGLSL };
     // What a language has no function for, and can't be written inline: refused with an error naming it,
     // never written as a call to a function that doesn't exist (gcd, det, union are written inline in JavaScript).
     const REFUSED = {
-        toJavaScript: { der: 'a derivative', int: 'an integral', lim: 'a limit' },
-        toPython: { der: 'a derivative', lim: 'a limit' },
+        toJavaScript: { der: 'a derivative', int: 'an integral', lim: 'a limit', setbuilder: 'a set described by a condition' },
+        toPython: { der: 'a derivative', lim: 'a limit', setbuilder: 'a set described by a condition' },
         toSQL: { der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
-            '∪': 'a union of sets', '∩': 'an intersection of sets', vmatrix: 'a determinant', det: 'a determinant' },
+            '∪': 'a union of sets', '∩': 'an intersection of sets', vmatrix: 'a determinant', det: 'a determinant', setbuilder: 'a set described by a condition' },
         toGLSL: { der: 'a derivative', int: 'an integral', lim: 'a limit', '\\sumidx': 'a sum to n', '\\prodidx': 'a product to n',
-            '∪': 'a union of sets', '∩': 'an intersection of sets', '∈': '∈ b', '∉': '∈ b' },
+            '∪': 'a union of sets', '∩': 'an intersection of sets', '∈': '∈ b', '∉': '∈ b', setbuilder: 'a set described by a condition' },
     };
     for (const name of operatorNames()) {
         for (const [format, render] of Object.entries(formats)) {
@@ -38,7 +38,7 @@ suite('operator table', () => {
     // SQLite has no function for these; the sqlite dialect throws rather than
     // writing SQL that fails later. Everything else must render.
     const SQLITE_UNSUPPORTED = new Set(['!', 'gcd', 'perm', 'comb', 'der', 'int', 'lim',
-        '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '_', '→', 'pmatrix', 'bmatrix', 'vmatrix', 'det']);
+        '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '_', '→', 'pmatrix', 'bmatrix', 'vmatrix', 'det', 'setbuilder']);
     for (const name of operatorNames()) {
         test(`${name} renders with toSQL sqlite`, () => {
             const node = sample(name);
@@ -56,7 +56,7 @@ suite('operator table', () => {
     }
 
     // Spreadsheets have no symbolic math, ±, sets to combine, or an index into a list: toExcel says so.
-    const EXCEL_UNSUPPORTED = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '→',
+    const EXCEL_UNSUPPORTED = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', '±', 'pm', '∪', '∩', '→', 'setbuilder',
         'pmatrix', 'bmatrix', 'vmatrix']);   // matrices: of numbers only (the sample's entries are letters)
     for (const name of operatorNames()) {
         test(`${name} renders with toExcel`, () => {

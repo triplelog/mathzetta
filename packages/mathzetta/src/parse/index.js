@@ -10,7 +10,7 @@
  */
 
 import { clean as cleanText } from './clean/index.js';
-import { casesToTernary } from './clean/latex.js';
+import { casesToTernary, evaluationBarsLatex, setBuilder } from './clean/latex.js';
 import { isOperatorWord, WRITTEN_TIMES } from './vocabulary.js';
 import { restoreStrings, swapInStrings } from './clean/strings.js';
 import { tokenize, PROTECTED } from './tokenize.js';
@@ -70,7 +70,30 @@ const isFunctionWord = (name) => /^[a-z][a-z0-9]*$/.test(name) && isOperatorWord
 function beforeProtecting(text) {
     if (!text.includes('\\')) return text;
     text = casesToTernary(text);
+    text = latexNotation(text);
     return text.replace(/\{\}\^\{([^{}]*)\}\s*\\mathrm\{P\}\s*_\{([^{}]*)\}/g, '\\perm($1,$2)');
+}
+
+/**
+ * Notation that is only a way of writing something MathZetta already has (and evaluation bars, [F]_a^b):
+ *   \big( \Bigg] \bigl| …     the delimiter alone (a size is how it is drawn, not what it means)
+ *   30^\circ, 30^{\circ}, \degree    30°
+ *   \cdots \ldots \dots \dotsb       ⋯, the "and so on" of a written-out sum
+ *   0.1\overline{6}             0.166.. (MathZetta's repeating decimal: the block, written twice)
+ *   \emptyset, \varnothing      \{\}, the empty set
+ *   (f \circ g)(x)              f(g(x))
+ */
+function latexNotation(text) {
+    text = evaluationBarsLatex(text);   // first: a size can be part of the bar (F \Big|_0^1)
+    text = setBuilder(text);
+    text = text.replace(/\\(?:[Bb]igg?)[lrm]?(?![A-Za-z])\s*/g, '');
+    text = text.replace(/\^\s*(?:\\circ\b|\{\s*\\circ\s*\})|\\degree\b|\\textdegree\b/g, '°');
+    text = text.replace(/\\(?:cdots|ldots|dotsb|dotsc|dots)(?![A-Za-z])/g, '⋯');
+    text = text.replace(/(\d*)\.(\d*)\\overline\s*\{\s*(\d+)\s*\}/g, (_, whole, prefix, block) => `${whole || '0'}.${prefix}${block}${block}..`);
+    text = text.replace(/\\(?:emptyset|varnothing)(?![A-Za-z])/g, '\\{\\}');
+    // (f \circ g)(x): f of g of x, as far as the brackets go
+    text = text.replace(/\(\s*([A-Za-z])\s*\\circ\s*([A-Za-z])\s*\)\s*\(([^()]*)\)/g, '$1($2($3))');
+    return text;
 }
 
 /** LaTeX input (anything with a \command) reads letters side by side as a product; see words.js. */

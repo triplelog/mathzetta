@@ -16,15 +16,26 @@ const cas = createCAS({ read: (t) => parse(t) });
 const complexCas = createCAS({ complex: true, read: (t) => parse(t, { names: ['Re', 'Im', 'conj', 'arg'] }) });
 
 const CASES = {
-  simplify: ['2x + 3x', 'sqrt(72)', 'sin(pi/6) + cos(pi/3)', 'sin(7pi/6)', 'tan(5pi/4)', 'sin(x)^2 + cos(x)^2 + 1', 'ln(e^(2x))', '(x^2 - 1)/(x - 1)',
+  simplify: ['tan(x) cos(x)', 'sec(x)^2 - tan(x)^2', '1 + tan(x)^2', '2 sin(x) cos(x)', 'cos(x)^2 - sin(x)^2', 'sin(2x)/(2 sin(x))', 'sin(x)^2/(1 - cos(x))',
+    'sin(x)/(1 + cos(x)) + (1 + cos(x))/sin(x)', 'sin(x)^4 - cos(x)^4', 'cos(2x)/(cos(x) - sin(x))', 'sin(x + pi/2)', 'cos(pi - x)', 'tan(x + pi)', 'sin(pi/12)', 'cos(5pi/12)',
+    'cos(pi/8)', 'sin(arccos(x))', 'sin(arctan(x))', 'sin(2 arcsin(x))', 'cos(2 arctan(x))', 'sin(x) cos(y) + cos(x) sin(y)', 'sin(2x) cos(x) + cos(2x) sin(x)',
+    '2x + 3x', 'sqrt(72)', 'sin(pi/6) + cos(pi/3)', 'sin(7pi/6)', 'tan(5pi/4)', 'sin(x)^2 + cos(x)^2 + 1', 'ln(e^(2x))', '(x^2 - 1)/(x - 1)',
     '(x + 1)^2 - x^2', 'log_2(8) + log_8(4)', 'sqrt(2) sqrt(6)', '1/3 + 1/6 - 0.25', 'e^x e^(2x)', 'arcsin(1/2) + arccos(1/2)', '(x^3 - 8)/(x - 2)', '2^(1/2) * 2^(2/3)'],
   expand: ['(x + 1)^3', '(x - y)(x + y)', '(2x - 3)^4', '(a + b + c)^2', '(x + 1)(x^2 - x + 1)'],
   factor: ['x^2 - 5x + 6', 'x^3 - x', '6x^2 + 9x', 'x^4 - 16', '2x^2 - x - 1', 'x^3 + 27', '4x^2 - 9y^2', 'x^3 - 6x^2 + 11x - 6'],
   cancel: ['(x^2 - 1)/(2x - 2)', '1/x + 1/y', '(x^2 + 2x + 1)/(x^2 - 1)', 'x/(x^2 + x)'],
   diff: ['x^3', 'x^2 sin(x)', 'e^(2x) cos(3x)', 'ln(x^2 + 1)', 'sqrt(x)', '(x + 1)/(x - 1)', 'sin(x)^2', 'arctan(2x)', 'x^x', 'tan(x)',
     'sec(x)', '\\sqrt[3]{x}', 'log_2(x)', 'arcsin(x)', 'cosh(x^2)', 'e^(-x^2/2)', 'x/(x^2 + 1)', 'ln(sin(x))', '|x|', '2^x'],
-  integrate: ['x^2', '3x^2 + 2x + 1', '1/x', 'cos(3x + 1)', 'e^(2x)', 'x e^x', 'x^2 e^x', 'x sin(x)', 'ln(x)', 'x ln(x)', '1/(x^2 + 1)', 'sqrt(x)', 'tan(x)',
+  integrate: ['x e^(x^2)', 'ln(x)/x', 'x/(x^2 + 1)', 'sin(x) cos(x)', 'x^2 cos(x^3)', 'cos(x)^3', 'sin(x)^5', 'sec(x)', 'csc(x)', 'sec(x)^3',
+    'e^x sin(x)', 'e^(2x) cos(3x)', 'sin(3x) cos(2x)', 'sqrt(4 - x^2)', '1/sqrt(4 - x^2)', '1/(x^2 + 4)', '(x + 3)/(x^2 + 2x + 5)',
+    '1/(x (x^2 + 1))', '1/(3x^2 + 2)', 'arctan(x)', 'arcsin(x)',
+    'x^2', '3x^2 + 2x + 1', '1/x', 'cos(3x + 1)', 'e^(2x)', 'x e^x', 'x^2 e^x', 'x sin(x)', 'ln(x)', 'x ln(x)', '1/(x^2 + 1)', 'sqrt(x)', 'tan(x)',
     '1/(x^2 - 1)', 'x^2/(x^2 + 1)', '(x^3 + 1)/(x - 1)', 'x arctan(x)', '(2x + 1)^5', '1/(2x + 1)', 'sin(x)^2 + cos(x)^2', 'x cos(2x)', '5^x', '1/sqrt(1 - x^2)', 'sinh(x)'],
+  // f @ point, with + or - for one side; ∞ as oo
+  limit: ['sin(x)/x @ 0', '(x^2 - 1)/(x - 1) @ 1', '(1 + 1/x)^x @ oo', '(1 - cos(x))/x^2 @ 0', '(3x^2 + 1)/(2x^2 - x) @ oo', 'x^3/(x^2 + 1) @ -oo',
+    '1/x @ 0', '1/x @ 0 +', '1/x @ 0 -', 'x e^(-x) @ oo', 'e^x/x^2 @ oo', 'x ln(x) @ 0 +', 'x^x @ 0 +', 'ln(x)/x @ oo', 'sqrt(x^2 + x) - x @ oo',
+    '(e^x - 1)/x @ 0', 'arctan(x) @ oo', 'tan(3x)/x @ 0', 'sin(5x)/sin(2x) @ 0', '(sqrt(x + 1) - 2)/(x - 3) @ 3', '1/x - 1/sin(x) @ 0',
+    '(1 + 2/x)^(3x) @ oo', '|x|/x @ 0', 'x sin(1/x) @ 0', '(2x + sin(x))/x @ oo', 'x^2/(1 - cos(x)) @ 0', '(x - 4)/(sqrt(x) - 2) @ 4', 'tan(x) @ pi/2 -'],
   solve: ['2x + 3 = 7', 'x^2 = 4', 'x^2 - 5x + 6 = 0', 'x^2 + x - 1 = 0', 'x^2 + 1 = 0', 'x^3 - 6x^2 + 11x - 6 = 0', 'e^x = 5', 'ln(x) = 2', 'sqrt(x + 1) = x - 1',
     '|x - 1| = 3', '2^x = 8', '1/x = 4', '3/(x - 1) = 2', 'x ln(x) = 0', 'e^(2x) - 3e^x + 2 = 0', 'x^4 - 5x^2 + 4 = 0', 'sqrt(2x + 3) = x', 'x^3 = -8', '(x - 1)/(x + 2) = 0'],
 };
@@ -48,16 +59,31 @@ for (const { op, inputs, cas, complex } of runs) {
   const read = (text) => (complex ? parse(text, { names: ['Re', 'Im', 'conj', 'arg'] }) : parse(text));
   for (const input of inputs) {
     let ours;
+    let at = null;
+    if (op === 'limit') {
+      const [, f, to, side] = /^(.*) @ (\S+)(?: ([+-]))?$/.exec(input);
+      at = { f, to: to === 'oo' ? '\\infty' : to === '-oo' ? '-\\infty' : to, side, py: to, dir: side ?? '+-' };
+    }
     try {
-      ours = op === 'solve' ? cas.solve(input, 'x', { steps: false }) : op === 'diff' || op === 'integrate' ? cas[op](input, 'x', { steps: false }) : cas[op](input, { steps: false });
+      ours = op === 'limit' ? cas.limit(at.f, 'x', at.to, { steps: false, side: at.side === '+' ? 'right' : at.side === '-' ? 'left' : undefined }) : op === 'solve' ? cas.solve(input, 'x', { steps: false }) : op === 'diff' || op === 'integrate' ? cas[op](input, 'x', { steps: false }) : cas[op](input, { steps: false });
     } catch (error) {
       labels.push(`${op} ${input}: the CAS failed: ${error.message}`);
       lines.push('out.append("skip")');
       continue;
     }
     labels.push(`${complex ? 'complex ' : ''}${op} ${input} → ${ours.text}`);
-    const f = py(read(input.split('=')[0]));
+    const f = py(read((at ? at.f : input).split('=')[0]));
     let check;
+    if (op === 'limit') {
+      const A = at.py === 'oo' ? 'sympy.oo' : at.py === '-oo' ? '-sympy.oo' : py(read(at.py));
+      const them = `sympy.limit(${f}, x, ${A}${at.py.endsWith('oo') ? '' : `, "${at.dir}"`})`;
+      check = ours.exists
+        ? `(lambda T, O: T == O or sympy.simplify(T - O) == 0)(${them}, ${py(ours.result.s)})`   // == for ±∞ (∞ − ∞ is nan)
+        // "does not exist": SymPy's sides differ, or it gives only bounds
+        : `(lambda L, R: L != R or isinstance(L, sympy.AccumBounds))(sympy.limit(${f}, x, ${A}, "-"), sympy.limit(${f}, x, ${A}, "+"))`;
+      lines.push(`try:\n    out.append("ok" if ${check} else "differs")\nexcept Exception as e:\n    out.append("error: " + str(e).splitlines()[0])`);
+      continue;
+    }
     if (op === 'solve') {
       const [l, r] = input.split('=').map((s) => py(read(s)));
       const mine = `sympy.FiniteSet(${ours.solutions.map((s) => py(s.s)).join(', ')})`;

@@ -347,7 +347,7 @@ const SYMPY_CALLS = {
     csc: 'csc', sec: 'sec', cot: 'cot', log: 'log', Abs: 'abs', floor: 'floor', ceiling: 'ceil', Max: 'max', Min: 'min',
     factorial: 'factorial', binomial: 'comb', ff: 'perm', gcd: 'gcd', gcd_list: 'sympy_list_gcd', Mod: 'mod', root: 'sympy_root', real_root: 'sympy_root', det: 'det',
     Rational: 'sympy_rational', Integer: 'sympy_value', Float: 'sympy_value', Eq: 'sympy_eq', Ne: 'sympy_ne',
-    And: 'sympy_and', Or: 'sympy_or', Not: 'sympy_not', Xor: 'sympy_xor', Nand: 'sympy_nand', Nor: 'sympy_nor',
+    And: 'sympy_and', Or: 'sympy_or', Not: 'sympy_not', Xor: 'sympy_xor', Nand: 'sympy_nand', Nor: 'sympy_nor', Implies: 'sympy_implies', Equivalent: 'sympy_iff',
     Piecewise: 'sympy_piecewise', FiniteSet: 'sympy_set', Interval: 'sympy_interval', Contains: 'sympy_contains',
     Union: 'union', Intersection: 'intersection', diff: 'derivative', integrate: 'sympy_integrate', limit: 'sympy_limit',
     summation: 'sympy_summation', product: 'sympy_product', expm1: 'expm1',
@@ -391,6 +391,8 @@ const CALLS = {
     cube: (a) => a.length === 1 && `((${a[0]})^3)`,
     fract: (a) => a.length === 1 && `((${a[0]}) - floor(${a[0]}))`,
     inversesqrt: (a) => a.length === 1 && `(1/sqrt(${a[0]}))`,   // GLSL
+    radians: (a) => a.length === 1 && `((${a[0]})°)`,             // GLSL: what toGLSL writes for 30°
+    degrees: (a) => a.length === 1 && `((${a[0]})/°)`,
     mod: (a) => a.length === 2 && `((${a[0]}) \\mod (${a[1]}))`,
     atan: (a) => a.length === 2 && `atan2(${a[0]}, ${a[1]})`,
     exp2: (a) => a.length === 1 && `((2)^(${a[0]}))`,
@@ -409,6 +411,8 @@ const CALLS = {
     sympy_not: (a) => a.length === 1 && `(!(${a[0]}))`,
     sympy_xor: (a) => a.length === 2 && `((${a[0]})  \\xor  (${a[1]}))`,
     sympy_nand: (a) => a.length === 2 && `((${a[0]})  \\nand  (${a[1]}))`,
+    sympy_implies: (a) => a.length === 2 && `((${a[0]})  \\implies  (${a[1]}))`,
+    sympy_iff: (a) => a.length === 2 && `((${a[0]})  \\iff  (${a[1]}))`,
     sympy_nor: (a) => a.length === 2 && `((${a[0]})  \\nor  (${a[1]}))`,
     sympy_piecewise: (a) => {
         const pieces = a.map(pieceOf);

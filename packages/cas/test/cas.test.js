@@ -98,6 +98,11 @@ table('cas: derivatives', (x) => text(cas.diff(x, 'x', { steps: false })), [
   ['x^x', 'x^x·(ln(x) + 1)'],
   ['\\sqrt[3]{x}', '1/(3x^(2/3))'],
   ['arctan(2x)', '2/(4x^2 + 1)'],
+  // the inverses of sec, csc and cot (MathZetta 1.2 reads \sec^{-1} x as arcsec x)
+  ['arcsec(x)', '1/(|x|·sqrt(x^2 - 1))'],
+  ['arccsc(x)', '-1/(|x|·sqrt(x^2 - 1))'],
+  ['arccot(x)', '-1/(x^2 + 1)'],
+  ['\\cot^{-1}(x^2)', '-2x/(x^4 + 1)'],
 ]);
 
 table('cas: integrals', (x) => text(cas.integrate(x, 'x', { steps: false })), [
@@ -405,5 +410,250 @@ suite('cas: properties', () => {
         assert(near(valueAt(l, x), valueAt(rhs, x)), `${e}: x = ${cas.format(s)}`);
       }
     }
+  });
+});
+
+// ---- integration methods and inequalities (2026-11-20) -------------------------------------------
+suite('cas: more integration methods', () => {
+  // each antiderivative is checked by differentiating it numerically, at points inside the integrand's domain
+  const checked = (f, points = [0.31, 0.77, 1.21]) => {
+    const F = cas.integrate(f, 'x', { steps: false }).result.s;
+    const original = mz(f).join(' ');
+    const h = 1e-5;
+    for (const x of points) {
+      const slope = (valueAt(F, x + h) - valueAt(F, x - h)) / (2 * h);
+      assert(Math.abs(slope - valueAt(original, x)) < 1e-5 * Math.max(1, Math.abs(slope)), `∫ ${f} = ${cas.integrate(f, 'x').text}: slope ${slope} vs ${valueAt(original, x)} at ${x}`);
+    }
+  };
+  test('u-substitution: ∫ f(g)·g′', () => {
+    for (const f of ['x e^(x^2)', 'ln(x)/x', 'x/(x^2 + 1)', 'sin(x) cos(x)', 'sin(x)^2 cos(x)', 'x^2 cos(x^3)', 'e^(sqrt(x))/sqrt(x)', 'cos(x)/(1 + sin(x))', 'tan(x) sec(x)^2', 'x sqrt(x^2 + 1)']) checked(f);
+    equal(cas.integrate('x e^(x^2)', 'x').text, 'e^x^2/2');
+    equal(cas.integrate('ln(x)/x', 'x').text, 'ln(x)^2/2');
+    const steps = cas.integrate('x e^(x^2)', 'x').steps.map((s) => s.id);
+    assert(steps.includes('integrate.u-substitution') && steps.includes('integrate.back'), steps.join(', '));
+  });
+  test('odd powers of sin and cos, secⁿ and cscⁿ, sec, csc, cot', () => {
+    for (const f of ['cos(x)^3', 'sin(x)^3', 'sin(x)^2 cos(x)^3', 'sin(x)^5', 'sec(x)', 'csc(x)', 'cot(x)', 'sec(x)^3', 'sec(x)^4', 'csc(x)^3', 'sec(x) tan(x)']) checked(f);
+    equal(cas.integrate('sec(x)', 'x').text, 'ln(|sec(x) + tan(x)|)');
+  });
+  test('e^(ax)·sin(bx) by parts twice; products of sines and cosines', () => {
+    for (const f of ['e^x sin(x)', 'e^(2x) cos(3x)', 'sin(3x) cos(2x)', 'cos(3x) cos(x)', 'sin(2x) sin(5x)']) checked(f);
+    equal(cas.integrate('e^x sin(x)', 'x').text, 'e^x·(-cos(x) + sin(x))/2');
+  });
+  test('√(c − kx²) and 1/√(c − kx²): a trig substitution', () => {
+    for (const f of ['sqrt(1 - x^2)', 'sqrt(4 - x^2)', '1/sqrt(4 - x^2)', 'sqrt(9 - 4x^2)']) checked(f, [0.2, 0.5, 0.7]);
+    equal(cas.integrate('1/sqrt(4 - x^2)', 'x').text, 'arcsin(x/2)');
+  });
+  test('fractions with an irreducible quadratic: ln and arctan', () => {
+    for (const f of ['1/(x^2 + 4)', '1/(x^2 + 2x + 5)', '(x + 3)/(x^2 + 2x + 5)', '1/(x (x^2 + 1))', 'x^3/(x^2 + 1)', '(2x^2 + 1)/((x - 1)(x^2 + 1))', '1/(3x^2 + 2)']) checked(f, [0.31, 0.77, 1.71]);
+    equal(cas.integrate('1/(x^2 + 4)', 'x').text, 'arctan(x/2)/2');
+    equal(cas.integrate('x/(x^2 + 1)', 'x').text, 'ln(|x^2 + 1|)/2');
+  });
+  test('arctan x and arcsin x alone, by parts', () => {
+    checked('arctan(x)');
+    checked('arcsin(x)', [0.2, 0.5, 0.7]);
+    equal(cas.integrate('arctan(x)', 'x').text, 'x·arctan(x) - ln(|x^2 + 1|)/2');
+  });
+  test('what has no elementary antiderivative is refused quickly', () => {
+    for (const f of ['e^(x^2)', 'sin(x)/x', 'x^x', 'sqrt(1 + x^3)', 'sin(x^2)', '1/(x^5 + x + 1)']) {
+      const start = Date.now();
+      throws(() => cas.integrate(f, 'x'));
+      assert(Date.now() - start < 500, `${f} took ${Date.now() - start} ms`);
+    }
+  });
+  test('the methods already there give the same answers', () => {
+    equal(cas.integrate('(2x + 3)/(x^2 + 3x + 2)', 'x').text, 'ln(|x + 1|) + ln(|x + 2|)');
+    equal(cas.integrate('x^2 e^x', 'x').text, 'x^2·e^x - 2x·e^x + 2e^x');
+    equal(cas.integrate('1/(x^2 - 1)', 'x').text, '-ln(|x + 1|)/2 + ln(|x - 1|)/2');
+  });
+});
+
+suite('cas: inequalities', () => {
+  const both = (s) => { const r = cas.solve(s); return `${r.text} | ${r.intervals}`; };
+  test('polynomials, absolute values, fractions', () => {
+    equal(both('x^2 - 4 > 0'), 'x < -2 or x > 2 | (-∞, -2) ∪ (2, ∞)');
+    equal(both('x^2 - 4 <= 0'), '-2 ≤ x ≤ 2 | [-2, 2]');
+    equal(both('|2x + 1| < 5'), '-3 < x < 2 | (-3, 2)');
+    equal(both('|x - 3| >= 2'), 'x ≤ 1 or x ≥ 5 | (-∞, 1] ∪ [5, ∞)');
+    equal(both('(x - 1)/(x + 2) >= 0'), 'x < -2 or x ≥ 1 | (-∞, -2) ∪ [1, ∞)', 'where the bottom is 0: never included');
+    equal(both('1/x > 0'), 'x > 0 | (0, ∞)');
+    equal(both('(x^2 - 9)/x <= 0'), 'x ≤ -3 or 0 < x ≤ 3 | (-∞, -3] ∪ (0, 3]');
+    equal(both('x^3 - x >= 0'), '-1 ≤ x ≤ 0 or x ≥ 1 | [-1, 0] ∪ [1, ∞)');
+    equal(both('(x - 1)(x - 2)(x - 3) < 0'), 'x < 1 or 2 < x < 3 | (-∞, 1) ∪ (2, 3)');
+    equal(both('x^2 > 2'), 'x < -sqrt(2) or x > sqrt(2) | (-∞, -sqrt(2)) ∪ (sqrt(2), ∞)');
+  });
+  test('linear, chains, roots, logs and exponentials', () => {
+    equal(both('2x + 3 > 7'), 'x > 2 | (2, ∞)');
+    equal(both('-1 < 2x + 1 < 5'), '-1 < x < 2 | (-1, 2)');
+    equal(both('3 <= 1 - 2x < 7'), '-3 < x ≤ -1 | (-3, -1]');
+    equal(both('sqrt(x - 1) < 2'), '1 ≤ x < 5 | [1, 5)', 'only where the root has a value');
+    equal(both('ln(x) > 1'), 'x > e | (e, ∞)');
+    equal(both('e^x > 2'), 'x > ln(2) | (ln(2), ∞)');
+  });
+  test('always, never, a single point, a touching root', () => {
+    equal(both('x^2 + 1 > 0'), 'true for every x | (-∞, ∞)');
+    equal(both('x^2 + 1 < 0'), 'no solution | ∅');
+    equal(both('x^2 <= 0'), 'x = 0 | {0}');
+    equal(both('(x - 1)^2 > 0'), 'x < 1 or x > 1 | (-∞, 1) ∪ (1, ∞)');
+  });
+  test('trig inequalities are left unsolved; other unknowns are refused', () => {
+    const r = cas.solve('sin(x) > 1/2');
+    equal(r.pieces, null);
+    equal(r.text, 'no exact solution found for x');
+    throws(() => cas.solve('x < y', 'x'));
+  });
+  test('1/x = 0 has no solution (it was a crash)', () => equal(cas.solve('1/x = 0').text, 'no solution'));
+  test('the sign chart is a step', () => {
+    const steps = cas.solve('|2x + 1| < 5').steps.map((s) => s.id);
+    assert(steps.includes('solve.sign-chart'), steps.join(', '));
+  });
+});
+
+suite('cas: limits', () => {
+  const L = (s, ...rest) => cas.limit(s, ...rest).text;
+  test('continuous: put the point in', () => {
+    equal(L('\\lim_{x \\to 2} x^2 + 1'), '5');
+    equal(L('\\lim_{x \\to 0} \\frac{\\arctan x}{x}'), '1');
+  });
+  test('0/0: cancel, or L\'Hôpital', () => {
+    equal(L('\\lim_{x \\to 1} \\frac{x^2-1}{x-1}'), '2');
+    equal(L('\\lim_{h \\to 0} \\frac{(2+h)^2 - 4}{h}'), '4');
+    equal(L('\\lim_{x \\to 0} \\frac{\\sin x}{x}'), '1');
+    equal(L('\\lim_{x \\to 0} \\frac{1 - \\cos x}{x^2}'), '1/2');
+    equal(L('\\lim_{x \\to 0} \\frac{x^2}{1 - \\cos x}'), '2', 'the decimal value of 0/0 is not taken for 0');
+    equal(L('\\lim_{x \\to 0} \\frac{\\sin 5x}{\\sin 2x}'), '5/2', 'sin 0 / sin 0 is not canceled to 1');
+    equal(L('\\lim_{x \\to 3} \\frac{\\sqrt{x+1} - 2}{x - 3}'), '1/4');
+    equal(L('\\lim_{x \\to 0} \\frac{\\tan 3x}{x}'), '3');
+    const ids = cas.limit('\\lim_{x \\to 0} \\frac{\\sin x}{x}').steps.map((s) => s.id);
+    assert(ids.includes('limit.lhopital'), ids.join(', '));
+  });
+  test('at ±∞: leading terms, highest powers, the conjugate', () => {
+    equal(L('\\lim_{x\\to\\infty} \\frac{3x^2 + 1}{2x^2 - x}'), '3/2');
+    equal(L('\\lim_{x\\to\\infty} \\frac{x^3}{x^2 + 1}'), '∞');
+    equal(L('\\lim_{x\\to -\\infty} \\frac{x^3}{x^2 + 1}'), '-∞');
+    equal(L('\\lim_{x\\to\\infty} \\frac{x}{x^2 + 1}'), '0');
+    equal(L('\\lim_{x\\to\\infty} \\left(\\sqrt{x^2 + x} - x\\right)'), '1/2');
+    equal(L('\\lim_{x\\to\\infty} \\left(x - \\sqrt{x^2 - 3x}\\right)'), '3/2');
+    equal(L('\\lim_{n\\to\\infty} \\frac{n}{n+1}'), '1');
+    equal(L('\\lim_{x\\to\\infty} \\arctan x'), 'π/2');
+  });
+  test('exponentials and logs: 0·∞, ∞/∞, 1^∞, 0^0, ∞^0', () => {
+    equal(L('\\lim_{x\\to\\infty} x e^{-x}'), '0');
+    equal(L('\\lim_{x\\to\\infty} \\frac{e^x}{x^2}'), '∞');
+    equal(L('\\lim_{x \\to 0^+} x \\ln x'), '0');
+    equal(L('\\lim_{x \\to 0^+} x^x'), '1');
+    equal(L('\\lim_{x\\to\\infty} \\frac{\\ln x}{x}'), '0');
+    equal(L('\\lim_{x\\to\\infty} \\left(1 + \\frac{1}{x}\\right)^x'), 'e');
+    equal(L('\\lim_{x\\to\\infty} \\left(1 + \\frac{2}{x}\\right)^{3x}'), 'e^6');
+    equal(L('\\lim_{x\\to\\infty} x^{1/x}'), '1');
+    equal(L('\\lim_{x \\to 0} \\frac{e^x - 1}{x}'), '1');
+    equal(L('\\lim_{x\\to -\\infty} e^x'), '0');
+  });
+  test('∞ − ∞ and the squeeze theorem', () => {
+    equal(L('\\lim_{x \\to 0} \\left(\\frac{1}{x} - \\frac{1}{\\sin x}\\right)'), '0');
+    equal(L('\\lim_{x \\to 1} \\left(\\frac{1}{x-1} - \\frac{2}{x^2-1}\\right)'), '1/2');
+    equal(L('\\lim_{x \\to 0} x \\sin(1/x)'), '0');
+    equal(L('\\lim_{x\\to\\infty} \\frac{2x + \\sin x}{x}'), '2');
+  });
+  test('one-sided limits, infinite limits, and none', () => {
+    equal(L('\\lim_{x \\to 0^+} \\frac{1}{x}'), '∞');
+    equal(L('\\lim_{x \\to 0^-} \\frac{1}{x}'), '-∞');
+    equal(L('\\lim_{x \\to 0} \\frac{1}{x^2}'), '∞');
+    equal(L('\\lim_{x \\to \\pi/2^-} \\tan x'), '∞');
+    equal(L('1/x', 'x', 0, { side: 'right' }), '∞');
+    const none = cas.limit('\\lim_{x \\to 0} \\frac{1}{x}');
+    deepEqual([none.exists, none.text, none.reason], [false, 'does not exist', 'from the left it goes to -∞, from the right to ∞']);
+    equal(cas.limit('\\lim_{x \\to 0} \\frac{|x|}{x}').exists, false);
+    equal(cas.limit('\\lim_{x\\to\\infty} \\sin x').exists, false);
+    equal(cas.limit('\\lim_{x \\to 0} \\sin(1/x)').exists, false);
+  });
+  test('a wrong answer is refused, not given: the check against numbers near the point', async () => {
+    const { verify, pointOf } = await import('../src/cas/limit.js');
+    const { sym, exactNum } = await import('../src/expr.js');
+    const check = (f, to, claim, side = 0) => { try { verify(cas.node(f), 'x', pointOf(to), side, claim); return 'accepted'; } catch { return 'refused'; } };
+    equal(check('-1/ln(x)', sym('∞'), { fin: cas.node('0') }), 'accepted', 'slow, but closing in');
+    equal(check('1 + 9/x', sym('∞'), { fin: cas.node('0') }), 'refused');
+    equal(check('100/x + 1', sym('∞'), { fin: cas.node('0') }), 'refused');
+    equal(check('sin(x)/x', exactNum('0'), { fin: cas.node('2') }), 'refused');
+    equal(check('1/x', exactNum('0'), { inf: -1 }, 1), 'refused');
+  });
+  test('improper integrals', () => {
+    equal(cas.integrate('\\int_1^{\\infty} \\frac{1}{x^2} dx').text, '1');
+    equal(cas.integrate('\\int_0^{\\infty} e^{-x} dx').text, '1');
+    equal(cas.integrate('\\int_0^{\\infty} x e^{-x} dx').text, '1');
+    equal(cas.integrate('\\int_{-\\infty}^{\\infty} \\frac{1}{1+x^2} dx').text, 'π');
+    equal(cas.integrate('\\int_2^{\\infty} \\frac{1}{x \\ln(x)^2} dx').text, '1/ln(2)');
+    throws(() => cas.integrate('\\int_1^{\\infty} \\frac{1}{x} dx'));   // diverges
+    throws(() => cas.integrate('\\int_0^{\\infty} \\sin x \\, dx'));   // no limit
+    equal(cas.integrate('\\int_0^1 \\ln x \\, dx').text, '-1');
+  });
+});
+
+table('cas: trigonometric identities', (x) => text(cas.simplify(x, { steps: false })), [
+  ['tan(x) cos(x)', 'sin(x)'],
+  ['cot(x) sin(x)', 'cos(x)'],
+  ['sec(x) cos(x)', '1'],
+  ['tan(x)/sin(x)', 'sec(x)'],
+  ['sec(x)/csc(x)', 'tan(x)'],
+  ['1/sec(x)', 'cos(x)'],
+  ['sec(x)^2 - tan(x)^2', '1'],
+  ['1 + tan(x)^2', 'sec(x)^2'],
+  ['csc(x)^2 - cot(x)^2', '1'],
+  ['1 + cot(x)^2', 'csc(x)^2'],
+  ['2 sin(x) cos(x)', 'sin(2x)'],
+  ['cos(x)^2 - sin(x)^2', 'cos(2x)'],
+  ['2 cos(x)^2 - 1', 'cos(2x)'],
+  ['1 - 2 sin(x)^2', 'cos(2x)'],
+  ['sin(2x)/(2 sin(x))', 'cos(x)'],
+  ['sin(x)^2/(1 - cos(x))', 'cos(x) + 1'],
+  ['(sin(x) + cos(x))^2', 'sin(2x) + 1'],
+  ['sin(x)^4 - cos(x)^4', '-cos(2x)'],
+  ['cos(x)^4 - sin(x)^4', 'cos(2x)'],
+  ['sin(x)/(1 + cos(x)) + (1 + cos(x))/sin(x)', '2csc(x)'],
+  ['cos(x)/(1 - sin(x)) - cos(x)/(1 + sin(x))', '2tan(x)'],
+  ['(1 - cos(2x))/sin(x)', '2sin(x)'],
+  ['cos(2x)/(cos(x) - sin(x))', 'cos(x) + sin(x)'],
+  ['sin(x + pi/2)', 'cos(x)'],
+  ['cos(x - pi/2)', 'sin(x)'],
+  ['sin(pi - x)', 'sin(x)'],
+  ['cos(pi + x)', '-cos(x)'],
+  ['tan(x + pi)', 'tan(x)'],
+  ['sin(pi/2 - x)', 'cos(x)'],
+  ['tan(pi/2 - x)', 'cot(x)'],
+  ['sin(pi/12)', '-sqrt(2)/4 + sqrt(6)/4'],
+  ['sin(7pi/12)', 'sqrt(2)/4 + sqrt(6)/4'],
+  ['tan(pi/12)', '-sqrt(3) + 2'],
+  ['cos(pi/8)', 'sqrt(sqrt(2) + 2)/2'],
+  ['sin(arccos(x))', 'sqrt(-x^2 + 1)'],
+  ['tan(arcsin(x))', 'x/sqrt(-x^2 + 1)'],
+  ['cos(arctan(x))', '1/sqrt(x^2 + 1)'],
+  ['sin(2 arcsin(x))', '2x·sqrt(-x^2 + 1)'],
+  ['cos(2 arctan(x))', '(-x^2 + 1)/(x^2 + 1)'],
+  ['sin(x) cos(y) + cos(x) sin(y)', 'sin(x + y)'],
+  ['sin(x) cos(y) - cos(x) sin(y)', 'sin(x - y)'],
+  ['cos(x) cos(y) - sin(x) sin(y)', 'cos(x + y)'],
+  ['sin(2x) cos(x) + cos(2x) sin(x)', 'sin(3x)'],
+  // left as they are: nothing shorter
+  ['sin(x) cos(x)', 'cos(x)·sin(x)'],
+  ['tan(x)', 'tan(x)'],
+  ['sin(x)^2', 'sin(x)^2'],
+]);
+
+suite('cas: trig identities hold', () => {
+  test('every simplified form has its input\'s value', () => {
+    for (const f of ['tan(x) + cot(x)', 'sin(x)^2 cos(x)^2', 'sin(x)^3 + sin(x) cos(x)^2', 'sin(x)/csc(x) + cos(x)/sec(x)', '(sec(x) - cos(x))/tan(x)', 'cos(3x)', 'sin(x + y) - sin(x - y)']) {
+      const back = cas.simplify(f, { steps: false }).result.s;
+      const original = mz(f).join(' ');
+      for (const x of POINTS) assert(near(valueAt(back, x), valueAt(original, x)), `${f} → ${cas.simplify(f).text} at ${x}`);
+    }
+  });
+  test('identities are proved exactly', () => {
+    for (const [a, b] of [['sec(x)^2 - tan(x)^2', '1'], ['tan(x) + cot(x)', 'sec(x) csc(x)'], ['sin(x)^2/(1 - cos(x))', '1 + cos(x)'], ['cos(x)^4 - sin(x)^4', 'cos(2x)']]) {
+      deepEqual(cas.equivalent(a, b), { equal: true, how: 'exact' }, `${a} = ${b}`);
+    }
+  });
+  test('the trig shape is a step', () => {
+    const ids = cas.simplify('sec(x)^2 - tan(x)^2').steps.map((s) => s.id);
+    assert(ids.includes('simplify.trig'), ids.join(', '));
   });
 });

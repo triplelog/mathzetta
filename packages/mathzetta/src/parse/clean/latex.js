@@ -32,6 +32,10 @@ const CLOSE = ')}]';
 /** Phase run before whitespace is removed. */
 export function spacedRewrites(input) {
     input = bareRoots(mixedNumbers(unicodeScripts(input)));
+    input = chooseNotation(nthDerivatives(spelledFunctions(input)));
+    input = differentials(input);
+    if (!/\\/.test(input)) input = setBuilder(input);   // plain text: {x : x > 2} (LaTeX's is read before names are protected)
+    input = input.replace(/(?<![.\w=])\.\.\.(?![.\w=])/g, '⋯').replace(/∅/g, '\\{\\}');   // 1 + 2 + ... + n: three dots on their own; ∅ the empty set
     input = ifThenElse(input);
     // a ≡ b (mod n): the congruence form, applying to the whole statement
     input = input.replace(/\(\s*\\?b?mod\s+([^()\s](?:[^()]*[^()\s])?)\s*\)/g, ' \\pmod{$1}');   // the body starts and ends on a non-space: no backtracking over a run of spaces
@@ -108,7 +112,222 @@ export function compactRewrites(input) {
     return input.replace(/\\log/g, 'log');
 }
 
+// ---- differentials: dy = f'(x)\,dx --------------------------------------------------
+
+/** The differential's mark until the tokenizer reads it: ⅆx is one name, dx (as Δx is). */
+export const DIFFERENTIAL = 'ⅆ';
+const GREEK_WORDS = 'alpha|beta|gamma|delta|epsilon|varepsilon|zeta|eta|theta|vartheta|iota|kappa|lambda|mu|nu|xi|rho|sigma|tau|upsilon|phi|varphi|chi|psi|omega';
+const DIFFERENTIAL_AT = new RegExp(String.raw`(\\(?:mathrm|operatorname|text)\{d\}\s*|d)([A-Za-zα-ω](?![A-Za-z0-9])|\\(?:${GREEK_WORDS})(?![A-Za-z]))`, 'g');
+
+/**
+ * A d before one letter (or a Greek one) that stands on its own is a differential, one quantity: dy = f'(x)\,dx,
+ * du = 2x\,dx, ds = \sqrt{dx^2 + dy^2}, dA = 2\pi r\,dr. Only where it is clearly one: written \mathrm{d}x,
+ * after a thin space (\,dx), or with another differential beside it; and not where an integral or a derivative
+ * is written, whose readers take their own d (∫ x dx, \frac{dy}{dx}, d/dx). Elsewhere d x is still d times x.
+ */
+function differentials(input) {
+    if (/\\[io]*int|∫|(?<![A-Za-z])int\(|\\partial|∂|(?<![A-Za-z])d\s*\/\s*d|frac\s*\{\s*(?:\\mathrm\s*\{\s*d\s*\}|\\operatorname\s*\{\s*d\s*\}|d)/.test(input)) return input;
+    const found = [];
+    for (const m of input.matchAll(DIFFERENTIAL_AT)) {
+        const before = input.slice(0, m.index);
+        const after = input.slice(m.index + m[0].length);
+        const written = m[1] !== 'd';   // \mathrm{d}: a differential wherever it stands (r\mathrm{d}r)
+        if (!written && (/[A-Za-z0-9\\^_/]$|frac\s*\{$/.test(before) || /^\s*[/}]/.test(after) && !/\{\s*$/.test(before))) continue;
+        const strong = written || /\\[,;:! ]\s*$/.test(before);
+        found.push({ m, strong });
+    }
+    const marked = found.length >= 2 ? found : found.filter((f) => f.strong);
+    for (const { m } of marked.reverse()) {
+        input = input.slice(0, m.index) + DIFFERENTIAL + m[2] + input.slice(m.index + m[0].length);
+    }
+    return input;
+}
+
+// ---- set-builder notation: {x | x > 2} ------------------------------------------------------------
+
+/**
+ * \{x \mid x > 2\}, \{x : x > 2\}, \left\{ x \in \mathbb{R} \middle| x^2 < 4 \right\}, and in plain text {x : x > 2}:
+ * setbuilder(x, x > 2). The divider is the first \mid, \middle| or : (or, in LaTeX, |) where no bracket is open.
+ */
+export function setBuilder(text) {
+    const OPENERS = [String.raw`\left\{`, String.raw`\left\lbrace`, String.raw`\{`, String.raw`\lbrace`, '{'];
+    const CLOSERS = [String.raw`\right\}`, String.raw`\right\rbrace`, String.raw`\}`, String.raw`\rbrace`, '}'];
+    const latex = /\\[A-Za-z{]/.test(text);
+    for (let guard = 0, from = 0; guard < 50; guard++) {
+        let start = -1;
+        let open = '';
+        for (let i = from; i < text.length && start < 0; i++) {
+            const o = OPENERS.find((s) => text.startsWith(s, i));
+            if (!o) continue;
+            if (o === '{' && (latex ? true : /[\\^_A-Za-z]$/.test(text.slice(0, i)))) continue;   // in LaTeX a bare { is a group
+            if (o === '{' && text[i + 1] === '{') { i++; continue; }   // {{…}}: a block
+            start = i;
+            open = o;
+        }
+        if (start < 0) return text;
+        // its closer, and the first divider at depth 0
+        let depth = 0;
+        let divider = null;   // \mid, \middle| or : ; else the first bare | (which may also be an absolute value's)
+        let bare = null;
+        let end = -1;
+        for (let i = start + open.length; i < text.length; i++) {
+            const c = CLOSERS.find((s) => text.startsWith(s, i));
+            if (depth === 0 && c && (open === '{' ? c === '}' : c !== '}')) { end = i; open += '|' + c; break; }
+            if ('([{'.includes(text[i]) && !(text[i] === '{' && text[i - 1] === '\\')) depth++;
+            else if (')]}'.includes(text[i]) && text[i - 1] !== '\\') depth--;
+            if (depth === 0 && !divider) {
+                const d = /^(?:\\middle\s*\||\\mid(?![A-Za-z])|:(?!=)|\|)/.exec(text.slice(i));
+                if (d && d[0] !== '|') divider = { at: i, length: d[0].length };
+                else if (d && latex && !bare && !/\\left\s*$|\\right\s*$|\\middle\s*$/.test(text.slice(0, i))) bare = { at: i, length: 1 };
+            }
+        }
+        divider ??= bare;
+        if (end < 0 || !divider) { from = start + 1; continue; }
+        const element = text.slice(start + open.split('|')[0].length, divider.at).trim();
+        const condition = text.slice(divider.at + divider.length, end).trim();
+        if (!element || !condition) { from = start + 1; continue; }
+        const close = open.split('|')[1];
+        text = `${text.slice(0, start)}setbuilder((${element}),(${condition}))${text.slice(end + close.length)}`;
+        from = start;
+    }
+    return text;
+}
+
+// ---- evaluation bars: [F]_a^b ---------------------------------------------------
+
+const SIZE = String.raw`\\(?:[Bb]igg?|right)[lrm]?`;
+/** Where an evaluation bar closes: \right] \right| \Big] \bigg| (a size, then ] or |), or a plain ]. */
+const BAR_CLOSE = new RegExp(`(?:${SIZE}\\s*([\\]|])|(\\]))\\s*(?=[_^])`, 'g');
+
+/** One script after _ or ^: {…}, a \command (\pi, \infty) or one character. */
+function barScript(text, at) {
+    let i = at;
+    while (text[i] === ' ') i++;
+    if (text[i] === '{') {
+        let depth = 0;
+        for (let j = i; j < text.length; j++) {
+            if (text[j] === '{') depth++;
+            else if (text[j] === '}' && --depth === 0) return { value: text.slice(i + 1, j).trim(), end: j + 1 };
+        }
+        return null;
+    }
+    const command = /^\\[A-Za-z]+/.exec(text.slice(i));
+    if (command) return { value: command[0], end: i + command[0].length };
+    if (text[i] === '-' && /\d/.test(text[i + 1] ?? '')) return { value: text.slice(i, i + 2), end: i + 2 };
+    return text[i] ? { value: text[i], end: i + 1 } : null;
+}
+
+/** _lo^hi or ^hi_lo at `at`, both there; else null. */
+function readLimits(text, at) {
+    let i = at;
+    while (text[i] === ' ') i++;
+    const first = text[i];
+    if (first !== '_' && first !== '^') return null;
+    const one = barScript(text, i + 1);
+    if (!one) return null;
+    let j = one.end;
+    while (text[j] === ' ') j++;
+    const second = first === '_' ? '^' : '_';
+    if (text[j] !== second) return null;
+    const two = barScript(text, j + 1);
+    if (!two) return null;
+    return first === '_' ? { lo: one.value, hi: two.value, end: two.end } : { lo: two.value, hi: one.value, end: two.end };
+}
+
+/** The opener matching a closer that ends at `close` (its first character): \left[ or \left. or a sized [, or a plain [. */
+function barOpener(text, close, plain) {
+    let depth = 0;
+    for (let i = close - 1; i >= 0; i--) {
+        if (plain) {
+            if (text[i] === ']') depth++;
+            else if (text[i] === '[') {
+                if (depth === 0) return { start: i, end: i + 1 };
+                depth--;
+            }
+            continue;
+        }
+        const before = text.slice(0, i + 1);
+        const right = /\\right\s*[\]|)}.]$|\\[Bb]igg?r?\s*[\]|]$/.exec(before);
+        const left = /\\left\s*(?:[[(.]|\\\{)$|\\[Bb]igg?l?\s*\[$/.exec(before);
+        if (right && i + 1 < close) { depth++; i -= right[0].length - 1; continue; }
+        if (left) {
+            if (depth === 0) return { start: i + 1 - left[0].length, end: i + 1 };
+            depth--;
+            i -= left[0].length - 1;
+        }
+    }
+    return null;
+}
+
+/** For F \Big|_0^1 with nothing opening the bar: F is the term before it, back to an = (or <, a comma …) or the start. */
+function termBefore(text, bar) {
+    let depth = 0;
+    for (let i = bar - 1; i >= 0; i--) {
+        const c = text[i];
+        if (')]}'.includes(c)) depth++;
+        else if ('([{'.includes(c)) { if (depth === 0) return i + 1; depth--; }
+        else if (depth === 0 && /[=<>&,]/.test(c)) return i + 1;
+        else if (depth === 0 && /\\(?:approx|leq?|geq?|neq?|to|quad|qquad)$/.test(text.slice(0, i + 1))) return i + 1;
+    }
+    return 0;
+}
+
+/**
+ * An evaluation bar is F at the top limit minus F at the bottom one: \left[\frac{x^3}{3}\right]_0^1,
+ * \left.x^2\right|_0^1, \frac{x^3}{3}\Big|_0^1, [x^2]_{x=0}^{x=1}. Written as evaluated(F, a, b) (or
+ * evaluated(F, x, a, b) when the limits name the variable), which build.js completes with the variable.
+ * Both limits are needed: \left.\frac{d}{dx} f\right|_{x=a} (one) is a derivative at a point, read later.
+ */
+export function evaluationBarsLatex(text) {
+    for (let guard = 0; guard < 50; guard++) {
+        BAR_CLOSE.lastIndex = 0;
+        let found = null;
+        for (let m = BAR_CLOSE.exec(text); m; m = BAR_CLOSE.exec(text)) {
+            const limits = readLimits(text, m.index + m[0].length);
+            if (!limits) continue;
+            const plain = Boolean(m[2]);
+            const bar = (m[1] ?? m[2]) === '|';
+            const opener = barOpener(text, m.index, plain);
+            // a bar with nothing opening it (F \Big|_0^1) takes the term before it; a ] always has its [
+            if (!opener && !(bar && !/^\\right/.test(m[0]))) continue;
+            if (opener && /\\left\s*\|$/.test(text.slice(opener.start, opener.end))) continue;   // |x|_…: an absolute value
+            found = { m, limits, opener };
+            break;
+        }
+        if (!found) return text;
+        const { m, limits, opener } = found;
+        const start = opener ? opener.start : termBefore(text, m.index);
+        const body = text.slice(opener ? opener.end : start, m.index).trim();
+        const named = /^\s*([A-Za-z])\s*=\s*([\s\S]+)$/.exec(limits.lo);
+        const hi = limits.hi.replace(/^\s*[A-Za-z]\s*=\s*/, '');
+        const call = named ? `evaluated((${body}),${named[1]},${named[2]},${hi})` : `evaluated((${body}),${limits.lo},${hi})`;
+        text = `${text.slice(0, start)}${start > 0 && /[^\s(=]/.test(text[start - 1]) ? ' ' : ''}${call}${text.slice(limits.end)}`;
+    }
+    return text;
+}
+
 // ---- written small: x₁, x¹², 1½, \sqrt x -------------------------------------
+
+const SPELLED = { __proto__: null, sine: 'sin', cosine: 'cos', tangent: 'tan', secant: 'sec', cosecant: 'csc', cotangent: 'cot' };
+/**
+ * sine(x), arcsine(x), cotangent x: the trig functions by their names, when an argument follows (a call, or a
+ * space and a name or number). The tokenizer would read arcsine as arcsin times e; tangent alone stays a word.
+ */
+function spelledFunctions(input) {
+    return input.replace(/(?<![A-Za-z\\])(arc)?(sine|cosine|tangent|secant|cosecant|cotangent)(?![A-Za-z])(?=\s*\(|\s+(?:[A-Za-z](?![A-Za-z])|\d|\\))/gi,
+        (word, arc, name) => (arc ? 'arc' : '') + SPELLED[name.toLowerCase()]);
+}
+
+/** f^{(4)}(x), f⁽⁴⁾(x): the fourth derivative, written as f′′′′(x) is (a count in brackets is not a power). */
+function nthDerivatives(input) {
+    return input.replace(/(?<![A-Za-z\\])([A-Za-z])\^\s*\{?\s*\(\s*([1-9])\s*\)\s*\}?(?=\s*\()/g, (_, f, n) => f + '′'.repeat(Number(n)));
+}
+
+/** ₅C₂, {}_5C_2, {}_{n}P_{r}, _nC_r: n choose r and n permute r, as \binom and perm are. */
+function chooseNotation(input) {
+    return input.replace(/(?:\{\s*\}|(?<![\w}\])′]))_\s*(?:\{\s*([^{}]+?)\s*\}|([A-Za-z0-9]+?))\s*(?:\\mathrm\{([CP])\}|([CP]))\s*_\s*(?:\{\s*([^{}]+?)\s*\}|([A-Za-z0-9]))/g,
+        (_, n1, n2, c1, c2, r1, r2) => `${(c1 ?? c2) === 'C' ? 'comb' : 'perm'}(${n1 ?? n2},${r1 ?? r2})`);
+}
 
 const SUPERSCRIPTS = { __proto__: null };
 const SUBSCRIPTS = { __proto__: null };
@@ -219,8 +438,15 @@ export function casesToTernary(input) {
             .map((row) => splitAtDepthZero(row, '&'))
             .filter((row) => row.join('').trim());
         let out = null;
+        // a system: every row one cell, each an equation or inequality (no "&", no condition) — all of them hold
+        const RELATION = /=|<|>|\\(?:le|ge|leq|geq|neq|ne|lt|gt)(?![A-Za-z])/;
+        if (rows.length > 1 && rows.every((row) => row.length === 1 && RELATION.test(row[0]))) {
+            out = rows.map((row) => `(${row[0].trim().replace(/\s*[,;.]$/, '')})`).join(' \\land ');
+            input = input.slice(0, start) + `(${out})` + input.slice(end + '\\end{cases}'.length);
+            continue;
+        }
         for (let k = rows.length - 1; k >= 0; k--) {
-            const value = rows[k][0].trim();
+            const value = rows[k][0].trim().replace(/\s*[,;]$/, '');   // x^2, & \text{if } x < 0: the comma is punctuation
             const condition = caseCondition(rows[k].slice(1).join('&'));
             if (out === null && !condition) out = `(${value})`;
             else out = `((${condition || 'true'}) ? (${value}) : ${out ?? '(unchanged)'})`;

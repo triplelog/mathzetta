@@ -18,6 +18,13 @@
  * a simple fraction, or one times π, π², e or a small square root, is
  * reported exactly (∑ 1/n² = π²/6).
  *
+ * Complex numbers: i is the imaginary unit (unless the scope gives it a value): (3 + 2i)(1 - i) is 5 - i,
+ * e^{iπ} is -1, |3 + 4i| is 5; with an i in the input (or { complex: true }) √−4 is 2i and ln(−1) is iπ. An odd
+ * root of a negative number stays real, as everywhere in MathZetta. Polynomials: an unknown is kept as itself
+ * where it is only added, multiplied, raised to a whole power or divided exactly: (x + 1)^2 is x^2 + 2*x + 1,
+ * (x^2 - 1)/(x - 1) is x + 1, a 2 by 2 determinant of letters is a*d - b*c. Anything that needs its value
+ * (sin x, x < 3, x^2 = 4) is "no value for 'x'", as before.
+ *
  * Two kinds of failure are told apart:
  *   MathError     the math has no answer: 1/0, √−1, 0^0, a divergent integral
  *   UnknownError  it can't be worked out: an unset variable, an indefinite integral
@@ -26,14 +33,16 @@
  * Nothing here runs generated code.
  */
 
-import { asTree, firstVariable } from './tree.js';
-import { expandChain, percentDecimal } from './common.js';
+import { asTree, firstVariable, walk } from './tree.js';
+import { expandChain, percentDecimal, setCondition } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 import { evaluate as floatEvaluate } from './evaluate.js';
 import { parseTree, setBlockHandler } from './parse/index.js';
 
 export class MathError extends Error {}
 export class UnknownError extends Error {}
+/** A double that underflowed to 0: refused as an answer, but 0 where a limit or an integral samples a function. */
+class TooSmallError extends UnknownError {}
 
 const LIMITS = {
     bits: 200000,        // largest exact number kept, in bits (~60,000 digits)
@@ -176,6 +185,7 @@ function bigRoot(r, n) {
 
 function num(v) {
     if (typeof v === 'number') return v;
+    if (isP(v)) needNumber(v);
     if (isX(v)) {
         let x = qToFloat(v.c);
         if (v.pi) x *= Math.PI ** v.pi;
@@ -232,6 +242,8 @@ function fromJS(v) {
 /** A value → plain JS: numbers, booleans, strings, arrays. */
 function toJS(v) {
     if (Array.isArray(v)) return v.map(toJS);
+    if (isC(v)) { const { re, im } = cParts(v); return { re: num(re), im: num(im) }; }   // a complex number
+    if (isP(v)) return formatPoly(v, { decimal: false, places: null, digits: 12, maxDigits: 50 });   // a polynomial: its text
     if (v && v.kind === 's') return v.text;
     if (typeof v === 'boolean') return v;
     return num(v);
@@ -381,11 +393,16 @@ function each2(f) {
     return g;
 }
 
-const add = each2((a, b) => (isX(a) && isX(b) && addX(a, b)) || checked(num(a) + num(b), num(a), num(b)));
-const neg = each1((a) => (isX(a) ? X(qneg(a.c), a.pi, a.e, a.root) : -num(a)));
+// the real operations (on exact values and doubles); add, neg, mul, div and pow below also take polynomials
+const add1 = (a, b) => (isX(a) && isX(b) && addX(a, b)) || checked(num(a) + num(b), num(a), num(b));
+const neg1 = (a) => (isX(a) ? X(qneg(a.c), a.pi, a.e, a.root) : -num(a));
+const mul1 = (a, b) => (isX(a) && isX(b) && mulX(a, b)) || checked(num(a) * num(b), num(a), num(b));
+const add = each2((a, b) => (isP(a) || isP(b) ? pAdd(a, b) : add1(a, b)));
+const neg = each1((a) => (isP(a) ? pNeg(a) : neg1(a)));
 const sub = (a, b) => add(a, neg(b));
-const mul = each2((a, b) => (isX(a) && isX(b) && mulX(a, b)) || checked(num(a) * num(b), num(a), num(b)));
-const div = each2((a, b) => {
+const mul = each2((a, b) => (isP(a) || isP(b) ? pMul(a, b) : mul1(a, b)));
+const div = each2((a, b) => (isP(a) || isP(b) ? pDiv(a, b) : div1(a, b)));
+function div1(a, b) {
     if (isZero(b)) throw new MathError('division by zero');
     if (isX(a) && isX(b)) {
         const inv = invX(b);
@@ -393,9 +410,19 @@ const div = each2((a, b) => {
         if (r) return r;
     }
     return checked(num(a) / num(b), num(a), num(b));
-});
+}
 
 const pow = each2((a, b) => {
+    if (isP(a) || isP(b)) return pPow(a, b);
+    try {
+        return pow1(a, b);
+    } catch (e) {
+        // √−4 is 2i where complex numbers are in play; an odd root of a negative number stays real (∛−8 = −2)
+        if (complexMode && e instanceof MathError && e.message === 'not a real number') return cPow({ re: a, im: rat(0) }, b);
+        throw e;
+    }
+});
+function pow1(a, b) {
     if (isX(a) && isRat(b)) {
         const { n: p, d: q } = b.c;
         const r = q === 1n ? powWhole(a, p) : powFraction(a, p, q);
@@ -407,12 +434,172 @@ const pow = each2((a, b) => {
     if (x === 0 && y < 0) throw new MathError('division by zero');
     if (x < 0 && !Number.isInteger(y)) throw new MathError('not a real number');
     const r = x ** y;
-    if (r === 0 && x !== 0) throw new UnknownError('too small to calculate');   // 10^-50000: past both exact and double
+    if (r === 0 && x !== 0) throw new TooSmallError('too small to calculate');   // 10^-50000: past both exact and double
     return checked(r, x, y);
-});
+}
+
+// ---- complex numbers and polynomials -----------------------------------------------------------
+//
+// A value with unknowns or i in it: a polynomial whose coefficients are complex numbers. kind 'p'; terms is a Map
+// from a monomial ('' for the constant, 'x^2*y' …) to { vars: [[name, power], …], re, im }, where re and im are real
+// values (exact, or doubles). A complex number is one with only the constant term. poly() keeps them tidy: terms
+// that cancel go, and what has no unknowns and no i left is the real number it holds, so real answers stay as they were.
+
+/** Complex results of real functions (√−4, ln −1) only where complex numbers are asked for: an i in the input, or { complex: true }. */
+let complexMode = false;
+const MAX_TERMS = 5000;
+const isP = (v) => v !== null && typeof v === 'object' && v.kind === 'p';
+/** A complex number (no unknowns), as a polynomial. */
+const isC = (v) => isP(v) && v.terms.size === 1 && v.terms.has('');
+const I = () => poly([{ vars: [], re: rat(0), im: rat(1) }]);
+
+const monoKey = (vars) => vars.map(([n, k]) => (k === 1 ? n : `${n}^${k}`)).join('*');
+function poly(entries) {
+    const terms = new Map();
+    for (const t of entries) {
+        const key = monoKey(t.vars);
+        const old = terms.get(key);
+        terms.set(key, old ? { vars: t.vars, re: add1(old.re, t.re), im: add1(old.im, t.im) } : t);
+    }
+    for (const [key, t] of terms) if (isZero(t.re) && isZero(t.im)) terms.delete(key);
+    if (terms.size > MAX_TERMS) throw new UnknownError('too many terms to work out');
+    if (!terms.size) return rat(0);
+    if (terms.size === 1 && terms.has('') && isZero(terms.get('').im)) return terms.get('').re;
+    return { kind: 'p', terms };
+}
+/** A value's terms: a real number is one constant term. */
+function termsOf(v) {
+    if (isP(v)) return [...v.terms.values()];
+    if (typeof v === 'boolean') return [{ vars: [], re: rat(v ? 1 : 0), im: rat(0) }];
+    if (!isX(v) && typeof v !== 'number') throw new UnknownError('not a number');
+    return [{ vars: [], re: v, im: rat(0) }];
+}
+/** The first unknown in a polynomial, for "no value for 'x'" where one can't be worked with. */
+const firstUnknown = (p) => [...p.terms.values()].find((t) => t.vars.length)?.vars[0][0];
+/** A polynomial where a number is needed: the error an unset variable always gave; a complex number has no real value. */
+function needNumber(p) {
+    if (isC(p)) throw new UnknownError('a complex number has no real value here');
+    throw new UnknownError(`no value for '${firstUnknown(p)}'`);
+}
+
+// complex parts { re, im }
+const cParts = (v) => (isC(v) ? v.terms.get('') : { re: v, im: rat(0) });
+const cOf = ({ re, im }) => poly([{ vars: [], re, im }]);
+const cMul = (a, b) => ({ re: add1(mul1(a.re, b.re), neg1(mul1(a.im, b.im))), im: add1(mul1(a.re, b.im), mul1(a.im, b.re)) });
+function cInv(z) {
+    const d = add1(mul1(z.re, z.re), mul1(z.im, z.im));
+    if (isZero(d)) throw new MathError('division by zero');
+    return { re: div1(z.re, d), im: neg1(div1(z.im, d)) };
+}
+const cAbs = (z) => (isZero(z.im) ? (compare(z.re, rat(0)) < 0 ? neg1(z.re) : z.re) : pow1(add1(mul1(z.re, z.re), mul1(z.im, z.im)), rat(1, 2)));
+/** The angle of z, exactly on the axes (π, ±π/2) and wherever arctan knows the value. */
+function cArg(z) {
+    if (isZero(z.im)) return compare(z.re, rat(0)) < 0 ? PI : rat(0);
+    if (isZero(z.re)) return compare(z.im, rat(0)) > 0 ? X(Q(1n, 2n), 1) : X(Q(-1n, 2n), 1);
+    return Math.atan2(num(z.im), num(z.re));
+}
+/** e^z = e^re (cos im + i sin im): e^{iπ} is exactly −1. */
+function cExp(z) {
+    const size = isZero(z.re) ? rat(1) : pow1(E, z.re);
+    return cOf({ re: mul1(size, trig('cos', z.im)), im: mul1(size, trig('sin', z.im)) });
+}
+function cLn(z) {
+    if (isZero(z.re) && isZero(z.im)) throw new MathError('ln 0 is undefined');
+    return { re: ln(cAbs(z)), im: cArg(z) };
+}
+/** z^y for a complex z and a real y that isn't whole: |z|^y at y times z's angle (the principal value). */
+function cPow(z, y) {
+    if (isZero(z.re) && isZero(z.im)) return pow1(rat(0), y);
+    const size = pow1(cAbs(z), y);
+    const angle = mul1(y, cArg(z));
+    return cOf({ re: mul1(size, trig('cos', angle)), im: mul1(size, trig('sin', angle)) });
+}
+
+function pAdd(a, b) { return poly([...termsOf(a), ...termsOf(b)]); }
+function pNeg(a) { return poly(termsOf(a).map((t) => ({ vars: t.vars, re: neg1(t.re), im: neg1(t.im) }))); }
+function mergeVars(u, v) {
+    const powers = new Map(u);
+    for (const [name, k] of v) powers.set(name, (powers.get(name) ?? 0) + k);
+    return [...powers].filter(([, k]) => k !== 0).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+}
+function pMul(a, b) {
+    const A = termsOf(a);
+    const B = termsOf(b);
+    charge(A.length * B.length);
+    const out = [];
+    for (const s of A) for (const t of B) out.push({ vars: mergeVars(s.vars, t.vars), ...cMul(s, t) });
+    return poly(out);
+}
+function pPowWhole(a, k) {
+    if (!isC(a) && k > 1000n) throw new UnknownError('too large to calculate');
+    let out = rat(1);
+    let base = a;
+    for (let e = k; e > 0n; e >>= 1n) {
+        if (e & 1n) out = pMul(out, base);
+        if (e > 1n) base = pMul(base, base);
+    }
+    return out;
+}
+function pPow(a, b) {
+    if (isP(b)) {   // a complex exponent: a^w = e^(w ln a)
+        if (!isC(b)) needNumber(b);
+        if (isP(a) && !isC(a)) needNumber(a);
+        const w = cParts(b);
+        if (isX(a) && equalX(a, E)) return cExp(w);
+        return cExp(cMul(w, cLn(cParts(a))));
+    }
+    const k = wholeOf(b);
+    if (k !== null) {
+        if (k >= 0n) return pPowWhole(a, k);
+        if (!isC(a)) needNumber(a);   // x^-1 is no polynomial
+        return pPowWhole(cOf(cInv(cParts(a))), -k);
+    }
+    if (!isC(a)) needNumber(a);
+    return cPow(cParts(a), b);
+}
+/** a / b: by a number or a complex number; by a polynomial only when it divides exactly ((x² − 1)/(x − 1) = x + 1). */
+function pDiv(a, b) {
+    if (!isP(b)) {
+        if (isZero(b)) throw new MathError('division by zero');
+        return poly(termsOf(a).map((t) => ({ vars: t.vars, re: div1(t.re, b), im: div1(t.im, b) })));
+    }
+    if (isC(b)) return pMul(a, cOf(cInv(cParts(b))));
+    const quotient = exactQuotient(termsOf(a), [...b.terms.values()]);
+    if (quotient === null) throw new UnknownError(`no value for '${firstUnknown(b)}'`);   // a fraction of polynomials: not worked out here
+    return quotient;
+}
+/** Long division by a polynomial in one unknown; null when it doesn't divide exactly. */
+function exactQuotient(A, B) {
+    const names = new Set(B.flatMap((t) => t.vars.map(([n]) => n)));
+    if (names.size !== 1) return null;
+    const [x] = names;
+    const degree = (t) => t.vars.find(([n]) => n === x)?.[1] ?? 0;
+    const lead = B.reduce((m, t) => (degree(t) > degree(m) ? t : m));
+    const d = degree(lead);
+    if (lead.vars.length !== 1) return null;
+    let rest = A;
+    const out = [];
+    for (let guard = 0; guard < 1000 && rest.length; guard++) {
+        const top = rest.reduce((m, t) => (degree(t) > degree(m) ? t : m));
+        if (degree(top) < d) return null;   // a remainder
+        const factor = { vars: mergeVars(top.vars, [[x, -d]]), ...cMul(top, cInv(lead)) };
+        out.push(factor);
+        const next = pAdd(poly(rest), pNeg(pMul(poly([factor]), poly(B))));
+        rest = isZero(next) ? [] : termsOf(next);
+    }
+    return rest.length ? null : poly(out);
+}
+/** a = b for polynomials: true when the difference is 0; an equation in unknowns has no one answer. */
+function pEqual(a, b) {
+    const d = sub(a, b);
+    if (!isP(d)) return isZero(d);
+    if (isC(d)) return false;
+    return needNumber(d);
+}
 
 /** −1, 0 or 1; exact for fractions, with a little tolerance for doubles. */
 function compare(a, b) {
+    if (isC(a) || isC(b)) throw new UnknownError('complex numbers have no order');
     if (isRat(a) && isRat(b)) return qcmp(a.c, b.c);
     if (isX(a) && isX(b) && equalX(a, b)) return 0;
     const x = num(a);
@@ -432,6 +619,7 @@ function equal(a, b) {
     // text equals only the same text, whichever side it is on: 1 = "a" is false, as "a" = 1 is
     if ((a && a.kind === 's') || (b && b.kind === 's')) return Boolean(a && a.kind === 's' && b && b.kind === 's' && a.text === b.text);
     if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
+    if (isP(a) || isP(b)) return pEqual(a, b);
     return compare(a, b) === 0;
 }
 
@@ -501,6 +689,8 @@ function inverseTrig(name, v) {
 }
 
 function ln(v) {
+    if (isP(v)) return isC(v) ? cOf(cLn(cParts(v))) : needNumber(v);
+    if (complexMode && compare(v, rat(0)) < 0) return cOf({ re: ln(neg1(v)), im: PI });   // ln −1 = iπ
     if (isX(v)) {
         if (v.c.n === 0n) throw new MathError('ln 0 is undefined');
         if (v.c.n < 0n) throw new MathError('not a real number');
@@ -560,6 +750,7 @@ function factorial(v) {
 }
 
 function whole(v, what) {
+    if (isP(v)) needNumber(v);
     const n = wholeOf(v) ?? (typeof v === 'number' && Number.isInteger(v) ? BigInt(v) : null);
     if (n === null) throw new MathError(`${what} needs whole numbers`);
     return n;
@@ -644,10 +835,11 @@ const gcdN = (a, b) => (b ? gcdN(b, a % b) : a);
 const CONSTANTS = {
     pi: () => PI, 'π': () => PI, tau: () => X(Q(2n), 1), 'τ': () => X(Q(2n), 1), e: () => E,
     '∞': () => Infinity, '-∞': () => -Infinity, true: () => true, false: () => false,
+    '°': () => X(Q(1n, 180n), 1),   // 30° is 30 · π/180, exactly: sin(30°) is 1/2
 };
 
 const ONE = {
-    abs: (a) => (isX(a) ? X(Q(babs(a.c.n), a.c.d), a.pi, a.e, a.root) : Math.abs(num(a))),
+    abs: (a) => (isC(a) ? cAbs(cParts(a)) : isX(a) ? X(Q(babs(a.c.n), a.c.d), a.pi, a.e, a.root) : Math.abs(num(a))),
     floor: floorV, ceil: ceilV,
     sqrt: (a) => pow(a, rat(1, 2)),
     ln: each1(ln),
@@ -667,6 +859,11 @@ const ONE = {
 ONE.det = (a) => MATRIX_FUNCTIONS.det(a);
 for (const f of ['sin', 'cos', 'tan', 'csc', 'sec', 'cot']) ONE[f] = each1((a) => trig(f, a));
 for (const f of ['arcsin', 'arccos', 'arctan']) ONE[f] = each1((a) => inverseTrig(f, a));
+// exactly where their partners are: arcsec 2 = arccos ½ = π/3; arccot 1 = π/2 − π/4
+const reciprocalOf = (a) => { if (isZero(a)) throw new MathError('not a real number'); return div(rat(1), a); };
+ONE.arcsec = each1((a) => inverseTrig('arccos', reciprocalOf(a)));
+ONE.arccsc = each1((a) => inverseTrig('arcsin', reciprocalOf(a)));
+ONE.arccot = each1((a) => sub(X(Q(1n, 2n), 1), inverseTrig('arctan', a)));
 
 // ---- matrices: a list of equally long lists ([[1, 2], [3, 4]]) or a pmatrix / bmatrix ----------
 
@@ -713,7 +910,7 @@ function power(a, b) {
 
 /** Matrix functions, written det(A), inv(A) …; a scope's own function of the same name comes first. */
 const MATRIX_FUNCTIONS = {
-    det: matrixOnly('det', M.det),
+    det: matrixOnly('det', (A) => determinant(A)),
     inv: matrixOnly('inv', M.inverse), inverse: matrixOnly('inverse', M.inverse),
     transpose: matrixOnly('transpose', M.transpose),
     trace: matrixOnly('trace', M.trace), tr: matrixOnly('tr', M.trace),
@@ -727,6 +924,25 @@ const MATRIX_FUNCTIONS = {
         return isMatrix(b) ? M.solve(A, b) : asVector(M.solve(A, b), b);
     },
 };
+
+/**
+ * det A: by elimination, or, with unknowns among the entries, by cofactors (elimination would divide by them):
+ * det [[a, b], [c, d]] is a*d - b*c.
+ */
+function determinant(A) {
+    if (!A.some((row) => row.some(isP))) return M.det(A);
+    if (A.length !== A[0].length) throw new MathError(`a ${A.length} by ${A[0].length} matrix has no determinant`);
+    if (A.length > 6) throw new UnknownError('too large to calculate');
+    const cofactors = (rows) => {
+        if (rows.length === 1) return rows[0][0];
+        return rows[0].reduce((sum, entry, j) => {
+            const minor = rows.slice(1).map((r) => r.filter((_, k) => k !== j));
+            const term = mul(entry, cofactors(minor));
+            return j % 2 ? sub(sum, term) : add(sum, term);
+        }, rat(0));
+    };
+    return cofactors(A);
+}
 
 /** pmatrix(…) and bmatrix(…): each argument a row ([] list, or one entry). */
 function matrixOf(node, v) {
@@ -753,6 +969,8 @@ const TWO = {
     '&': (a, b) => truthy(a) && truthy(b), '|': (a, b) => truthy(a) || truthy(b),
     '\\xor': (a, b) => truthy(a) !== truthy(b), '\\nor': (a, b) => !(truthy(a) || truthy(b)),
     '\\nand': (a, b) => !(truthy(a) && truthy(b)),
+    '\\implies': (a, b) => !truthy(a) || truthy(b),
+    '\\iff': (a, b) => truthy(a) === truthy(b),
 };
 
 const MANY = {
@@ -816,18 +1034,24 @@ function calc(node, env) {
         throw new UnknownError('subscript');
     }
     if (op === 'der') return derivative(node, env);
+    if (op === 'evaluated') {   // [F]_a^b: F with x = b, minus F with x = a, exactly
+        const [body, variable, lo, hi] = args;
+        return sub(calc(body, bind(env, variable.value, v(hi))), calc(body, bind(env, variable.value, v(lo))));
+    }
     if (op === 'int') return integral(args, env);
     if (op === 'lim') return limit(args, env);
     if (op === '\\sumidx' || op === '\\prodidx') return series(op === '\\sumidx', args, env);
     if (['()', '[]', '{}'].includes(op)) return group(args.map(v), op);
     if (op === 'pmatrix' || op === 'bmatrix') return matrixOf(node, v);
-    if (op === 'vmatrix') return M.det(matrixOf(node, v));
+    if (op === 'vmatrix') return determinant(matrixOf(node, v));
     // A^T: the transpose, unless T has a value
     if (op === '^' && args[1].type === 'symbol' && args[1].value === 'T' && !Object.prototype.hasOwnProperty.call(env, 'T')) {
         const m = v(args[0]);
         if (isMatrix(m)) return M.transpose(m);
     }
     if (op === 'pmod') return congruence(args, v);
+    if (op === 'setbuilder') throw new UnknownError('a set described by a condition has no list of values');
+    if (setCondition(node)) return v(setCondition(node));   // y ∈ {x | P}: P with y for x
     if (op === '∈' || op === '∉') {
         const inside = membershipExact(node, v);
         if (inside !== undefined) return inside;
@@ -850,6 +1074,9 @@ function lookup(name, env) {
     if (Object.prototype.hasOwnProperty.call(env, name)) return env[name];
     if (Object.prototype.hasOwnProperty.call(CONSTANTS, name)) return CONSTANTS[name]();
     if (percentDecimal(name)) return X(decimalToQ(percentDecimal(name)));   // 50% is 1/2, exactly
+    if (name === 'i') return I();   // the imaginary unit, unless the scope or a ∑ gives i a value
+    // an unknown: a polynomial in it, so (x + 1)^2 is x^2 + 2*x + 1; anything that needs its value says so (num)
+    if (/^[A-Za-z\u0370-\u03FF][A-Za-z0-9_\u0370-\u03FF′]*$/.test(name)) return poly([{ vars: [[name, 1]], re: rat(1), im: rat(0) }]);
     throw new UnknownError(`no value for '${name}'`);
 }
 
@@ -881,6 +1108,7 @@ function asFunction(body, name, env) {
             return r;
         } catch (e) {
             if (e instanceof MathError) return NaN;
+            if (e instanceof TooSmallError) return 0;   // e^-x far out: a sample, not the answer, so 0 is right
             throw e;
         }
     };
@@ -1290,6 +1518,7 @@ function bestFraction(x, maxDen) {
  */
 function format(v, o) {
     if (typeof v === 'boolean') return String(v);
+    if (isP(v)) return formatPoly(v, o);
     if (v && v.kind === 's') return JSON.stringify(v.text);
     if (Array.isArray(v)) {
         if (v.group === 'pm' && v.length === 2 && equal(v[1], neg(v[0]))) return `±${wrapped(v[0], o)}`;
@@ -1300,6 +1529,39 @@ function format(v, o) {
     if (typeof v === 'number') return formatDouble(v, o);
     if (o.decimal || o.places !== null) return formatDecimal(v, o);
     return formatExact(v, o);
+}
+
+/** x^2 + 2*x + 1, 3 - 2*i, (1 + i)*x: terms by degree, highest first; MathZetta reads it back. */
+function formatPoly(p, o) {
+    // highest degree first; within a degree, the higher power of the earlier letter: x^3, 3*x^2*y, 3*x*y^2, y^3
+    const degree = (t) => t.vars.reduce((s, [, k]) => s + k, 0);
+    const names = [...new Set([...p.terms.values()].flatMap((t) => t.vars.map(([n]) => n)))].sort();
+    const power = (t, n) => t.vars.find(([m]) => m === n)?.[1] ?? 0;
+    const terms = [...p.terms.values()].sort((s, t) => degree(t) - degree(s) || names.reduce((c, n) => c || power(t, n) - power(s, n), 0));
+    const parts = terms.map((t) => term(t, o));
+    return parts.reduce((all, part, k) => (k === 0 ? part : part.startsWith('-') ? `${all} - ${part.slice(1)}` : `${all} + ${part}`), '');
+}
+function complexText(re, im, o) {
+    if (isZero(im)) return format(re, o);
+    const negative = !isZero(im) && compare(im, rat(0)) < 0;
+    const size = format(negative ? neg1(im) : im, o);
+    const imaginary = size === '1' ? 'i' : /^[\d.]+$/.test(size) ? `${size}*i` : `(${size})*i`;
+    if (isZero(re)) return negative ? `-${imaginary}` : imaginary;
+    return `${format(re, o)} ${negative ? '-' : '+'} ${imaginary}`;
+}
+function term(t, o) {
+    const mono = monoKey(t.vars);
+    if (!mono) return complexText(t.re, t.im, o);
+    if (!isZero(t.im)) return `(${complexText(t.re, t.im, o)})*${mono}`;
+    const c = t.re;
+    const text = format(c, o);
+    if (text === '1') return mono;
+    if (text === '-1') return `-${mono}`;
+    if (isRat(c) && c.c.d !== 1n && !(o.decimal || o.places !== null)) {   // 3x²/4
+        const n = babs(c.c.n);
+        return `${c.c.n < 0n ? '-' : ''}${n === 1n ? mono : `${n}*${mono}`}/${c.c.d}`;
+    }
+    return /^-?[\w.^]+(?:\([\w ,.]*\))?$/.test(text) ? `${text}*${mono}` : `(${text})*${mono}`;   // 2*x, pi^2*x, sqrt(2)*x; (1/3 + pi)*x
 }
 
 const wrapped = (v, o) => { const t = format(v, o); return /^[\d.]+$|^[a-zπ]+$/i.test(t) ? t : `(${t})`; };
@@ -1398,6 +1660,7 @@ function formatBig(v, o) {
  * @param {number} [options.places] round the written answer to this many decimal places
  * @param {number} [options.digits] significant digits for answers that aren't exact (12)
  * @param {number} [options.maxDigits] longest whole number written out in full (50)
+ * @param {boolean} [options.complex] complex results of real functions (√−4 = 2i); default: when the input mentions i
  * @returns {{ value: *, text: string, exact: boolean }} the answer as plain JS (numbers,
  *   booleans, strings, arrays), as MathZetta-readable text, and whether it is exact
  * @throws {MathError} when there is no answer (1/0, √−1, a divergent integral)
@@ -1409,14 +1672,19 @@ export function calculate(input, scope = {}, options = {}) {
     const env = {};
     for (const [k, val] of Object.entries(scope)) env[k] = fromJS(val);
     depth++;
+    const outer = complexMode;
+    // complex results of real functions (√−4) where complex numbers are in play: an i in the input, or asked for
+    let mentionsI = false;
+    walk(tree, (n) => { if (n.type === 'symbol' && n.value === 'i' && !Object.prototype.hasOwnProperty.call(scope, 'i')) mentionsI = true; });
+    complexMode = options.complex ?? (mentionsI || (depth > 1 && outer));
     let v;
-    try { v = calc(tree, env); } finally { depth--; }
+    try { v = calc(tree, env); } finally { depth--; complexMode = outer; }
     const o = { decimal: false, places: null, digits: 12, maxDigits: 50, ...options };
     if (o.places === undefined) o.places = null;
     if (o.places !== null && !(Number.isInteger(o.places) && o.places >= 0 && o.places <= LIMITS.places)) {
         throw new UnknownError(`places is a whole number from 0 to ${LIMITS.places}`);   // {{~999999999 1/3}}
     }
-    const exact = (x) => (Array.isArray(x) ? x.every(exact) : typeof x !== 'number');
+    const exact = (x) => (Array.isArray(x) ? x.every(exact) : isP(x) ? [...x.terms.values()].every((t) => typeof t.re !== 'number' && typeof t.im !== 'number') : typeof x !== 'number');
     return { value: toJS(v), text: format(v, o), exact: exact(v) };
 }
 

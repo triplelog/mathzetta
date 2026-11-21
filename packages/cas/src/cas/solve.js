@@ -218,6 +218,10 @@ function isolate(cas, equation, D, F, v, options, record, found, unsolved, depth
   if (isN(rhs) && rhs.q.isZero) {
     const lhs = canon(current.args[0]);
     const top = factorsOf(lhs).filter((f) => mentions(f, v) && !isDenominator(f));
+    if (!top.length && factorsOf(lhs).some((f) => mentions(f, v))) {   // 1/x = 0: nothing on top can be 0
+      record('solve.never', 'No solution', ['check'], current, current, {});
+      return;
+    }
     if (top.length > 1 || top.length < factorsOf(lhs).filter((f) => mentions(f, v)).length) {
       const cases = top.map((f) => eq(display(baseOf(f)), ZERO_NODE));
       record('solve.zero-product', 'A product is zero when a factor is', ['split'], current, cases.reduce((acc, e) => (acc ? op('|', [acc, e]) : e), null), {});
@@ -514,3 +518,108 @@ export function solveLinearSystem(cas, equations, vars) {
 }
 
 export { keyOf };
+
+// ---- inequalities ------------------------------------------------------------------------
+
+const RELATIONS = { '<': (d) => d < 0, '>': (d) => d > 0, '≤': (d) => d <= 0, '≥': (d) => d >= 0 };
+const TRIG = new Set(['sin', 'cos', 'tan', 'csc', 'sec', 'cot']);
+
+/**
+ * An inequality (or a chain, -1 < 2x + 1 < 5) in one unknown, by a sign chart: the points where a side minus the other
+ * is 0 (the equation solver finds them), has no value (a denominator is 0) or starts to have one (a root's or a log's
+ * argument is 0) cut the line into intervals; one number tested in each interval, and each point itself, says where
+ * it holds. Trigonometric inequalities hold on infinitely many intervals: not done here (unsolved).
+ * @returns {{ pieces: {lo, hi, loClosed, hiClosed}[] | null, steps }} pieces as exact nodes (null: −∞ or ∞)
+ */
+export function solveInequality(cas, input, v) {
+  const steps = [];
+  const conditions = [];
+  // a < E < b is E > a and E < b
+  if (isOp(input.args[0]) && RELATIONS[input.args[0].op]) {
+    const [inner, b] = input.args;
+    const [a, E] = inner.args;
+    conditions.push({ h: normal(op('-', [a, E])), op: inner.op }, { h: normal(op('-', [E, b])), op: input.op });
+  } else {
+    conditions.push({ h: normal(op('-', [input.args[0], input.args[1]])), op: input.op });
+  }
+  const others = new Set(conditions.flatMap((c) => [...freeSymbols(c.h)]));
+  others.delete(v);
+  if (others.size) throw new CasError(`an inequality in ${v} with other unknowns (${[...others].join(', ')}) can't be charted`);
+  if (conditions.some((c) => walk(c.h, 'pre').some(({ node }) => isOp(node) && TRIG.has(node.op) && freeSymbols(node).has(v)))) {
+    return { pieces: null, steps, unsolved: true };
+  }
+  // the critical points
+  const where = [];
+  for (const { h } of conditions) {
+    where.push(h);
+    for (const { node: n } of walk(h, 'pre')) {
+      if (!isOp(n) || !freeSymbols(n).has(v)) continue;
+      if (n.op === '/') where.push(n.args[1]);
+      if (n.op === 'sqrt' || n.op === 'ln') where.push(n.args[0]);
+      if (n.op === 'root' || n.op === 'log') where.push(n.args[1]);
+      if (n.op === '^' && isN(canon(n.args[1])) && canon(n.args[1]).q.sign < 0) where.push(n.args[0]);
+    }
+  }
+  const points = new Map();
+  for (const expr of where) {
+    const solved = solveEquation(cas, eq(expr, ZERO_NODE), v, { steps: false });
+    if (solved.unsolved.length && !solved.always) return { pieces: null, steps, unsolved: true };
+    if (solved.always) continue;
+    for (const s of solved.solutions) {
+      const at = numeric(s);
+      if (!at || Math.abs(at.im) > 1e-12) continue;   // complex: not on the line
+      points.set(s.s, { node: s, x: at.re });
+    }
+  }
+  const sorted = [...points.values()].sort((a, b) => a.x - b.x).filter((p, i, all) => i === 0 || Math.abs(p.x - all[i - 1].x) > 1e-12);
+  // does it hold at t (a number)? false where a side has no value
+  const holds = (t) => conditions.every(({ h, op: rel }) => {
+    try {
+      const d = approximate(substitute(h, v, exactNum(Number(t).toPrecision(17))), { digits: 20 });
+      if (!Number.isFinite(d.re) || Math.abs(d.im) > 1e-12) return false;
+      return RELATIONS[rel](Math.abs(d.re) < 1e-12 ? 0 : d.re);
+    } catch {
+      return false;
+    }
+  });
+  const holdsAt = (p) => conditions.every(({ h, op: rel }) => {
+    try {
+      const d = approximate(normal(substitute(h, v, p.node)), { digits: 30 });
+      if (!Number.isFinite(d.re) || Math.abs(d.im) > 1e-12) return false;
+      return RELATIONS[rel](Math.abs(d.re) < 1e-15 ? 0 : d.re);
+    } catch {
+      return false;
+    }
+  });
+  // test points: one in each interval
+  const xs = sorted.map((p) => p.x);
+  const inside = [];
+  if (!xs.length) inside.push(0);
+  else {
+    inside.push(xs[0] - Math.max(1, Math.abs(xs[0])));
+    for (let i = 0; i + 1 < xs.length; i++) inside.push((xs[i] + xs[i + 1]) / 2);
+    inside.push(xs[xs.length - 1] + Math.max(1, Math.abs(xs[xs.length - 1])));
+  }
+  const intervalHolds = inside.map(holds);
+  const pointHolds = sorted.map(holdsAt);
+  // join: interval 0, point 0, interval 1, point 1, … into pieces
+  const pieces = [];
+  let open = null;
+  const close = (hi, hiClosed) => { pieces.push({ ...open, hi, hiClosed }); open = null; };
+  for (let i = 0; i <= sorted.length; i++) {
+    const lo = i === 0 ? null : sorted[i - 1].node;
+    if (intervalHolds[i]) open ??= { lo, loClosed: false };
+    else if (open) close(lo, i > 0 && pointHolds[i - 1]);
+    if (i === sorted.length) break;
+    const p = sorted[i];
+    if (pointHolds[i]) {
+      if (open) continue;                     // the interval goes on through the point
+      if (intervalHolds[i + 1]) open = { lo: p.node, loClosed: true };
+      else pieces.push({ lo: p.node, hi: p.node, loClosed: true, hiClosed: true });   // a point alone
+    } else if (open) close(p.node, false);
+  }
+  if (open) close(null, false);
+  const chart = sorted.length ? sorted.map((p) => cas.format(p.node)).join(', ') : 'none';
+  steps.push(cas.step('solve.sign-chart', 'A sign chart', ['inequality'], input, input, { points: sym(chart), v }));
+  return { pieces, steps };
+}

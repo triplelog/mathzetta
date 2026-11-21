@@ -63,7 +63,7 @@ const MEMBERS = {
     sympy: new Set(['pi', 'E', 'oo', 'true', 'false', 'nan', 'Rational', 'Integer', 'sqrt', 'root', 'exp', 'log', 'expm1',
         'sin', 'cos', 'tan', 'csc', 'sec', 'cot', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh', 'atan2',
         'Abs', 'floor', 'ceiling', 'factorial', 'binomial', 'ff', 'gcd', 'gcd_list', 'Max', 'Min', 'Mod', 'Eq', 'Ne',
-        'And', 'Or', 'Not', 'Xor', 'Nand', 'Nor', 'Piecewise', 'FiniteSet', 'Interval', 'Contains', 'S', 'Union', 'Intersection',
+        'And', 'Or', 'Not', 'Xor', 'Nand', 'Nor', 'Implies', 'Equivalent', 'Piecewise', 'FiniteSet', 'Interval', 'Contains', 'S', 'Union', 'Intersection',
         'diff', 'integrate', 'limit', 'summation', 'product', 'real_root', 'Matrix', 'det']),
     'sympy.S': new Set(['Reals', 'Integers', 'Naturals', 'Rationals', 'Complexes']),
     'sympy.Interval': new Set(['open', 'Lopen', 'Ropen']),
@@ -237,7 +237,7 @@ function freeOutsideBinding(tree, v) {
     (function visit(n) {
         if (found) return;
         if (n.type === 'op') {
-            if (['der', 'int', 'lim', '\\sumidx', '\\prodidx'].includes(n.op) && boundVariables(n).map(pythonName).includes(v)) return;
+            if (['der', 'int', 'lim', '\\sumidx', '\\prodidx', 'evaluated'].includes(n.op) && boundVariables(n).map(pythonName).includes(v)) return;
             n.args.forEach(visit);
         } else if (n.type === 'symbol' && pythonName(n.value) === v) found = true;
     })(tree);

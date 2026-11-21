@@ -26,7 +26,6 @@ const BUT = (...not) => EVERY.filter((f) => !not.includes(f));
 const KNOWN = [
     [['"1"===1', '0===false', '1===true', '""===0'], BUT('javascript', 'text'),
         "JavaScript's strict equality; every other language writes plain ="],
-    [['1.333..'], BUT('latex', 'text'), 'a repeating decimal, written out as 1.333'],
     [['Math.round(x/7,2)+math.round(x/7)+round(13.244,i)'], ['glsl'],
         'a digit count that is a variable: GLSL has no way to round to i places, so it rounds to whole numbers'],
     [['random()', '=RAND()'], EVERY, 'a random number: no one value to compare'],

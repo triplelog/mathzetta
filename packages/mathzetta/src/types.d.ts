@@ -322,11 +322,19 @@ export interface CalculateOptions {
     digits?: number;
     /** Longest whole number written out in full (50). */
     maxDigits?: number;
+    /**
+     * Complex results of real functions: √−4 = 2i, ln(−1) = iπ. Default: on when the input mentions i (which is
+     * the imaginary unit unless the scope gives it a value). Arithmetic with i is complex either way.
+     */
+    complex?: boolean;
 }
 export interface Calculation {
-    /** The answer as plain JS: numbers, booleans, strings, arrays. */
-    value: number | boolean | string | unknown[];
-    /** The answer as MathZetta-readable text: '1/2', '2*sqrt(2)', '(5*pi)/6'. */
+    /**
+     * The answer as plain JS: numbers, booleans, strings, arrays; a complex number as { re, im }; a polynomial
+     * (unknowns, only added, multiplied and raised to whole powers) as its text, 'x^2 + 2*x + 1'.
+     */
+    value: number | boolean | string | unknown[] | { re: number; im: number };
+    /** The answer as MathZetta-readable text: '1/2', '2*sqrt(2)', '(5*pi)/6', '3 - 2*i', 'x^2 + 2*x + 1'. */
     text: string;
     /** False when part of it is a rounded double. */
     exact: boolean;

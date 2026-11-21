@@ -326,6 +326,24 @@ export interface CAS {
         always: boolean;
         /** Equations left that no exact method solves (try { approximate: true }). */
         unsolved: Expr[];
+        /**
+         * For an inequality (<, >, ≤, ≥, or a chain a < E < b): where it holds, by a sign chart. Each piece is an
+         * interval, ends exact (null: −∞ or ∞), or a single point (lo = hi). null when it can't be charted (trig).
+         */
+        pieces?: { lo: Expr | null; hi: Expr | null; loClosed: boolean; hiClosed: boolean }[] | null;
+        /** The same in interval notation: '(-∞, -2) ∪ (2, ∞)', '[-2, 2]', '{0}', '∅'. */
+        intervals?: string;
+    };
+    /**
+     * lim input as v → to: limit('\\lim_{x \\to 0} \\frac{\\sin x}{x}') (one-sided from x \\to 0^+), or limit('sin(x)/x', 'x', 0,
+     * { side: 'left' | 'right' }). text: the value (a number, '∞', '-∞') or 'does not exist' (exists: false, with the reason).
+     */
+    limit(input: ExprInput, v?: string, to?: ExprInput | number, options?: CallOptions & { side?: 'left' | 'right' }): CASResult & {
+        exists: boolean;
+        /** The value is ∞ or -∞. */
+        infinite?: boolean;
+        /** Why there is no limit: the sides differ, or it keeps swinging. */
+        reason?: string;
     };
     /** Linear equations in several unknowns. */
     /** `solution` is null unless there is exactly one. */

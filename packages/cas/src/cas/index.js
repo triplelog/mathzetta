@@ -20,12 +20,18 @@
 // Each call returns its steps; { steps: 'brief' | false | { show, hide, explain } }
 // picks which (see steps.js). The guide: docs/cas.md.
 
-import { parse, fromPostfix, op, sym, isOp, walk, nodeCount } from '../expr.js';
+import { parse, fromPostfix, op, sym, isOp, walk, nodeCount, replaceAt, exactNum } from '../expr.js';
 import { canon, display, normal, freeSymbols, add, neg, CasError, withComplex } from './form.js';
 import { readRuleDocs, buildRuleSet, rewrite, codedStep } from './rules.js';
 import { stepOptions, selectSteps, DETAIL } from './steps.js';
 import { expand as expandForm, factorForm, drawFactored, cancel as cancelForm, together as togetherForm } from './poly.js';
-import { solveEquation, solveLinearSystem, substitute as substituteNode } from './solve.js';
+import { solveEquation, solveLinearSystem, solveInequality, substitute as substituteNode } from './solve.js';
+import { findLimit, readLimit, pointOf, limitNode, NoLimit } from './limit.js';
+import { trigShapes } from './trig.js';
+
+const INEQUALITIES = new Set(['<', '>', '≤', '≥']);
+const TRIG_NAMES = new Set(['sin', 'cos', 'tan', 'sec', 'csc', 'cot']);
+const INVERSE_TRIG = new Set(['arcsin', 'arccos', 'arctan', 'arcsec', 'arccsc', 'arccot']);
 import { antiderivative, definite } from './integrate.js';
 import { approximate as approximateNode, approximateParts } from './approx.js';
 import { toText } from './text.js';
@@ -59,6 +65,19 @@ export const MESSAGES = {
   'solve.reject': '{value} is not a solution: {reason}.',
   'solve.always': 'This is true for every {v}.',
   'solve.never': 'This is never true, so there is no solution.',
+  'simplify.trig': 'Write it with sin and cos, use sin² + cos² = 1 and the double-angle formulas, and cancel.',
+  'limit.substitute': '{f} is continuous at {v} = {a}: put {a} in.',
+  'limit.cancel': '{f} is 0/0 at {v} = {a}: cancel the common factor first.',
+  'limit.lhopital': "{f} is {form} as {v} → {a}: by L'Hôpital's rule, take the limit of the top's derivative over the bottom's.",
+  'limit.leading': 'As {v} → {a}, the highest powers decide: {f} behaves like {lead}.',
+  'limit.zero-times-infinity': '{f} is 0·∞: write it as a quotient.',
+  'limit.combine': '{f} is ∞ − ∞: write it as one fraction.',
+  'limit.squeeze': '{bounded} stays between two bounds, and what it is multiplied by goes to 0: so does the product (the squeeze theorem).',
+  'limit.divide-power': 'Divide the top and the bottom by {power}.',
+  'limit.conjugate': '{f} is ∞ − ∞ with a root: multiply top and bottom by the conjugate.',
+  'limit.exp-log': '{f} is {form}: write it as e to the power (exponent · ln base), and find the limit of the exponent.',
+  'limit.one-sided': 'From the left {f} goes to {left}, from the right to {right}: the limit does not exist.',
+  'solve.sign-chart': 'Where each side minus the other is 0, or has no value: {points}. It keeps one sign between them, so test one {v} in each interval, and each point.',
   'solve.unsolved': 'There is no exact method here for solving for {v}; try { approximate: true }.',
   'solve.numeric': 'Found {count} solution(s) numerically.',
   'system.eliminate': 'Use one equation to remove {v} from the others.',
@@ -70,6 +89,14 @@ export const MESSAGES = {
   'integrate.divide': 'The top has at least the degree of the bottom: divide first.',
   'integrate.partial-fractions': 'Split the fraction into simple fractions, one for each factor below.',
   'integrate.evaluate': 'Evaluate {F} at {b} and at {a}, and subtract.',
+  'integrate.improper': 'An improper integral: at an infinite end, the limit of {F} as {v} goes there; then subtract.',
+  'integrate.u-substitution': 'Let {u} = {inside}, so d{u} = {du} d{v}: the integral is in {u} alone.',
+  'integrate.complete-square': 'Partial fractions, and complete the square in {Q}: the top that is a multiple of its derivative gives a log, the rest an arctangent.',
+  'integrate.parts-twice': 'By parts twice: the integral of {e}·{t} comes back, so solve for it.',
+  'integrate.product-to-sum': 'Write the product of sines and cosines as a sum.',
+  'integrate.odd-power': 'Keep one {f} and write the rest with {other} (sin² + cos² = 1): then {other} is the substitution.',
+  'integrate.reduction': 'The reduction formula for {f} to the power {n}.',
+  'integrate.trig-substitution': 'Let {x} = {a}·sin θ: the root becomes {a}·cos θ.',
   substitute: 'Put in the values.',
 };
 
@@ -180,8 +207,15 @@ class CAS {
     const ex = rewrite(display(expandForm(x)), this.set.view('simplify'), { format: this.format });
     tries.push({ node: ex.node, id: 'simplify.expand', name: 'Multiply out' });
     if (x.k === 'add' && !plain) tries.push({ node: drawFactored(factorForm(x)), id: 'simplify.factor', name: 'Factor' });
+    // the trig identities: in sin and cos, sin² + cos² = 1, the double angles, canceled (src/cas/trig.js)
+    // a trig function of an inverse one (sin(2 arcsin x)) written out is preferred, even when a little longer
+    const nested = (n) => walk(n, 'pre').some(({ node: m }) => isOp(m) && TRIG_NAMES.has(m.op) && walk(m.args[0], 'pre').some(({ node: k }) => isOp(k) && INVERSE_TRIG.has(k.op)));
+    for (const shape of trigShapes(this, best)) tries.push({ node: shape, id: 'simplify.trig', name: 'Trigonometric identities', prefer: nested(best) && !nested(shape) });
+    let unnested = false;   // a preferred shape was taken: none that nests again replaces it
     for (const t of tries) {
-      if (nodeCount(t.node) < nodeCount(best)) {
+      if (unnested && t.id === 'simplify.trig' && !t.prefer) continue;
+      if (t.prefer) unnested = true;
+      if (nodeCount(t.node) < nodeCount(best) || t.prefer) {
         extra = this.step(t.id, t.name, ['shorter'], best, t.node);   // the one step that names the shorter form
         best = t.node;
       }
@@ -286,6 +320,7 @@ class CAS {
   solve(input, v, options = {}) {
     const start = this.node(input);
     const variable = this.variable(start, v);
+    if (isOp(start) && INEQUALITIES.has(start.op)) return this.inequality(start, variable, options);
     const s = solveEquation(this, start, variable, options);
     let solutions = s.solutions;
     if (options.approximate) {
@@ -300,6 +335,63 @@ class CAS {
       unsolved: s.unsolved.filter((e) => !e.always), always: s.always,
       steps: selectSteps(s.steps, stepOptions(options.steps)),
     };
+  }
+
+  /**
+   * An inequality, or a chain: where it holds, as conditions ('x < -2 or x > 2', '-3 < x < 2') and as intervals
+   * ('(-∞, -2) ∪ (2, ∞)'); pieces: { lo, hi, loClosed, hiClosed } with null for an end at infinity.
+   */
+  inequality(start, variable, options) {
+    const s = solveInequality(this, start, variable);
+    const base = { solutions: [], variable, unsolved: [], always: false, steps: selectSteps(s.steps, stepOptions(options.steps)) };
+    if (!s.pieces) return { ...base, pieces: null, intervals: '', result: null, unsolved: [start], text: `no exact solution found for ${variable}` };
+    const x = sym(variable);
+    const always = s.pieces.length === 1 && !s.pieces[0].lo && !s.pieces[0].hi;
+    const condition = ({ lo, hi, loClosed, hiClosed }) => {
+      if (lo && hi && lo.s === hi.s) return op('=', [x, lo]);
+      if (!lo && !hi) return null;
+      if (!lo) return op(hiClosed ? '≤' : '<', [x, hi]);
+      if (!hi) return op(loClosed ? '≥' : '>', [x, lo]);
+      return op(hiClosed ? '≤' : '<', [op(loClosed ? '≤' : '<', [lo, x]), hi]);
+    };
+    const interval = ({ lo, hi, loClosed, hiClosed }) => (lo && hi && lo.s === hi.s
+      ? `{${this.format(lo)}}`
+      : `${loClosed ? '[' : '('}${lo ? this.format(lo) : '-∞'}, ${hi ? this.format(hi) : '∞'}${hiClosed ? ']' : ')'}`);
+    const result = s.pieces.map(condition).filter(Boolean).reduce((acc, c) => (acc ? op('|', [acc, c]) : c), null);
+    const intervals = s.pieces.length ? s.pieces.map(interval).join(' ∪ ') : '∅';
+    const text = always ? `true for every ${variable}` : result ? this.format(result) : 'no solution';
+    return { ...base, pieces: s.pieces, intervals, result, always, text };
+  }
+
+  /**
+   * lim input as v → to: limit('\\lim_{x \\to 0} \\frac{\\sin x}{x}'), or limit('sin(x)/x', 'x', 0); { side: 'left' | 'right' }.
+   * text is the value (a number, ∞, -∞) or 'does not exist' (exists: false, with the reason).
+   */
+  limit(input, v, to, options = {}) {
+    if (to !== undefined && to !== null && typeof to === 'object' && !Array.isArray(to) && !to.type) { options = to; to = undefined; }
+    const start = this.node(input);
+    const written = readLimit(start);
+    // limits inside an expression (\lim_{x→2} x^2 + 1 is (lim x²) + 1): each worked out in place
+    if (!written && walk(start, 'pre').some(({ node }) => readLimit(node))) {
+      let out = start;
+      for (const { node, path } of walk(start, 'post').filter(({ node: n }) => readLimit(n)).reverse()) {
+        const inner = this.limit(node, undefined, undefined, { steps: false });
+        if (!inner.exists) return inner;
+        out = replaceAt(out, path, inner.result);
+      }
+      return this.simplify(out, options);
+    }
+    const f = written ? written.f : start;
+    const variable = written ? written.v : this.variable(start, v);
+    const point = written ? written.to : typeof to === 'number' ? exactNum(String(to)) : this.node(to ?? '0');
+    const side = options.side === 'right' || options.side === '+' ? 1 : options.side === 'left' || options.side === '-' ? -1 : written ? written.side : 0;
+    try {
+      const { value, steps } = findLimit(this, f, variable, pointOf(point), side);
+      return { ...this.result(limitNode(value), steps, options), exists: true, infinite: Boolean(value.inf) };
+    } catch (error) {
+      if (!(error instanceof NoLimit)) throw error;
+      return { result: null, text: 'does not exist', exists: false, reason: error.message, steps: [] };
+    }
   }
 
   /** Linear equations in several unknowns. */
