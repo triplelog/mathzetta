@@ -16,8 +16,9 @@ export const PATHS = {
     ')': { fill: 'M0.08,0 C0.9,0.2 0.9,0.8 0.08,1 L0,0.975 C0.52,0.75 0.52,0.25 0,0.025 Z' },
     '{': { fill: 'M1,0 C0.45,0 0.5,0.05 0.5,0.2 L0.5,0.38 C0.5,0.46 0.35,0.49 0.05,0.5 C0.35,0.51 0.5,0.54 0.5,0.62 L0.5,0.8 C0.5,0.95 0.45,1 1,1 L1,0.985 C0.68,0.985 0.64,0.95 0.64,0.8 L0.64,0.62 C0.64,0.53 0.55,0.505 0.3,0.5 C0.55,0.495 0.64,0.47 0.64,0.38 L0.64,0.2 C0.64,0.05 0.68,0.015 1,0.015 Z' },
     '}': { fill: 'M0,0 C0.55,0 0.5,0.05 0.5,0.2 L0.5,0.38 C0.5,0.46 0.65,0.49 0.95,0.5 C0.65,0.51 0.5,0.54 0.5,0.62 L0.5,0.8 C0.5,0.95 0.55,1 0,1 L0,0.985 C0.32,0.985 0.36,0.95 0.36,0.8 L0.36,0.62 C0.36,0.53 0.45,0.505 0.7,0.5 C0.45,0.495 0.36,0.47 0.36,0.38 L0.36,0.2 C0.36,0.05 0.32,0.015 0,0.015 Z' },
-    // Radical: short tick, long down-stroke, long up-stroke to the top right.
-    'sqrt': { stroke: 'M0,0.62 L0.18,0.55 L0.45,0.97 L0.98,0.015' },
+    // Radical: short tick, long down-stroke, long up-stroke to the top right, ending at the very top
+    // (y = 0), which CSS puts on the center of the bar (.mv-hook).
+    'sqrt': { stroke: 'M0,0.62 L0.18,0.55 L0.45,0.97 L0.98,0' },
     // \cancel: one stroke, bottom left to top right, stretched over what it crosses out.
     'cancel': { stroke: 'M0,1 L1,0' },
     // Integral: an S slanted to the right with small hooks at each end.

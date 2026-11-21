@@ -162,6 +162,14 @@ test('fonts.css: every file it names is in fonts/, and the Greek faces cover onl
     assert.ok(css.lastIndexOf('inlinemath-greek') > css.lastIndexOf('lmroman'), 'declared after Latin Modern, so tried first for Greek');
 });
 
+test('the radical\'s hook is drawn inside the radicand and sized by CSS, so its tip always meets the bar', () => {
+    for (const input of ['\\sqrt{x}', '\\sqrt{\\frac{x+1}{x-1}}', '\\sqrt[3]{x^2+1}']) {
+        const html = toHTML(input, { label: false });
+        assert.match(html, /mv-radicand"[^>]*><svg class="mv-hook"/, input);
+        assert.doesNotMatch(html.match(/<svg class="mv-hook"[^>]*>/)[0], /height/, 'no estimated height: CSS takes it from the box');
+    }
+});
+
 test('every delimiter kind draws', () => {
     for (const input of ['(x+1)^2', '[0, 1)', '\\{1, 2\\}', '|x|', '\\lfloor x \\rfloor', '\\lceil x \\rceil', '\\binom{n}{k}']) {
         assert.ok(has(toHTML(input), 'fence'), input);

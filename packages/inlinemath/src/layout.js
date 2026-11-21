@@ -460,13 +460,16 @@ class Layout {
         const top = Math.max(inner.h, LH) + GAP + RULE;
         const depth = Math.max(inner.d, LD);
         const height = top + depth;
-        const hook = svg('sqrt', `${this.p}-hook`, `height:${em(height)};width:${em(0.5 + 0.06 * (height - 1))};vertical-align:${em(-depth)}`);
+        // The hook is drawn inside the radicand's box and sized by CSS to it (inlinemath.css .mv-hook), from the
+        // bar's center down: its tip meets the bar whatever the font or the content. Only its width is estimated.
+        const width = 0.5 + 0.06 * (height - 1);
+        const hook = svg('sqrt', `${this.p}-hook`, `width:${em(width)};left:${em(-width)}`);
         let pre = '';
         if (index) {
             const k = SCRIPT * 0.8;
             pre = this.el('rootindex', index.html, `font-size:${em(k)};vertical-align:${em((-depth + 0.55 * height) / k)}`);
         }
-        return box(this.el('sqrt', pre + hook + this.el('radicand', inner.html)), top, depth);
+        return box(this.el('sqrt', pre + this.el('radicand', hook + inner.html, `margin-left:${em(width + 0.05)}`)), top, depth);
     }
 
     /**

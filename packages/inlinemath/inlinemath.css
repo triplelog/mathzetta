@@ -70,8 +70,10 @@
 
 /* ---- radicals (metric: border and padding-top) ----------------------------- */
 .mv-sqrt { display: inline-block; white-space: nowrap; }
-.mv-hook { display: inline-block; overflow: visible; margin-left: 0.05em; }
-.mv-radicand { display: inline-block; border-top: 0.06em solid currentColor; padding: 0.1em 0.1em 0 0.06em; }
+.mv-radicand { display: inline-block; position: relative; border-top: 0.06em solid currentColor; padding: 0.1em 0.1em 0 0.06em; }
+/* the hook, in the radicand's left margin (layout.js sets its width and that margin): from the bar's center
+   (just below the middle of the 0.06em border above the box) to the bottom of what it holds, so the tip always meets the bar */
+.mv-hook { position: absolute; top: -0.02em; height: calc(100% + 0.02em); overflow: visible; }   /* a hair below the center: never above the bar */
 .mv-rootindex { display: inline-block; margin: 0 -0.32em 0 0.12em; }
 
 /* ---- delimiters: drawn at the full height of what they enclose -------------- */
