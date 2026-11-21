@@ -68,6 +68,7 @@ const PY = {
     eq: { '=': '==', '===': '==', '≠': '!=', '≠=': '!=' },
     ternary: (c, t, f) => `(${t} if ${c} else ${f})`,
     list: { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ')'], '[)': ['(', ')'] },
+    emptySet: 'set()',
     contains: (list, x, negate) => `${x} ${negate ? 'not in' : 'in'} ${list}`,
     factorial: (x) => `math.factorial(${x})`,
     perm: (n, k) => `math.perm(${n}, ${k})`,
@@ -525,6 +526,8 @@ function operation(node, render, lang) {
         const m = lang.matrix(matrixRows(node).map((r) => r.map(render)));
         return op === 'vmatrix' ? lang.det(m) : m;
     }
+    // Python's {} is an empty dict: its empty set is set()
+    if (op === '{}' && !node.args.length && lang.emptySet && lang.list['{}'][0] === '{') return lang.emptySet;
     if (lang.list[op]) return lang.list[op][0] + list() + lang.list[op][1];
     if (lang.eq[op]) return binary(lang.eq[op]);
     if (isCustomFunction(op)) return `${identifier(customName(op), lang)}(${list()})`;

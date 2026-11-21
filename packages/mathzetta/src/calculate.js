@@ -532,6 +532,12 @@ function pMul(a, b) {
 }
 function pPowWhole(a, k) {
     if (!isC(a) && k > 1000n) throw new UnknownError('too large to calculate');
+    // a complex number whose exact power would pass 20,000 bits ((3/5 + 4/5i)^100000 took 3 s): in polar form
+    if (isC(a) && k > 1n) {
+        const { re, im } = cParts(a);
+        const size = (v) => (isX(v) ? bitLength(v.c.n) + bitLength(v.c.d) + (v.root ? bitLength(v.root.r) : 0) : 64);
+        if (Number(k) * Math.max(size(re), size(im), 1) > 20000) return cPow(cParts(a), rat(k));
+    }
     let out = rat(1);
     let base = a;
     for (let e = k; e > 0n; e >>= 1n) {

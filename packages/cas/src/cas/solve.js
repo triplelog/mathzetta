@@ -521,6 +521,14 @@ export { keyOf };
 
 // ---- inequalities ------------------------------------------------------------------------
 
+/** A double as a decimal with no exponent (the number reader takes none): 5e-8 → '0.00000005000000000000000', 1e43 → digits. */
+function plainDecimal(t) {
+  if (Math.abs(t) >= 1e21) return BigInt(Math.round(t)).toString();
+  return t.toFixed(Math.min(100, Math.max(0, 17 - Math.floor(Math.log10(Math.abs(t) || 1)))));
+}
+
+const ONE = () => exactNum('1');
+
 const RELATIONS = { '<': (d) => d < 0, '>': (d) => d > 0, '≤': (d) => d <= 0, '≥': (d) => d >= 0 };
 const TRIG = new Set(['sin', 'cos', 'tan', 'csc', 'sec', 'cot']);
 
@@ -534,14 +542,16 @@ const TRIG = new Set(['sin', 'cos', 'tan', 'csc', 'sec', 'cot']);
 export function solveInequality(cas, input, v) {
   const steps = [];
   const conditions = [];
-  // a < E < b is E > a and E < b
-  if (isOp(input.args[0]) && RELATIONS[input.args[0].op]) {
-    const [inner, b] = input.args;
-    const [a, E] = inner.args;
-    conditions.push({ h: normal(op('-', [a, E])), op: inner.op }, { h: normal(op('-', [E, b])), op: input.op });
-  } else {
-    conditions.push({ h: normal(op('-', [input.args[0], input.args[1]])), op: input.op });
+  // a < E < b is a < E and E < b; a chain of any length, each link
+  const links = [];
+  let first = input;
+  while (isOp(first.args[0]) && RELATIONS[first.args[0].op]) {
+    links.unshift({ op: first.op, right: first.args[1] });
+    first = first.args[0];
   }
+  const terms = [first.args[0], first.args[1], ...links.map((l) => l.right)];
+  const ops = [first.op, ...links.map((l) => l.op)];
+  ops.forEach((rel, i) => conditions.push({ h: normal(op('-', [terms[i], terms[i + 1]])), op: rel }));
   const others = new Set(conditions.flatMap((c) => [...freeSymbols(c.h)]));
   others.delete(v);
   if (others.size) throw new CasError(`an inequality in ${v} with other unknowns (${[...others].join(', ')}) can't be charted`);
@@ -556,8 +566,14 @@ export function solveInequality(cas, input, v) {
       if (!isOp(n) || !freeSymbols(n).has(v)) continue;
       if (n.op === '/') where.push(n.args[1]);
       if (n.op === 'sqrt' || n.op === 'ln') where.push(n.args[0]);
-      if (n.op === 'root' || n.op === 'log') where.push(n.args[1]);
+      if (n.op === 'root') where.push(n.args[1]);
+      if (n.op === 'log') where.push(n.args[1], n.args[0], op('-', [n.args[0], ONE()]));   // a varying base: 0 and 1 too
+      // where the function starts to have a value: arcsin, arccos, arctanh on [-1, 1], arcsec and arccsc outside it, arccosh from 1
+      if (['arcsin', 'arccos', 'arctanh', 'arcsec', 'arccsc'].includes(n.op)) where.push(op('-', [n.args[0], ONE()]), op('+', [n.args[0], ONE()]));
+      if (n.op === 'arccosh') where.push(op('-', [n.args[0], ONE()]));
       if (n.op === '^' && isN(canon(n.args[1])) && canon(n.args[1]).q.sign < 0) where.push(n.args[0]);
+      // a fractional power (x^(1/2)): real from where its base is 0
+      if (n.op === '^' && isN(canon(n.args[1])) && !canon(n.args[1]).q.isInteger) where.push(n.args[0]);
     }
   }
   const points = new Map();
@@ -575,9 +591,10 @@ export function solveInequality(cas, input, v) {
   // does it hold at t (a number)? false where a side has no value
   const holds = (t) => conditions.every(({ h, op: rel }) => {
     try {
-      const d = approximate(substitute(h, v, exactNum(Number(t).toPrecision(17))), { digits: 20 });
+      const d = approximate(substitute(h, v, exactNum(plainDecimal(t))), { digits: 20 });
       if (!Number.isFinite(d.re) || Math.abs(d.im) > 1e-12) return false;
-      return RELATIONS[rel](Math.abs(d.re) < 1e-12 ? 0 : d.re);
+      // strictly between the points, so not 0 unless it is 0 all along (|x| − x for x > 0): only rounding is snapped
+      return RELATIONS[rel](Math.abs(d.re) < 1e-30 ? 0 : d.re);
     } catch {
       return false;
     }

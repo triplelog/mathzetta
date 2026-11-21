@@ -9,7 +9,8 @@
  *   toHTML('{{solve(x^2 - 5x + 6 = 0, x)}}', { blocks: casBlocks() })   // x = 2 or x = 3
  *   stepsHTML(mathCAS().diff('x^2 sin x', 'x', { steps: 'brief' }).steps)
  *
- * Block functions: simplify, expand, factor, cancel, limit(f, x, a) (and \lim_{x \to a} as written), diff(f, x[, n]) (or der, derivative,
+ * Block functions: simplify, expand, factor, cancel, limit(f, x, a[, right | left]) or limit(f, x -> a^+) (and \lim_{x \to a} as
+ * written), diff(f, x[, n]) (or der, derivative,
  * differentiate), integrate(f, x[, a, b]) (or integral), solve(equation, x), approx(expr[, digits]);
  * d/dx … and ∫ … without limits go to the CAS too. In Markdown, saved variables ($_f := x^3$)
  * stand for their expressions: {{diff(f, x)}}. Everything else is MathZetta's calculator (calculateBlock), as without this.
@@ -78,6 +79,7 @@ function withValues(tokens, scope) {
   return tokens.flatMap((t) => (values.has(t) && !bound.has(t) ? values.get(t) : [t]));
 }
 
+const SIDES = { right: 'right', r: 'right', '+': 'right', left: 'left', l: 'left', '-': 'left' };
 const CALLS = new Set(['simplify', 'expand', 'factor', 'cancel', 'diff', 'integrate', 'solve', 'approx', 'limit']);
 // other names people write for them
 const ALIASES = { integral: 'integrate', differentiate: 'diff', approximate: 'approx', simp: 'simplify' };
@@ -144,6 +146,17 @@ export function casBlocks(options = {}) {
       const at = cas.substitute(d.result, { [name]: by.args[1].s }, how);
       return { ...at, steps: [...(d.steps ?? []), ...(at.steps ?? [])] };
     };
+    // limit(f, x, a[, side]) with side right/left (r, l, +, -), or limit(f, x -> a), limit(f, x -> a^+)
+    const limitCall = ([f, by, to, side]) => {
+      let where = side ? SIDES[side.s.replace(/^\\/, '')] : undefined;
+      if (side && !where) throw new Error(`a side is right or left, not ${side.s}`);
+      if (by && by.op === '→') {
+        [by, to] = by.args;
+        const mark = to.op === '^' ? to.args[1].s.replace(/^\\/, '') : null;
+        if (mark === '+' || mark === '-') { where = SIDES[mark]; to = to.args[0]; }
+      }
+      return cas.limit(f, word(by), to, { ...how, ...(where ? { side: where } : {}) });
+    };
     let r;
     try {
       switch (worked ? 'simplify-read' : symbolic ? name : head === 'der' ? 'derivative' : head === 'lim' ? 'lim' : 'antiderivative') {
@@ -156,7 +169,7 @@ export function casBlocks(options = {}) {
         case 'integrate': r = cas.integrate(args[0], word(args[1]), { ...how, ...(args[3] ? { from: args[2].s, to: args[3].s } : {}) }); break;
         case 'solve': r = cas.solve(args[0], word(args[1]), how); break;
         case 'lim': r = cas.limit(node, undefined, undefined, how); break;
-        case 'limit': r = cas.limit(args[0], word(args[1]), args[2] ?? undefined, how); break;
+        case 'limit': r = limitCall(args); break;
         case 'approx': r = cas.approximate(args[0], { ...how, digits: args[1] ? Number(args[1].s) : 15 }); break;
         case 'derivative': r = derivative(node.args[0], node.args[1], 1); break;
         default: r = cas.integrate(node, undefined, how); break;

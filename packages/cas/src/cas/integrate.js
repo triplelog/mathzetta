@@ -200,7 +200,31 @@ function specialForms(cas, node, v) {
       const parts = [...rest, op('^', [op('-', [whole(1), op('^', [op(other, [arg]), whole(2)])]), whole(k)]), op(odd.base.op, [arg])];
       const rewritten = parts.reduce((all, f) => op('*', [all, f]));
       const next = normal(integral(rewritten, w));
-      return step('integrate.odd-power', 'An odd power', next, { f: odd.base, other: op(other, [arg]) });
+      const first = step('integrate.odd-power', 'An odd power', next, { f: odd.base, other: op(other, [arg]) });
+      if (!(arg.type === 'sym' && arg.token === v)) return first;
+      // the substitution at once, u = cos x (or sin x): a polynomial in u, integrated term by term
+      // (left to the rules, sin⁴¹ x was 21 integrals and 40 rounds of rewriting)
+      const u = v === 'u' ? 't' : 'u';
+      const m = rest.length ? factors.find((f) => f !== odd).n : 0;
+      // a polynomial of degree 2k + m: past 100 its working (and its answer) runs long
+      if (2 * k + m > 100) throw new CasError(`a power this high (${odd.n + m}) is not integrated here`);
+      const sign = odd.base.op === 'sin' ? -1 : 1;   // d(cos x) = −sin x dx
+      const inside = op(other, [arg]);
+      const poly = op('*', [op('^', [op('-', [whole(1), op('^', [sym(u), whole(2)])]), whole(k)]), op('^', [sym(u), whole(m)])]);
+      const inU = normal(integral(sign < 0 ? op('neg', [poly]) : poly, sym(u)));
+      const cs = coefficients(expand(canon(poly)), u);
+      if (!cs) return first;
+      const terms = [...cs].map(([d, c]) => op('*', [display(c), op('/', [op('^', [inside, whole(d + 1)]), whole(d + 1)])]));
+      const sum = terms.reduce((all, t) => op('+', [all, t]));
+      const result = normal(sign < 0 ? op('neg', [sum]) : sum);
+      return {
+        node: result,
+        steps: [
+          ...first.steps,
+          cas.step('integrate.u-substitution', 'Substitute', ['substitute'], next, inU, { u: sym(u), inside, du: sign < 0 ? op('neg', [odd.base]) : odd.base, v }),
+          cas.step('integrate.back', 'Back to ' + v, ['substitute'], inU, result, { u: sym(u), inside }),
+        ],
+      };
     }
   }
 
@@ -460,7 +484,9 @@ function improper(cas, F, v, a, b, f) {
     if (L.infinite) throw new CasError(`the integral diverges: as ${v} → ${cas.format(bound)}, ${cas.format(F)} goes to ${L.text}`);
     return L.result;
   };
-  const [Fa, Fb] = [valueAt(a, ends[0], 'right'), valueAt(b, ends[1], 'left')];
+  // a finite end is neared from inside the interval: from the right at its lower end (the order may be b < a: ∫ from ∞ to 0)
+  const ascending = number(ends[0]) < number(ends[1]);
+  const [Fa, Fb] = [valueAt(a, ends[0], ascending ? 'right' : 'left'), valueAt(b, ends[1], ascending ? 'left' : 'right')];
   const value = normal(op('-', [Fb, Fa]));
   const shown = op('-', [Fb, Fa]);
   return { value, step: cas.step('integrate.improper', 'Limits at the ends', ['evaluate'], F, shown, { a, b, F, v }) };

@@ -436,6 +436,15 @@ suite('cas: more integration methods', () => {
     for (const f of ['cos(x)^3', 'sin(x)^3', 'sin(x)^2 cos(x)^3', 'sin(x)^5', 'sec(x)', 'csc(x)', 'cot(x)', 'sec(x)^3', 'sec(x)^4', 'csc(x)^3', 'sec(x) tan(x)']) checked(f);
     equal(cas.integrate('sec(x)', 'x').text, 'ln(|sec(x) + tan(x)|)');
   });
+  test('high odd powers: the substitution at once (sin⁴¹ x took 4 s), and a cap past degree 100', () => {
+    for (const f of ['sin(x)^7', 'cos(x)^9 sin(x)^2', 'sin(x)^5 cos(x)^4']) checked(f);
+    const start = Date.now();
+    equal(cas.integrate('sin(x)^41', 'x', { steps: false }).text.startsWith('-cos(x)^41/41 + 20cos(x)^39/39'), true);
+    assert(Date.now() - start < 1000, `sin^41 took ${Date.now() - start} ms`);
+    const ids = cas.integrate('sin(x)^3', 'x').steps.map((s) => s.id);
+    deepEqual(ids, ['integrate.odd-power', 'integrate.u-substitution', 'integrate.back']);
+    throws(() => cas.integrate('sin(x)^103', 'x'));
+  });
   test('e^(ax)·sin(bx) by parts twice; products of sines and cosines', () => {
     for (const f of ['e^x sin(x)', 'e^(2x) cos(3x)', 'sin(3x) cos(2x)', 'cos(3x) cos(x)', 'sin(2x) sin(5x)']) checked(f);
     equal(cas.integrate('e^x sin(x)', 'x').text, 'e^x·(-cos(x) + sin(x))/2');
@@ -489,6 +498,21 @@ suite('cas: inequalities', () => {
     equal(both('sqrt(x - 1) < 2'), '1 ≤ x < 5 | [1, 5)', 'only where the root has a value');
     equal(both('ln(x) > 1'), 'x > e | (e, ∞)');
     equal(both('e^x > 2'), 'x > ln(2) | (ln(2), ∞)');
+    equal(both('1 < x < 3 < 5'), '1 < x < 3 | (1, 3)', 'a chain of any length');
+    equal(both('0 < x < 2 < 1'), 'no solution | ∅', 'a link with no x that fails');
+    equal(both('ln(x) < 100'), '0 < x < e^100 | (0, e^100)', 'a test point near e^100 (it was written 1.3e+43, unread)');
+  });
+  test('small numbers: no exponent in test points, no snapping to 0 between the points', () => {
+    equal(both('x (x - 1/10000000) < 0'), '0 < x < 1/10000000 | (0, 1/10000000)');
+    equal(both('x^2 + 1/10^15 > 0'), 'true for every x | (-∞, ∞)');
+    equal(both('x^2 - 1/10^15 < 0'), '-sqrt(10)/100000000 < x < sqrt(10)/100000000 | (-sqrt(10)/100000000, sqrt(10)/100000000)');
+  });
+  test('where the functions have values: arcsin, arccos, arctanh, arccosh, fractional powers', () => {
+    equal(both('arcsin(x) > -2'), '-1 ≤ x ≤ 1 | [-1, 1]');
+    equal(both('arccos(x) > -1'), '-1 ≤ x ≤ 1 | [-1, 1]');
+    equal(both('arctanh(x) < 0'), '-1 < x < 0 | (-1, 0)');
+    equal(both('arccosh(x) > -1'), 'x ≥ 1 | [1, ∞)');
+    equal(both('x^(1/2) > -1'), 'x ≥ 0 | [0, ∞)');
   });
   test('always, never, a single point, a touching root', () => {
     equal(both('x^2 + 1 > 0'), 'true for every x | (-∞, ∞)');
@@ -566,6 +590,42 @@ suite('cas: limits', () => {
     equal(cas.limit('\\lim_{x \\to 0} \\frac{|x|}{x}').exists, false);
     equal(cas.limit('\\lim_{x\\to\\infty} \\sin x').exists, false);
     equal(cas.limit('\\lim_{x \\to 0} \\sin(1/x)').exists, false);
+  });
+  test('a side with no real values: no limit from there, nor a two-sided one', () => {
+    equal(L('ln(x)', 'x', 0, { side: 'left' }), 'does not exist');
+    equal(L('ln(x)', 'x', 0), 'does not exist');
+    equal(L('ln(x)', 'x', 0, { side: 'right' }), '-∞');
+    equal(L('sqrt(x)', 'x', 0), 'does not exist');
+    equal(L('sqrt(x)', 'x', 0, { side: 'right' }), '0');
+    equal(L('sqrt(1 - x^2)', 'x', 1, { side: 'left' }), '0');
+    equal(L('cbrt(x)', 'x', 0), '0', 'an odd root is real on both sides');
+    equal(L('e^(1/x)', 'x', 0, { side: 'right' }), '∞', 'too large is not "not real"');
+    equal(createCAS({ read: (t) => mz(t), complex: true }).limit('sqrt(-x)', 'x', 1).text, 'i', 'complex mode: values off the line are values');
+  });
+  test('logs to any base; letters of unknown sign are refused', () => {
+    equal(L('\\log_{1/2} x', 'x', '∞'), '-∞');
+    equal(L('\\log_{10}(100 \\sin(x) / x)', 'x', 0), '2');
+    equal(L('\\log_2 x', 'x', 0, { side: 'right' }), '-∞');
+    throws(() => cas.limit('a x', 'x', '∞'), 'sign of a');
+    throws(() => cas.limit('x / a', 'x', '∞'), 'sign of a');
+  });
+  test('powers: only 1^∞, 0^0 and ∞^0 are indeterminate', () => {
+    equal(L('(2 + 1/x)^x', 'x', '∞'), '∞');
+    equal(L('(1/2 + 1/x)^x', 'x', '∞'), '0');
+    equal(L('x^(1/x)', 'x', 0, { side: 'right' }), '0');
+    equal(L('0^x', 'x', '∞'), '0');
+    equal(cas.limit('0^x', 'x', '-∞').reason, '0 to a negative power has no value');
+    equal(L('(1 + x)^(1/x)', 'x', 0), 'e', 'the exponent has no two-sided limit, the power has');
+    deepEqual(cas.limit('(2 + 1/x)^x', 'x', '∞').steps.map((s) => s.id), []);
+    const forms = (f, ...rest) => cas.limit(f, ...rest).steps.filter((s) => s.id === 'limit.exp-log').map((s) => s.explanation.match(/is (\S+):/)[1]);
+    deepEqual(forms('(1 + 1/x)^x', 'x', '∞'), ['1^∞']);
+    deepEqual(forms('x^x', 'x', 0, { side: 'right' }), ['0^0']);
+    deepEqual(forms('(1 + x)^(1/x)', 'x', 0).length, 1, 'the abandoned try leaves no steps');
+  });
+  test('limits inside an expression: the full answer, and ∞ refused', () => {
+    const r = cas.limit('\\lim_{x \\to 2} x^2 + 1');
+    deepEqual([r.text, r.exists, r.infinite], ['5', true, false]);
+    throws(() => cas.limit('\\lim_{x \\to 0^+} (1/x) + 1'), 'infinite');
   });
   test('a wrong answer is refused, not given: the check against numbers near the point', async () => {
     const { verify, pointOf } = await import('../src/cas/limit.js');

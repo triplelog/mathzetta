@@ -170,14 +170,17 @@ export function setBuilder(text) {
         let divider = null;   // \mid, \middle| or : ; else the first bare | (which may also be an absolute value's)
         let bare = null;
         let end = -1;
+        let asked = 0;
         for (let i = start + open.length; i < text.length; i++) {
             const c = CLOSERS.find((s) => text.startsWith(s, i));
             if (depth === 0 && c && (open === '{' ? c === '}' : c !== '}')) { end = i; open += '|' + c; break; }
             if ('([{'.includes(text[i]) && !(text[i] === '{' && text[i - 1] === '\\')) depth++;
             else if (')]}'.includes(text[i]) && text[i - 1] !== '\\') depth--;
+            if (depth === 0 && text[i] === '?') asked++;   // {x > 0 ? 1 : 0}: the : is the ternary's
             if (depth === 0 && !divider) {
                 const d = /^(?:\\middle\s*\||\\mid(?![A-Za-z])|:(?!=)|\|)/.exec(text.slice(i));
-                if (d && d[0] !== '|') divider = { at: i, length: d[0].length };
+                if (d && d[0] === ':' && asked) asked--;
+                else if (d && d[0] !== '|') divider = { at: i, length: d[0].length };
                 else if (d && latex && !bare && !/\\left\s*$|\\right\s*$|\\middle\s*$/.test(text.slice(0, i))) bare = { at: i, length: 1 };
             }
         }
@@ -298,8 +301,9 @@ export function evaluationBarsLatex(text) {
         const { m, limits, opener } = found;
         const start = opener ? opener.start : termBefore(text, m.index);
         const body = text.slice(opener ? opener.end : start, m.index).trim();
-        const named = /^\s*([A-Za-z])\s*=\s*([\s\S]+)$/.exec(limits.lo);
-        const hi = limits.hi.replace(/^\s*[A-Za-z]\s*=\s*/, '');
+        // the limits may name the variable, a Greek one too: _{\theta=0}^{\theta=\pi}
+        const named = /^\s*([A-Za-zα-ωΑ-Ω]|\\[A-Za-z]+)\s*=\s*([\s\S]+)$/.exec(limits.lo);
+        const hi = limits.hi.replace(/^\s*(?:[A-Za-zα-ωΑ-Ω]|\\[A-Za-z]+)\s*=\s*/, '');
         const call = named ? `evaluated((${body}),${named[1]},${named[2]},${hi})` : `evaluated((${body}),${limits.lo},${hi})`;
         text = `${text.slice(0, start)}${start > 0 && /[^\s(=]/.test(text[start - 1]) ? ' ' : ''}${call}${text.slice(limits.end)}`;
     }

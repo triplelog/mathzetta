@@ -25,7 +25,7 @@ import { fromPostfix } from './tree.js';
 import { operatorNames, precedenceOf } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 
-export const version = '1.2.0';
+export const version = '1.3.0';
 
 export { parse, parse as parseToPostfix, parseSteps, parseTree, clean, setBlockHandler } from './parse/index.js';
 export { fromPostfix, toPostfix, asTree, walk, firstVariable, num, sym, op, leaf } from './tree.js';
@@ -60,13 +60,15 @@ export function getSupportedOperations() {
         inverse_trig: ['arcsin', 'arccos', 'arctan', 'arcsec', 'arccsc', 'arccot', 'arcsinh', 'arccosh', 'arctanh', 'atan2'],
         logarithmic: ['ln', 'log', 'loglog', 'logloglog', 'expm1'],
         functions: ['sqrt', 'root', 'abs', 'floor', 'ceil', 'round', 'max', 'min', 'gcd', 'mean', 'random'],
-        calculus: ['der', 'int', 'lim'],
+        calculus: ['der', 'int', 'lim', 'evaluated'],
         summation: ['sum', 'prod', '\\sumidx', '\\prodidx'],
-        comparison: ['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '∈', '∉', '→'],
+        comparison: ['=', '===', '≠', '≠=', '<', '>', '≤', '≥', '≈', '≡', '∈', '∉', '→'],
         logical: ['&', '|', '\\not', '\\xor', '\\nor', '\\nand', '\\implies', '\\iff', '?:'],
         combinatorics: ['perm', 'comb'],
-        groups: ['()', '[]', '{}', '(]', '[)'],
-        misc: ['_'],
+        sets: ['∪', '∩', 'setbuilder'],
+        matrices: ['pmatrix', 'bmatrix', 'vmatrix', 'det'],
+        groups: ['()', '[]', '{}', '(]', '[)', 'pm'],
+        misc: ['_', 'pmod', 'fixed'],
         all: operatorNames(),
     };
 }

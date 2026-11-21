@@ -101,7 +101,7 @@ export const MESSAGES = {
 };
 
 /** The calls that run in the CAS's number mode (complex or real). */
-const CALLS = ['normal', 'rewrite', 'simplify', 'expand', 'factor', 'cancel', 'diff', 'differentiate', 'integrate', 'solve', 'solveSystem', 'substitute', 'approximate', 'equivalent'];
+const CALLS = ['normal', 'rewrite', 'simplify', 'expand', 'factor', 'cancel', 'diff', 'differentiate', 'integrate', 'solve', 'solveSystem', 'substitute', 'approximate', 'equivalent', 'limit'];
 
 class CAS {
   constructor(set, messages, format, read, complex) {
@@ -377,9 +377,11 @@ class CAS {
       for (const { node, path } of walk(start, 'post').filter(({ node: n }) => readLimit(n)).reverse()) {
         const inner = this.limit(node, undefined, undefined, { steps: false });
         if (!inner.exists) return inner;
+        // ∞ inside a sum or product is not a number to simplify with
+        if (inner.infinite) throw new CasError('a limit inside an expression that is infinite is not worked out here');
         out = replaceAt(out, path, inner.result);
       }
-      return this.simplify(out, options);
+      return { ...this.simplify(out, options), exists: true, infinite: false };
     }
     const f = written ? written.f : start;
     const variable = written ? written.v : this.variable(start, v);

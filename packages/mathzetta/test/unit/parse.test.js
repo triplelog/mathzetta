@@ -83,6 +83,21 @@ suite('unchanged: the value of a case nobody wrote', () => {
 
 suite('strings and {{blocks}}', () => {
     test('quoted strings are kept whole', () => eq(parse('x = "2+2<5"'), ['x', '"2+2<5"', '=']));
+    test('review before 1.3: bars written plainly or with Greek, differentials after a bare function, a ternary in braces, set()', () => {
+        eq(P('[x^2]_0^1'), 'x 2 ^ x 0 1 evaluated');
+        eq(calculate('[x^2]_0^1').text, '1');
+        eq(P('[\\sin\\theta]_{\\theta=0}^{\\theta=\\pi}'), 'θ sin θ 0 pi evaluated');
+        eq(calculate('[\\cos θ]_{θ=0}^{θ=π}').text, '-2');
+        eq(P('dy = \\cos x\\,dx'), 'dy x cos dx * =');
+        eq(P('dr = \\cos\\theta\\,d\\theta'), 'dr θ cos dθ * =');
+        eq(P('du = \\sec^2 x\\,dx'), 'du x sec 2 ^ dx * =');
+        eq(P('\\sin x \\cos x'), 'x sin x cos *', 'a function still ends a bare argument as before');
+        eq(P('\\int \\sin x\\,dx'), 'x sin x 2 int', 'an integral keeps its own d');
+        eq(P('{x > 0 ? 1 : 0}'), 'x 0 > 1 0 ?:');
+        eq(P('{x : x > 0 ? 1 : 0}'), 'x x 0 > 1 0 ?: setbuilder');
+        eq(toPython('\\emptyset'), 'set()', "Python's {} is a dict");
+        eq(P('x in set()'), 'x 0 {} ∈');
+    });
     test('the CAS call words are kept whole, in LaTeX too', () => {
         eq(parse('\\frac{1}{2} + diff(x^3, x)'), ['1', '2', '/', 'x', '3', '^', 'x', '2', '\\:diff', '+']);
         eq(parse('\\sin x + simplify(x)'), ['x', 'sin', 'x', '1', '\\:simplify', '+']);

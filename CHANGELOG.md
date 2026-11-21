@@ -2,7 +2,7 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
-## Unreleased (after mathzetta 1.2.0, @mathzetta/inlinemath 0.3.0, @mathzetta/cas 0.2.0)
+## mathzetta 1.3.0, @mathzetta/inlinemath 0.4.0, @mathzetta/cas 0.3.0
 
 Calculus II notation that was misread or refused (a survey of precalculus through Calculus II inputs).
 
@@ -65,19 +65,36 @@ Calculus II notation that was misread or refused (a survey of precalculus throug
   `equivalent` proves such identities exactly. 22 identities in `npm run check:sympy` (192/192 agree).
 - **Improper integrals:** an integral to ±∞ takes the antiderivative's limit at that end
   (`\int_1^{\infty} 1/x^2 dx = 1`, `\int_{-\infty}^{\infty} 1/(1+x^2) dx = π`), and diverges when it is infinite or has none.
+- Before release (a review): a limit from a side where the function has no real values does not exist (`ln x` and
+  `√x` from the left of 0, and so two-sided; both gave an answer); `log_b` keeps its base (`\log_{1/2} x → -∞`,
+  `\log_{10}(100 sin x/x) → 2`); a letter of unknown sign is refused (`a·x` at ∞ gave an empty answer); 2^∞, (1/2)^∞,
+  0^∞ and ∞^c are answered directly, and only 1^∞, 0^0 and ∞^0 are called indeterminate; `(1 + x)^(1/x)` at 0 is e
+  (it said "does not exist"); `limit` runs in complex mode; a limit inside an expression returns `exists`, and an
+  infinite one there is refused (`∞ + 1`). Inequalities: chains of any length, test points written without an
+  exponent (`ln x < 100`, `x(x − 10⁻⁷) < 0` gave no solution), no snapping of small values to 0, and where arcsin,
+  arccos, arctanh, arcsec, arccsc, arccosh, a log's base and fractional powers start to have values. `sin^41 x`
+  integrates at once (it took 4 s and failed), up to degree 100; an improper integral from ∞ down to a finite end
+  nears that end from inside.
 
 ### mathzetta (more)
 
 - `\lim_{x \to \pi/2^-}`: the side marker belongs to the whole point (it was read as π/(2^-)).
 - The CAS call words (`simplify`, `expand`, `factor`, `cancel`, `diff`, `integrate`, `solve`, `approx`, `limit`) are
   read whole next to LaTeX: `\frac{1}{2} + diff(x^3, x)` was d·i·f·f(…).
+- Before release (a review): evaluation bars written without LaTeX (`[x^2]_0^1` was x^(2_0^1)) or with a Greek
+  variable (`[\sin\theta]_{\theta=0}^{\theta=\pi}`); a differential ends a bare function's argument
+  (`du = \cos x\,dx` is cos(x)·dx, not cos(x·dx)); a ternary in braces (`{x > 0 ? 1 : 0}`) is not set-builder;
+  Python writes the empty set `set()` (`{}` is a dict) and reads it back; `calculate` takes a complex power whose
+  exact value would pass 20,000 bits in polar form (`(3/5 + 4/5 i)^100000` took 3 s); `getSupportedOperations()`
+  puts every operator in a group (new groups `sets` and `matrices`).
 
 ### @mathzetta/inlinemath
 
 - CAS blocks read calls with LaTeX in them (`{{simplify(\sec^2 x - \tan^2 x)}}`): the call names are kept whole.
 - Scope values reach CAS blocks, except the variable a call works in: with `a = 2`, `{{diff(x^3, x = a)}}` is 12
   (it was 3a²) and `{{solve(x^2 = a, x)}}` is x = ±√2, while with `x = 2` the x of `{{diff(x^3, x)}}` stays a variable.
-- CAS blocks work out limits (`{{\lim_{x \to 0} \frac{\sin x}{x}}}`, `{{limit(f, x, a)}}`): a number, ∞, or "does not exist".
+- CAS blocks work out limits (`{{\lim_{x \to 0} \frac{\sin x}{x}}}`, `{{limit(f, x, a)}}`): a number, ∞, or "does not exist";
+  one-sided as `{{limit(1/x, x, 0, right)}}` (or `left`, `r`, `l`) or `{{limit(1/x, x -> 0^+)}}`.
 - Draws evaluation bars (`[F]` with both limits), the empty set as ∅, a repeating decimal with a bar over its
   block, and the new inverses (as sec⁻¹ with `inverseTrig: 'power'`).
 

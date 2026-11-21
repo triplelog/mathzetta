@@ -296,8 +296,8 @@ const NP_BARE = {
 
 /** sorted(set(A) | set(B)), sorted(set(A) & set(B)): Python's ∪ and ∩ as the writer spells them. */
 function pythonSets(text) {
-    if (!text.includes('sorted')) return text;
-    return rewriteCalls(text, /(?<![\w.])sorted\s*\(/g, (args) => {
+    if (!text.includes('set')) return text;
+    return emptySets(rewriteCalls(text, /(?<![\w.])sorted\s*\(/g, (args) => {
         if (args.length !== 1) return null;
         const arg = args[0];
         for (let i = 0, depth = 0; i < arg.length; i++) {   // the | or & outside every bracket
@@ -314,8 +314,11 @@ function pythonSets(text) {
             }
         }
         return null;
-    });
+    }));
 }
+
+/** set(): Python's empty set (its {} is an empty dict), as the writer spells it. */
+const emptySets = (text) => text.replace(/(?<![\w.])set\s*\(\s*\)/g, '∅');
 
 const NP_CONSTANTS = { inf: '∞', nan: 'NaN' };
 

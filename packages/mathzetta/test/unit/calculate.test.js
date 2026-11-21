@@ -274,6 +274,13 @@ suite('calculate: complex numbers', () => {
         eq(calculate('(3 + 2i)(1 - i)').value, { re: 5, im: -1 });
         eq(calculate('(3 + 2i)(1 - i)').exact, true);
     });
+    test('a power whose exact value would be huge is taken in polar form, at once', () => {
+        const start = Date.now();
+        eq(T('(3/5 + 4/5 i)^100000'), '-0.645929681065 + 0.763396913224*i');
+        if (Date.now() - start > 500) throw new Error(`took ${Date.now() - start} ms (it took 3 s)`);
+        eq(T('(3/5 + 4/5 i)^10'), '-9653287/9765625 + (1476984/9765625)*i', 'small: still exact');
+        eq(T('i^100001'), 'i');
+    });
     test('modulus, Euler, roots and logs', () => {
         eq(T('|3 + 4i|'), '5');
         eq(T('e^{i\\pi} + 1 = 0'), 'true');

@@ -89,6 +89,17 @@ test('a derivative at a point: the bar, the point below it, no id twice; the CAS
     assert.equal(text(toHTML('{{diff(x^3, x = 2, 2)}}', { blocks: casBlocksAtPoint() })), '12');
 });
 
+test('limit blocks: a side as a fourth argument, or x -> a^+', () => {
+    const blocks = casBlocksAtPoint();
+    assert.equal(blocks('limit(1/x, x, 0, right)'), '(∞)');
+    assert.equal(blocks('limit(1/x, x, 0, l)'), '(-∞)');
+    assert.equal(blocks('limit(1/x, x, 0)'), '"does not exist"');
+    assert.equal(blocks('limit(1/x, x -> 0^+)'), '(∞)');
+    assert.equal(blocks('limit(1/x, x -> 0^-)'), '(-∞)');
+    assert.equal(blocks('limit(sin(x)/x, x -> 0)'), '1');
+    assert.equal(blocks('limit(1/x, x, 0, up)'), '(limit(1/x, x, 0, up))', 'not a side: left as written');
+});
+
 test('scope values reach CAS blocks, except the variable a call works in', () => {
     const blocks = casBlocksAtPoint();
     assert.equal(text(toHTML('{{diff(x^3, x = a)}}', { blocks, scope: { a: 2 } })), '12');

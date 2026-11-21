@@ -68,7 +68,8 @@ const isFunctionWord = (name) => /^[a-z][a-z0-9]*$/.test(name) && isOperatorWord
  * {}^{n}\mathrm{P}_{k} for permutations.
  */
 function beforeProtecting(text) {
-    if (!text.includes('\\')) return text;
+    // no LaTeX, but maybe a bar written plainly: [x^2]_0^1
+    if (!text.includes('\\')) return /[\]|]\s*_/.test(text) ? evaluationBarsLatex(text) : text;
     text = casesToTernary(text);
     text = latexNotation(text);
     return text.replace(/\{\}\^\{([^{}]*)\}\s*\\mathrm\{P\}\s*_\{([^{}]*)\}/g, '\\perm($1,$2)');

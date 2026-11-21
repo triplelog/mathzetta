@@ -49,6 +49,9 @@ const FUNCTION = 100;
 /** `%` between operands: the programming remainder, which binds like * and /. */
 const PERCENT_MOD = '%mod';
 
+/** A differential as the tokenizer leaves it (the cleaner marked it ⅆ): dx, dθ. */
+const DIFFERENTIAL_TOKEN = /^d[A-Za-z\u0370-\u03FF]$/;
+
 /** Raw token for an empty argument list, as in f(): build.js turns it into no arguments. */
 export const EMPTY_LIST = '∅';
 
@@ -154,7 +157,8 @@ class Parser {
 
     /** Side by side: multiply. Inside a bare argument, keep going unless a new function starts. */
     implicit(t, bare) {
-        const lbp = bare && !isFunction(t) ? IMPLICIT + 1 : IMPLICIT;
+        // a differential ends a bare argument: du = \cos x\,dx is cos(x)·dx (only a marked one is a single token dx)
+        const lbp = bare && !isFunction(t) && !DIFFERENTIAL_TOKEN.test(t) ? IMPLICIT + 1 : IMPLICIT;
         return { lbp, run: () => { this.parseExpression(IMPLICIT); this.emit('*'); } };
     }
 

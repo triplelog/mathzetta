@@ -14,7 +14,7 @@
 //   3. the answer is held to numbers near the point: if they disagree, no answer is given rather than a wrong one.
 
 import { op, sym, isOp, isNum, exactNum } from '../expr.js';
-import { N, canon, display, normal, freeSymbols, CasError } from './form.js';
+import { N, canon, display, normal, freeSymbols, CasError, settings } from './form.js';
 import { together, coefficients, rationalCoefficients, mentions } from './poly.js';
 import { substitute } from './solve.js';
 import { approximate } from './approx.js';
@@ -40,6 +40,28 @@ function value(node) {
     return Math.abs(r.im ?? 0) > 1e-12 ? NaN : r.re ?? r.number;
   } catch {
     return NaN;
+  }
+}
+
+/** Does a constant node have a value: a real number, or in complex mode any complex one? */
+function hasValue(node) {
+  if (!settings.complex) return Number.isFinite(value(node));
+  try {
+    const r = approximate(node, { digits: 15 });
+    return Number.isFinite(r.re ?? r.number) && Number.isFinite(r.im ?? 0);
+  } catch {
+    return false;
+  }
+}
+
+/** Is f not real at t (a root of a negative number, ln of one, arcsin past ±1)? Too large to work out is not that. */
+function notReal(f, v, t) {
+  if (!Number.isFinite(t)) return false;
+  try {
+    const r = approximate(substitute(f, v, exactNum(plain(t))), { digits: 15 });
+    return Math.abs(r.im ?? 0) > 1e-12;
+  } catch (error) {
+    return /not real/.test(error.message);
   }
 }
 
@@ -93,6 +115,14 @@ export function findLimit(cas, f, v, a, side = 0) {
       throw new NoLimit(`from the left it goes to ${+left.toPrecision(6)}, from the right to ${+right.toPrecision(6)}`);
     }
   }
+  // a side where f has no real values (√x and ln x left of 0): no limit from there, nor a two-sided one
+  if (!a.inf && !settings.complex) {
+    for (const s of side ? [side] : [-1, 1]) {
+      if (approach(a, s).every((t) => notReal(f, v, t))) {
+        throw new NoLimit(`it has no real values ${s < 0 ? 'to the left' : 'to the right'} of ${+value(a.fin).toPrecision(6)}`);
+      }
+    }
+  }
   const L = new Limits(cas, v, a, side, steps);
   let result;
   try {
@@ -144,8 +174,8 @@ class Limits {
       // tested as written first: the normal form would cancel sin 0 / sin 0 to 1
       const raw = substitute(f, v, a.fin);
       let put = null;
-      if (Number.isFinite(value(raw)) && !this.pole(raw) && !zeroBelow(raw)) try { put = normal(raw); } catch { /* 1/0, 0^0: not continuous here */ }
-      if (put && Number.isFinite(value(put))) {
+      if (hasValue(raw) && !this.pole(raw) && !zeroBelow(raw)) try { put = normal(raw); } catch { /* 1/0, 0^0: not continuous here */ }
+      if (put && hasValue(put)) {
         const done = this.cas.simplify(put, { steps: false }).result;
         this.step('limit.substitute', 'Put the point in', f, done, { f });
         return fin(done);
@@ -160,6 +190,13 @@ class Limits {
       case '^': return this.power(f, depth);
       default: return this.func(f, depth);
     }
+  }
+
+  /** The sign of a limit's (nonzero) value; a CasError when it has no known sign (a·x as x → ∞, a a letter). */
+  signOf(node) {
+    const s = Math.sign(value(node));
+    if (!s) throw new CasError(`the sign of ${this.cas.format(node)} is not known`);
+    return s;
   }
 
   /** Does a tan, sec, csc or cot in n (with the point put in) sit where its cos or sin is exactly 0? */
@@ -232,7 +269,7 @@ class Limits {
       this.step('limit.zero-times-infinity', '0·∞: a quotient', f, q, { f });
       return this.quotient(q, q.args[0], q.args[1], depth + 1);
     }
-    const sign = (l) => (l.inf ? l.inf : Math.sign(value(l.fin)));
+    const sign = (l) => (l.inf ? l.inf : this.signOf(l.fin));
     return inf(sign(lx) * sign(ly));
   }
 
@@ -257,7 +294,7 @@ class Limits {
     }
     if (ld.fin && !zero(ld)) {
       if (ln.fin) return fin(this.cas.simplify(normal(op('/', [ln.fin, ld.fin])), { steps: false }).result);
-      return inf(ln.inf * Math.sign(value(ld.fin)));
+      return inf(ln.inf * this.signOf(ld.fin));
     }
     if (ld.inf && ln.fin) return fin(exactNum('0'));
     if (zero(ld) && !zero(ln)) {
@@ -310,7 +347,7 @@ class Limits {
     if (a.inf) {
       const [n, d] = [p.length - 1, q.length - 1];
       const lead = normal(op('/', [op('*', [display(N(p[n])), op('^', [sym(v), exactNum(String(n))])]), op('*', [display(N(q[d])), op('^', [sym(v), exactNum(String(d))])])]));
-      this.step('limit.leading', 'The leading terms', f, lead, { f, lead });
+      if (lead.s !== f.s) this.step('limit.leading', 'The leading terms', f, lead, { f, lead });
       if (n < d) return fin(exactNum('0'));
       if (n === d) return fin(display(N(p[n].div(q[d]))));
       const sign = p[n].div(q[d]).sign * ((n - d) % 2 && a.inf < 0 ? -1 : 1);
@@ -341,7 +378,16 @@ class Limits {
     const { v } = this;
     const [B, E] = f.args;
     const lb = this.of(B, depth + 1);
-    const le = this.of(E, depth + 1);
+    let le;
+    const before = this.steps.length;
+    try {
+      le = this.of(E, depth + 1);
+    } catch (error) {
+      // (1 + x)^(1/x) at 0: the exponent has no two-sided limit, but E·ln B may have one
+      if (!(error instanceof NoLimit) || !lb.fin || Math.abs(value(lb.fin) - 1) > 1e-12) throw error;
+      this.steps.length = before;   // that attempt's steps are not the way
+      return this.expLog(f, B, E, '1^∞', depth);
+    }
     if (lb.bnd || le.bnd) throw new CasError('a power of something that keeps swinging is not worked out here');
     const num = (l) => (l.fin ? value(l.fin) : l.inf * Infinity);
     const b = num(lb);
@@ -351,23 +397,40 @@ class Limits {
       if (!(Math.abs(b) < 1e-300 && Math.abs(e) < 1e-300)) return fin(this.cas.simplify(normal(op('^', [lb.fin, le.fin])), { steps: false }).result);
     }
     const constantBase = !freeSymbols(B).has(v);
-    if (constantBase && le.inf) {   // 2^x, e^-x
-      if (b === 1) return fin(exactNum('1'));
+    const constantExponent = !freeSymbols(E).has(v);
+    const zeroB = lb.fin && Math.abs(b) < 1e-300;
+    const one = lb.fin && Math.abs(b - 1) < 1e-12;
+    if (lb.fin && le.inf && !(one && !constantBase)) {   // 2^x, e^-x, (2 + 1/x)^x, x^(1/x) at 0⁺: no indeterminate form
+      if (one) return fin(exactNum('1'));
+      if (zeroB) {
+        if (le.inf < 0) {
+          if (constantBase) throw new NoLimit('0 to a negative power has no value');
+          return inf(1);   // a base going to 0 (from above: it is real) to a power going to -∞
+        }
+        return fin(exactNum('0'));
+      }
       if (b > 1) return le.inf > 0 ? inf(1) : fin(exactNum('0'));
       if (b > 0) return le.inf > 0 ? fin(exactNum('0')) : inf(1);
       throw new NoLimit('a negative number to a growing power swings between signs');
     }
-    const constantExponent = !freeSymbols(E).has(v);
-    if (constantExponent && lb.inf) {
-      if (e > 0) return inf(lb.inf > 0 ? 1 : Number.isInteger(e) && e % 2 ? -1 : 1);
+    if (lb.inf < 0 && !constantExponent) throw new CasError('a power of something going to -∞ is not worked out here');
+    if (lb.inf && (constantExponent || (le.fin && Math.abs(e) > 1e-300) || le.inf)) {   // x², x^(1 + 1/x), x^x at ∞
+      if (e > 0) return inf(lb.inf > 0 ? 1 : constantExponent && Number.isInteger(e) && e % 2 ? -1 : 1);
       if (e < 0) return fin(exactNum('0'));
     }
-    if (constantExponent && lb.fin && Math.abs(b) < 1e-300 && e > 0) return fin(exactNum('0'));
-    // 1^∞, 0^0, ∞^0, and the rest: e^(E ln B)
-    const form = Math.abs(b - 1) < 1e-12 && le.inf ? '1^∞' : Math.abs(b) < 1e-300 ? '0^0' : '∞^0';
+    if (constantExponent && zeroB && e > 0) return fin(exactNum('0'));
+    // 1^∞, 0^0, ∞^0: e^(E ln B)
+    const form = one ? '1^∞' : zeroB ? '0^0' : lb.inf && le.fin ? '∞^0' : null;
+    if (!form) throw new CasError('a power of this shape is not worked out here');
+    return this.expLog(f, B, E, form, depth);
+  }
+
+  /** B^E as e^(E ln B): the limit of the exponent. */
+  expLog(f, B, E, form, depth) {
     const exponent = normal(op('*', [E, op('ln', [B])]));
     this.step('limit.exp-log', 'Take logs', f, op('^', [sym('e'), exponent]), { f, form: sym(form) });
     const le2 = this.of(exponent, depth + 1);
+    if (le2.bnd) throw new CasError('a power of something that keeps swinging is not worked out here');
     if (le2.inf) return le2.inf > 0 ? inf(1) : fin(exactNum('0'));
     return fin(this.cas.simplify(normal(op('^', [sym('e'), le2.fin])), { steps: false }).result);
   }
@@ -377,7 +440,15 @@ class Limits {
     const args = f.args;
     if (args.length !== 1) {
       // log(b, x), root(n, x): the argument that varies
-      if (name === 'log' && !freeSymbols(args[0]).has(this.v)) return this.func(op('ln', [args[1]]), depth);   // the base's ln is a positive factor
+      // log_b f = ln f / ln b (a base below 1 turns ∞ into -∞)
+      if (name === 'log' && !freeSymbols(args[0]).has(this.v)) {
+        const l = this.of(args[1], depth + 1);
+        if (l.fin) {
+          const put = normal(op('log', [args[0], l.fin]));
+          if (Number.isFinite(value(put))) return fin(this.cas.simplify(put, { steps: false }).result);
+        }
+        return this.of(normal(op('/', [op('ln', [args[1]]), op('ln', [args[0]])])), depth + 1);
+      }
       throw new CasError(`a limit of ${name} is not worked out here`);
     }
     let l;
@@ -395,8 +466,7 @@ class Limits {
     if (l.fin) {
       if (POLES[name] && this.isExactZero(op(POLES[name], [l.fin]))) return this.blowUp(f);   // tan at π/2
       const put = normal(op(name, [l.fin]));
-      const y = value(put);
-      if (Number.isFinite(y)) return fin(this.cas.simplify(put, { steps: false }).result);
+      if (hasValue(put)) return fin(this.cas.simplify(put, { steps: false }).result);
       if (name === 'ln' && Math.abs(value(l.fin)) < 1e-300) return inf(-1);   // ln of something going to 0⁺
       if (['tan', 'sec', 'csc', 'cot'].includes(name)) return this.blowUp(f);
       throw new CasError(`${name} has no value at the limit of its argument`);

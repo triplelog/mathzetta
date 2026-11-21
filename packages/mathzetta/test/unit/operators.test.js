@@ -1,7 +1,7 @@
 import { suite, test, eq, throws } from '../harness.js';
 import { operator, operatorNames, needsParens, VARIADIC } from '../../src/operators.js';
 import { op, sym, num } from '../../src/tree.js';
-import { toLaTeX, toMathML, toJavaScript, toPython, toSQL, toText, toSpeech, toGLSL, toExcel } from '../../src/all.js';
+import { toLaTeX, toMathML, toJavaScript, toPython, toSQL, toText, toSpeech, toGLSL, toExcel, getSupportedOperations } from '../../src/all.js';
 
 suite('operator table', () => {
     // A node for every operator, with as many arguments as it takes.
@@ -94,5 +94,14 @@ suite('operator table', () => {
 
     test('a number node is not an operator', () => {
         eq(toLaTeX(num(5)), '5');
+    });
+});
+
+suite('getSupportedOperations', () => {
+    test('every operator is in a group', () => {
+        const groups = getSupportedOperations();
+        const grouped = new Set(Object.entries(groups).filter(([k]) => k !== 'all').flatMap(([, v]) => v));
+        eq(groups.all.filter((name) => !grouped.has(name)), []);
+        eq([...grouped].filter((name) => !groups.all.includes(name)), []);
     });
 });

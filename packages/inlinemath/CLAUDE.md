@@ -25,7 +25,7 @@ npm run build   # dist/ (ES modules + <script> builds, mathzetta and @mathzetta/
 
 ## Rules
 
-- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (index, lite, lite-calc, markdown, cas); peers are `mathzetta ^1.2` and, optional, `MathZetta CAS ^0.2` (package.json has the exact ranges).
+- A new export or option goes in `src/types.d.ts` and the entry's `.d.ts` (index, lite, lite-calc, markdown, cas); peers are `mathzetta ^1.3` and, optional, `MathZetta CAS ^0.3` (package.json has the exact ranges).
 - `markdownToHTML` takes untrusted documents: no pattern there may hold two unbounded runs of the same characters side by side (the heading one was cubic), nested blocks stop at `MAX_NESTING`, and a search that failed once to the end of the text is remembered (`noCloser`, `never`). The "review before 0.3" tests in test/run.js time each case.
 
 - Check looks with a headless-Chrome screenshot of the gallery (the demos are inlinemath.com's pages, in the private
