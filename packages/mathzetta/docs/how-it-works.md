@@ -22,6 +22,124 @@ LaTeX · MathML · speech · JavaScript · Python · GLSL · SQL · Excel · tex
 `parseSteps(text)` returns the output of every stage, including the text
 after each cleaning phase. Start there when an input parses wrongly.
 
+## When math can be read two ways
+
+Some input has two reasonable readings. MathZetta always takes the same one, listed here with how to write the
+other. Every row is checked by `test/cases/ambiguity.tsv`, so this list and the parser can't drift apart. Three tools
+settle most cases: brackets, an explicit `*`, and the `names` option (`parse(text, { names: ['rate'] })`), which keeps a
+word whole and makes a name a function when brackets follow it. `values: ['x']` does the opposite: it marks `x` as never
+a function.
+
+### Letters: one word or a product
+
+| You type | MathZetta reads | To get the other reading |
+|---|---|---|
+| `xy` | x · y | Two letters are a product. |
+| `speed`, `cost` | one name each | Three or more letters stay a word in plain text (`cost` is not cos·t). Write `cos t` for the cosine. |
+| `sinx`, `xsinx` | sin(x), x · sin(x) | A known function with an argument splits off. |
+| `\frac{rate}{time}` | (r·a·t·e)/(t·i·m·e) | With any `\command` the input is LaTeX, where letters side by side multiply. Use `\text{rate}` or `names: ['rate', 'time']`. |
+| `lg 100` | l · g · 100 | `lg` is not a name MathZetta knows. Write `log_10(100)` or `log10(100)`. |
+
+### Brackets: a call or a product
+
+| You type | MathZetta reads | To get the other reading |
+|---|---|---|
+| `f(x+1)` | f applied to x + 1 | `f`, `g`, `h`, `u`, `v`, `F`, `G`, `H` and words before `(` are functions. Write `f * (x+1)` for a product. |
+| `x(t)`, `y(0)` | x applied to t, y applied to 0 | A letter applied to one other letter or a number is a function (as in `a(t) = v'(t)`). Write `x * (t)`, or `values: ['x']`. |
+| `x(x+1)`, `x(x)`, `e(x+1)` | x · (x + 1), x · x, e · (x + 1) | Anything more inside, the same letter, or `e` is a product. Use `names: ['x']` to make `x` a function. |
+| `ab(c)` | a · b(c) | Only the last letter is the function. |
+
+### Side by side: implicit products and division
+
+Writing two things side by side multiplies them with the same priority as `*` and `/`, from left to right.
+
+| You type | MathZetta reads | To get the other reading |
+|---|---|---|
+| `1/2x` | (1/2) · x | `1/(2x)` |
+| `a/bc` | (a/b) · c | `a/(bc)` |
+| `e^2x` | e² · x | `e^{2x}` or `e^(2x)` |
+| `2^x+1` | 2^x + 1 | `2^(x+1)` |
+
+### How far a function without brackets reaches
+
+| You type | MathZetta reads | Rule |
+|---|---|---|
+| `sin 2x`, `sin x^2` | sin(2x), sin(x²) | The product or power right after it is the argument. |
+| `sin x cos x`, `sin x/x` | sin(x) · cos(x), sin(x)/x | It stops at the next function and at `+ - * /`. |
+| `sin^2 x` | (sin x)² | A power on the function name squares the result. |
+
+### Powers of −1: a reciprocal, an inverse function, or an inverse trig function
+
+| You type | MathZetta reads |
+|---|---|
+| `x^-1` | 1/x |
+| `sin^-1 x`, `\sin^{-1} x` | arcsin(x), not 1/sin(x). Write `(\sin x)^{-1}` for the reciprocal. |
+| `f^{-1}(x)` | the inverse function f⁻¹ applied to x |
+
+### log
+
+| You type | MathZetta reads | To get the other reading |
+|---|---|---|
+| `log x`, `\log x` | ln(x), the natural log | `log_10(x)` or `log10(x)` for base 10 |
+| `log(8, 2)` | log₂(8) = 3 | The base is the second argument, as in Python and spreadsheets. |
+
+### mod, % and percent
+
+| You type | MathZetta reads | Why |
+|---|---|---|
+| `2 + 3 mod 4` | (2 + 3) mod 4 | The word `mod` takes everything on its left, as in math. |
+| `2 + 3 % 4` | 2 + (3 mod 4) | `%` between two numbers binds like `*`, as in code. |
+| `50% * 8`, `10%3` | 0.5 · 8, 10 mod 3 | `%` with nothing after it is percent; between two operands it is mod. |
+| `a ≡ b (mod n)` | the congruence a ≡ b, modulo n | The `(mod n)` applies to the whole statement. |
+
+### Minus signs and powers; spreadsheet rules after `=`
+
+| You type | MathZetta reads | Why |
+|---|---|---|
+| `-2^2`, `2^3^2` | −(2²) = −4, 2^(3²) = 512 | In math `^` binds tighter than a minus sign and groups from the right. |
+| `=-2^2`, `=2^3^2` | (−2)² = 4, (2³)² = 64 | A leading `=` is a spreadsheet formula, and spreadsheets do the opposite. |
+
+### One symbol, several jobs
+
+| You type | MathZetta reads |
+|---|---|
+| `\|a\|\|b\|` | \|a\| · \|b\| |
+| `a \| b` | a or b |
+| `\{x \| x > 0\}`, `{x : x > 0}` | the set of x with x > 0 |
+| `{x \| x > 0}` | x or x > 0 (plain braces with `\|` are a group, not a set: use `:` or `\{ \}`) |
+| `n!`, `!n`, `!7!` | n factorial, not n, not (7!) |
+| `f'(x)`, `'hello'` | the derivative f′ at x; the text hello |
+| `(0, 1)`, `x \in (0, 1)`, `f(0, 1)` | a pair; x in the open interval; f of two arguments |
+| `x = 1, y = 2` | both equations hold |
+| `3 < x < 7` | a chain: 3 < x and x < 7 |
+| `1, 2`, `1,000` | refused: a list needs brackets, and a comma never separates thousands |
+
+### How far calculus reaches
+
+| You type | MathZetta reads | Rule |
+|---|---|---|
+| `d/dx x^2 + 1`, `\frac{d}{dx} x^2 + 1` | d/dx (x² + 1) | A derivative takes the rest of the sum. |
+| `\int x^2 + 1 dx` | ∫ (x² + 1) dx | An integral takes everything up to its `dx`. |
+| `\lim_{x\to 0} x + 1`, `\sum_{i=1}^n i + 1` | (lim x) + 1, (∑ i) + 1 | Limits, sums and products stop at `+` and `-`: write `\lim_{x\to 0} (x + 1)`. |
+| `x dx`, `\int x\,dx` | x · d · x, a differential | `d` is a differential after an integral, in `\mathrm{d}x`, or after `\,`. |
+
+### Numbers with spaces
+
+| You type | MathZetta reads | Rule |
+|---|---|---|
+| `1 000`, `12 345 678` | 1000, 12345678 | Digits in groups of three are one number. |
+| `2 3`, `2x 3` | 2 · 3, 2 · x · 3 | Any other numbers side by side multiply. |
+| `1 1/2`, `1\frac{1}{2}` | 1 + 1/2 | A whole number before a proper fraction is a mixed number. |
+| `1 3/2`, `3\frac{x}{2}` | 1 · 3/2, 3 · x/2 | Not with an improper fraction, or with letters in it. |
+
+### Not ambiguous, but languages disagree
+
+These aren't about reading: the input is clear, but JavaScript, Python, SQL and spreadsheets give different answers.
+MathZetta picks one meaning and writes every output to match it (test/unit/agreement.test.js runs them):
+`-7 mod 3` is 2 (the divisor's sign), `round(-2.5)` is −3 (halves away from zero), `root(3, -8)` is −2 (an odd root of a
+negative number is real), and `"ab" in name` is a text search that ignores the case of A to Z. `i` is the imaginary
+unit in `calculate` unless the values or a `\sum` index give it one; in `evaluate` it is an ordinary name.
+
 ## 1. Cleaning (`src/parse/clean/`)
 
 People write the same thing many ways: `\sin`, `sin`, `Math.sin`; `<=`,
@@ -278,7 +396,7 @@ x^(n+1) + 2   toSpeech: x to the power of n plus 1, plus 2    toAudioSpeech: …
 Inline Math's `aria-label` uses `toAudioSpeech()`; its live view's
 `segments()` (narration that lights up the part being read) stays on
 `toSpeech()`. test/cases/speech.tsv has both columns, and
-test/unit/render.test.js checks that every pair the eye tells apart reads
+test/unit/speech.test.js checks that every pair the eye tells apart reads
 differently by ear.
 
 `SPEECH_WORDS` and `SPEECH_NAMES` are the defaults, exported so you can
@@ -349,7 +467,7 @@ in an input can't stall the cleaner either.
 
 **Accept a new code spelling** (a library's function, a dialect's
 keyword): `prefixes()` or `CALLS` in `clean/code.js`, and a row in the
-"code people type" suite of `test/unit/roundtrip.test.js`. When a renderer
+"reading: code people type" suite of `test/unit/parse.test.js`. When a renderer
 starts writing something new, the round-trip test fails until the parser
 reads it.
 

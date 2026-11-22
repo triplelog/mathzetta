@@ -126,7 +126,7 @@ the [CDN page](https://mathzetta.com/cdn.html) builds a script tag or import map
 pick, and the [postfix quiz](https://mathzetta.com/quiz.html) teaches the algorithm.
 
 ```bash
-npm test                # ~6,400 checks: unit tests and every table in test/cases
+npm test                # ~6,500 checks: unit tests and every table in test/cases
 npm run build           # the bundles in build/ (what npm and the CDN ship)
 npm run coverage        # what the test tables don't cover yet
 ```

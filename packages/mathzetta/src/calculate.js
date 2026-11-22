@@ -532,6 +532,8 @@ function pMul(a, b) {
 }
 function pPowWhole(a, k) {
     if (!isC(a) && k > 1000n) throw new UnknownError('too large to calculate');
+    // refused before the work: (a+b+c+d+e+f)^40 has 1,221,759 terms and took 3 s to pass MAX_TERMS
+    if (isP(a) && !isC(a) && powerTerms(a, Number(k)) > MAX_TERMS) throw new UnknownError('too many terms to work out');
     // a complex number whose exact power would pass 20,000 bits ((3/5 + 4/5i)^100000 took 3 s): in polar form
     if (isC(a) && k > 1n) {
         const { re, im } = cParts(a);
@@ -545,6 +547,28 @@ function pPowWhole(a, k) {
         if (e > 1n) base = pMul(base, base);
     }
     return out;
+}
+/**
+ * At most how many terms a polynomial to the kth power has: n terms give at most C(n+k−1, k) products that differ,
+ * and no more monomials than each unknown's powers allow (∏ (k·(highest − lowest) + 1)); the smaller bound counts.
+ * (x+1)^20 is 21, (a+b)^10 is 11, (1+x+…+x⁹)^10 is 91.
+ */
+function powerTerms(p, k) {
+    const n = p.terms.size;
+    let choose = 1;
+    for (let j = 1; j <= Math.min(k, n - 1) && choose <= MAX_TERMS; j++) choose = (choose * (k + j)) / j;   // C(k+n−1, n−1)
+    const spans = new Map();   // each unknown's lowest and highest power (0 where a term lacks it)
+    for (const t of p.terms.values()) for (const [name] of t.vars) spans.set(name, [0, 0]);
+    for (const t of p.terms.values()) {
+        for (const [name, span] of spans) {
+            const power = t.vars.find(([v]) => v === name)?.[1] ?? 0;
+            span[0] = Math.min(span[0], power);
+            span[1] = Math.max(span[1], power);
+        }
+    }
+    let monomials = 1;
+    for (const [lo, hi] of spans.values()) if ((monomials *= k * (hi - lo) + 1) > MAX_TERMS) break;
+    return Math.min(choose, monomials);
 }
 function pPow(a, b) {
     if (isP(b)) {   // a complex exponent: a^w = e^(w ln a)
@@ -618,13 +642,21 @@ function compare(a, b) {
     return x < y ? -1 : 1;
 }
 
-function equal(a, b) {
+/**
+ * a = b. `loose` (=, ≠) is evaluate's and JavaScript's ==, where true and false are 1 and 0 beside a number
+ * (1 = true is true); strict (===, ≠=) keeps them apart.
+ */
+function equal(a, b, loose = false) {
     if (Array.isArray(a) || Array.isArray(b)) {
-        return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => equal(x, b[i]));
+        return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => equal(x, b[i], loose));
     }
     // text equals only the same text, whichever side it is on: 1 = "a" is false, as "a" = 1 is
     if ((a && a.kind === 's') || (b && b.kind === 's')) return Boolean(a && a.kind === 's' && b && b.kind === 's' && a.text === b.text);
-    if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
+    if (typeof a === 'boolean' && typeof b === 'boolean') return a === b;
+    if (typeof a === 'boolean' || typeof b === 'boolean') {
+        if (!loose) return false;
+        return equal(typeof a === 'boolean' ? rat(a ? 1 : 0) : a, typeof b === 'boolean' ? rat(b ? 1 : 0) : b);
+    }
     if (isP(a) || isP(b)) return pEqual(a, b);
     return compare(a, b) === 0;
 }
@@ -967,8 +999,8 @@ const TWO = {
     round: roundV,
     fixed: fixedV,
     perm, comb,
-    '=': (a, b) => equal(a, b), '===': (a, b) => equal(a, b),
-    '≠': (a, b) => !equal(a, b), '≠=': (a, b) => !equal(a, b),
+    '=': (a, b) => equal(a, b, true), '===': (a, b) => equal(a, b),
+    '≠': (a, b) => !equal(a, b, true), '≠=': (a, b) => !equal(a, b),
     '≈': (a, b) => Math.abs(num(a) - num(b)) <= 1e-9 * Math.max(1, Math.abs(num(a)), Math.abs(num(b))),
     '<': (a, b) => compare(a, b) < 0, '>': (a, b) => compare(a, b) > 0,
     '≤': (a, b) => compare(a, b) <= 0, '≥': (a, b) => compare(a, b) >= 0,
@@ -1698,6 +1730,7 @@ export function calculate(input, scope = {}, options = {}) {
 /**
  * The text of a `{{...}}` block → what replaces it. A leading `~` asks for a
  * decimal, `~3` for three decimal places: {{~ pi}} → 3.14159265359, {{~2 1/3}} → 0.33.
+ * The places touch the sign: after a space a number is the question ({{~ 1/3}} → 0.333333333333).
  * Answers with a decimal point in the question come back as decimals too.
  * When there is no answer the block becomes the string "undefined"; when it
  * can't be worked out, the expression is left as written.
@@ -1708,7 +1741,7 @@ export function calculate(input, scope = {}, options = {}) {
 export function calculateBlock(text, scope = {}) {
     let expression = text.trim();
     const options = {};
-    const approx = /^(~|≈)\s*(\d+)?/.exec(expression);
+    const approx = /^(~|≈)(\d+)?\s*/.exec(expression);
     if (approx) {
         options.decimal = true;
         if (approx[2] !== undefined) options.places = Number(approx[2]);
@@ -1728,7 +1761,7 @@ export function calculateBlock(text, scope = {}) {
 setBlockHandler(calculateBlock);
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [LIMITS, SIN_TABLE, CONSTANTS, ONE, TWO, MANY]) Object.setPrototypeOf(table, null);
 
 Object.setPrototypeOf(MATRIX_FUNCTIONS, null);

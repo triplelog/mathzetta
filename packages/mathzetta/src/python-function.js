@@ -54,7 +54,8 @@ const MEMBERS = {
         'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh', 'arcsin', 'arccos', 'arctan', 'arcsinh', 'arccosh', 'arctanh', 'arctan2',
         'degrees', 'radians', 'pi', 'e', 'inf', 'nan', 'isclose', 'isfinite', 'isin', 'mod', 'round', 'where', 'cbrt',
         'maximum', 'minimum', 'gcd', 'logical_and', 'logical_or', 'logical_not', 'logical_xor', 'random',
-        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd', 'char', 'linalg', 'union1d', 'intersect1d', 'array']),
+        'nanmax', 'nanmin', 'nansum', 'nanprod', 'nanmean', 'nanmedian', 'nanstd', 'char', 'linalg', 'union1d', 'intersect1d', 'array',
+        'dot', 'multiply', 'array_equal']),   // a product with a matrix or a list in it, and = between them
     'np.linalg': new Set(['det']),
     'np.random': new Set(['random']),
     'np.char': new Set(['mod']),   // what fixed() writes for numpy: np.char.mod("%.2f", x)
@@ -679,5 +680,5 @@ export function fillPythonTemplate(template, formulas = {}, options = {}) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [MEMBERS, IMPORTS, SYMBOLIC, AGGREGATE_LATEX]) Object.setPrototypeOf(table, null);

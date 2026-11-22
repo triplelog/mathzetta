@@ -1,4 +1,4 @@
-# reading.tsv — How input is read: plain text, LaTeX, unicode, JavaScript and Python spellings, words and names — the cleaned text, the postfix, and how it is written back as LaTeX and MathML.
+# reading.tsv — How input is read: plain text, LaTeX, unicode, names and functions — the cleaned text, the postfix, and how it is written back as LaTeX and MathML. Code spellings are in code-spellings.tsv, plain English in english.tsv.
 # Columns: Input, Clean, Postfix, Latex, MathML, JavaScript, Evaluated. A blank cell is not checked; a # line is a note.
 Input	Clean	Postfix	Latex	MathML	JavaScript	Evaluated
 \\sqrt{x^2+y^2}	\sqrt{x^{2}+y^{2}}	["x","2","^","y","2","^","+","sqrt"]	\sqrt{x^2 + y^2}	<math><msqrt id="mz-7"><mrow id="mz-6"><msup id="mz-2"><mi id="mz-0">x</mi><mn id="mz-1">2</mn></msup><mo>+</mo><msup id="mz-5"><mi id="mz-3">y</mi><mn id="mz-4">2</mn></msup></mrow></msqrt></math>
@@ -29,7 +29,7 @@ math.ln(3+2)	log_{e}(3+2)	["3","2","+","ln"]	\ln\left(3 + 2\right)	<math><mrow i
 Math.ln(7+2)	log_{e}(7+2)	["7","2","+","ln"]	\ln\left(7 + 2\right)	<math><mrow id="mz-3"><mi>ln</mi><mo>(</mo><mrow id="mz-2"><mn id="mz-0">7</mn><mo>+</mo><mn id="mz-1">2</mn></mrow><mo>)</mo></mrow></math>
 \log[5]{4}	log_[5]{4}	["5","4","log"]	\log_{5}\left(4\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">5</mn></msub><mo>(</mo><mn id="mz-1">4</mn><mo>)</mo></mrow></math>
 \log10{5}	log_{10}{5}	["10","5","log"]	\log_{10}\left(5\right)	<math><mrow id="mz-2"><msub><mi>log</mi><mn id="mz-0">10</mn></msub><mo>(</mo><mn id="mz-1">5</mn><mo>)</mo></mrow></math>
-3Math.log10	3log_{e}10	["3","10","ln","*"]	3\ln\left(10\right)	<math><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>10</mn><mo>)</mo></mrow></mrow></math>
+3Math.log10	3log_{10}	ERROR: An operator is missing an operand		
 3Math.LN2+3	3log_{e}(2)+3	["3","2","ln","*","3","+"]	3\ln\left(2\right) + 3	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>2</mn><mo>)</mo></mrow></mrow><mo>+</mo><mn>3</mn></mrow></math>
 3Math.LN10+4	3log_{e}(10)+4	["3","10","ln","*","4","+"]	3\ln\left(10\right) + 4	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><mi>ln</mi><mo>(</mo><mn>10</mn><mo>)</mo></mrow></mrow><mo>+</mo><mn>4</mn></mrow></math>
 3Math.LOG10E+5	3log_{10}(e)+5	["3","10","e","log","*","5","+"]	3\log_{10}\left(e\right) + 5	<math><mrow><mrow><mn>3</mn><mo>⁢</mo><mrow><msub><mi>log</mi><mn>10</mn></msub><mo>(</mo><mi>e</mi><mo>)</mo></mrow></mrow><mo>+</mo><mn>5</mn></mrow></math>
@@ -172,7 +172,7 @@ true||6|	true||6|	["true","6","abs","|"]	\mathrm{true} \lor \left|6\right|	<math
 z \in ((x in y) in x)	z∈((x∈y)∈x)	["z","x","y","∈","x","∈","∈"]	z \in \left(x \in y \in x\right)	<math><mrow><mi>z</mi><mo>∈</mo><mrow><mo>(</mo><mrow><mrow><mi>x</mi><mo>∈</mo><mi>y</mi></mrow><mo>∈</mo><mi>x</mi></mrow><mo>)</mo></mrow></mrow></math>
 \sqrt[x in (0,5] ? 3 : 2]{x}	sqrt{x∈(0,5]?(3)?:2,x}	["x","0","5","2","(]","∈","3","2","?:","x","root"]	\sqrt[{\begin{cases}3 & \text{if } x \in (0, 5] \\ 2 & \text{otherwise} \end{cases}}]{x}	<math><mroot><mi>x</mi><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>3</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mi>x</mi><mo>∈</mo><mrow><mo>(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></mrow></mtd></mtr><mtr><mtd><mn>2</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></mroot></math>
 \left(x \downarrow y ∈ \left(x, \sinh\left(x\right)\right) \right) \downarrow x \bmod y 	(x \nor y∈(x,sinh(x))) \nor x mod y	["x","y","x","x","sinh","2","()","∈","\\nor","x","y","mod","\\nor"]
-\infty \cdot \left|\cos^{-1}\left(x \cdot y\right) \lor \tanh\left(x\right)\right| 	∞*|arccos(x* y)∨tanh(x)|	["∞","x","y","*","arccos","x","tanh","|","abs","*"]
+\infty \cdot \left|\cos^{-1}\left(x \cdot y\right) \lor \tanh\left(x\right)\right| 	∞*|arccos(x * y)∨tanh(x)|	["∞","x","y","*","arccos","x","tanh","|","abs","*"]
 der(3x^12,x)=der(3x^12)=ddx(3x^12)=36x^11\neqddy(3x^12)	der(3x^{12},x)=der(3x^{12})=der(3x^{12},x)=36x^{11}≠der(3x^{12},y)	["3","x","12","^","*","x","der","3","x","12","^","*","x","der","=","3","x","12","^","*","x","der","=","36","x","11","^","*","=","3","x","12","^","*","y","der","≠"]	\frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = \frac{\mathrm{d}}{\mathrm{d}x}\left[3x^{12}\right] = 36x^{11} \neq \frac{\mathrm{d}}{\mathrm{d}y}\left[3x^{12}\right]	<math><mrow><mrow><mrow><mrow><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>x</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow><mo>=</mo><mrow><mn>36</mn><mo>⁢</mo><msup><mi>x</mi><mn>11</mn></msup></mrow></mrow><mo>≠</mo><mrow><mfrac><mi>d</mi><mrow><mi>d</mi><mi>y</mi></mrow></mfrac><mrow><mo>[</mo><mrow><mn>3</mn><mo>⁢</mo><msup><mi>x</mi><mn>12</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow></math>
 dd\alpha(\alpha)=7	der(α,α)=7	["α","α","der","7","="]	\frac{\mathrm{d}\alpha}{\mathrm{d}\alpha} = 7	<math><mrow><mfrac><mrow><mi>d</mi><mi>α</mi></mrow><mrow><mi>d</mi><mi>α</mi></mrow></mfrac><mo>=</mo><mn>7</mn></mrow></math>
 dd\delta(\delta)=7	der(δ,δ)=7	["δ","δ","der","7","="]	\frac{\mathrm{d}\delta}{\mathrm{d}\delta} = 7	<math><mrow><mfrac><mrow><mi>d</mi><mi>δ</mi></mrow><mrow><mi>d</mi><mi>δ</mi></mrow></mfrac><mo>=</mo><mn>7</mn></mrow></math>
@@ -231,7 +231,7 @@ int(t^2,0,8)	int(t^{2},0,8)	["t","2","^","0","8","3","int"]	\int_{0}^{8}{t^2}\ma
 \lim_{-3} x^2	lim_{-3}x^{2}	["x","2","^","-3","2","lim"]	\lim_{x\to -3}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>-3</mn></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
 \lim_0 x^2	lim_{0}x^{2}	["x","2","^","0","2","lim"]	\lim_{x\to 0}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>0</mn></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
 \lim_{\infty} x^2	lim_{∞}x^{2}	["x","2","^","∞","2","lim"]	\lim_{x\to \infty}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mi>∞</mi></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
-\lim_{-\infty} x^2	lim_{-∞}x^{2}	["x","2","^","-∞","2","lim"]	\lim_{x\to -\infty}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mi>-∞</mi></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
+\lim_{-\infty} x^2	lim_{-∞}x^{2}	["x","2","^","-∞","2","lim"]	\lim_{x\to -\infty}{x^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mrow><mo>−</mo><mi>∞</mi></mrow></mrow></munder><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
 \lim_{x\to5^+} x^3	lim_{x→5^+}x^{3}	["x","3","^","x","5","r","4","lim"]	\lim_{x\to 5^+}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><msup><mn>5</mn><mo>+</mo></msup></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
 \lim_{x->5} x^3	lim_{x→5}x^{3}	["x","3","^","x","5","→","2","lim"]	\lim_{x\to 5}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>5</mn></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
 \lim_{x\to5} x^3	lim_{x→5}x^{3}	["x","3","^","x","5","→","2","lim"]	\lim_{x\to 5}{x^3}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mi>x</mi><mo>→</mo><mn>5</mn></mrow></munder><msup><mi>x</mi><mn>3</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
@@ -266,7 +266,7 @@ cos(π/2)	cos(π/2)	["pi","2","/","cos"]	\cos\left(\frac{\pi}{2}\right)	<math><m
 6 ÷ 2	6/2	["6","2","/"]	\frac{6}{2}	<math><mfrac id="mz-2"><mn id="mz-0">6</mn><mn id="mz-1">2</mn></mfrac></math>
 2 · 3	2*3	["2","3","*"]	2 \cdot 3	<math><mrow id="mz-2"><mn id="mz-0">2</mn><mo>⋅</mo><mn id="mz-1">3</mn></mrow></math>
 \lim_{2→10} (1 + 1/2)^2	lim_{2→10}(1+1/2)^{2}	["1","1","2","/","+","2","^","2","10","→","2","lim"]	\lim_{2\to 10}{\left(1 + \frac{1}{2}\right)^2}	<math><mrow displaystyle="true"><munder><mi>lim</mi><mrow><mn>2</mn><mo>→</mo><mn>10</mn></mrow></munder><msup><mrow><mo>(</mo><mrow><mn>1</mn><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac></mrow><mo>)</mo></mrow><mn>2</mn></msup></mrow></math>	ERROR: No JavaScript for a limit
-4x	4x	[4,'x','*']	4x
+4x	4x	["4","x","*"]	4x
 3/2-\frac{3}{2}=0	3/2-frac{3}{2}=0		\frac{3}{2} - \frac{3}{2} = 0
 math.sin(x)+Math.cos(pi)-\tan{pi/2}	sin(x)+cos(pi)-tan{pi/2}		\sin\left(x\right) + \cos\left(\pi\right) - \tan\left(\frac{\pi}{2}\right)
 Math.pow(x,2)=x**2=x^2=x^{2}	pow(x,2)=x^2=x^{2}=x^{2}		x^2 = x^2 = x^2 = x^2
@@ -322,16 +322,6 @@ x1 + x2		["x1","x2","+"]	x1 + x2
 \mathrm{cost}(x)		["x","1","\\:cost"]	\operatorname{cost}\left(x\right)
 \operatorname{sgn}(x)		["x","1","\\:sgn"]	\operatorname{sgn}\left(x\right)
 \Delta x		["Δx"]	\Delta x
-2+3 mod 4		["2","3","+","4","mod"]	\left(2 + 3\right) \bmod 4
-a + b mod n		["a","b","+","n","mod"]	\left(a + b\right) \bmod n
-c = m^e mod n		["c","m","e","^","n","mod","="]	c = m^e \bmod n
-a mod 2n		["a","2","n","*","mod"]	a \bmod \left(2n\right)
-2 mod 3*4		["2","3","mod","4","*"]	\left(2 \bmod 3\right) \cdot 4
-a mod n + 1		["a","n","mod","1","+"]	a \bmod n + 1
-1 + (a mod n)		["1","a","n","mod","+"]	1 + \left(a \bmod n\right)
-a*b mod n		["a","b","*","n","mod"]	\left(ab\right) \bmod n
-2 + 3 % 4		["2","3","4","mod","+"]	2 + \left(3 \bmod 4\right)
-a % n * 2		["a","n","mod","2","*"]	\left(a \bmod n\right) \cdot 2
 x \bmod 2		["x","2","mod"]	x \bmod 2
 x \equiv 1 \pmod{3}		["x","1","≡","3","pmod"]	x \equiv 1 \pmod{3}
 17 ≡ 2 (mod 5)		["17","2","≡","5","pmod"]	17 \equiv 2 \pmod{5}
@@ -343,11 +333,11 @@ x(x+1)		["x","x","1","+","*"]	x\left(x + 1\right)
 x(2t)		["x","2","t","*","*"]	x\left(2t\right)
 y(0) = 1		["0","1","\\:y","1","="]	y\left(0\right) = 1
 \int_{a}^{b} f(x)	int(f(x),x,a,b)	["x","1","\\:f","x","a","b","4","int"]	\int_{a}^{b}{f\left(x\right)}\mathrm{d}x	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mi>a</mi></mrow><mrow><mi>b</mi></mrow></msubsup><mrow><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo></mrow><mi>d</mi><mi>x</mi></mrow></math>	ERROR: No JavaScript for an integral
-int(\alpha^2-1,0,infinity)	int(α^{2}-1,0,∞)	["α","2","^","1","-","0","∞","3","int"]	\int_{0}^{\infty}{\alpha^2 - 1}\mathrm{d}α	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>α</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>α</mi></mrow></math>	ERROR: No JavaScript for an integral
+int(\alpha^2-1,0,infinity)	int(α^{2}-1,0,∞)	["α","2","^","1","-","0","∞","3","int"]	\int_{0}^{\infty}{\alpha^2 - 1}\mathrm{d}\alpha	<math><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>α</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>α</mi></mrow></math>	ERROR: No JavaScript for an integral
 int(x^2-1,x,0,infinity)+int(x^2-1,x)+int(x^2-1,0,infinity)+int(x^2-1)	int(x^{2}-1,x,0,∞)+int(x^{2}-1,x)+int(x^{2}-1,0,∞)+int(x^{2}-1)	["x","2","^","1","-","x","0","∞","4","int","x","2","^","1","-","x","2","int","+","x","2","^","1","-","0","∞","3","int","+","x","2","^","1","-","1","int","+"]	\int_{0}^{\infty}{x^2 - 1}\mathrm{d}x + \int{x^2 - 1}\mathrm{d}x + \int_{0}^{\infty}{x^2 - 1}\mathrm{d}x + \int{x^2 - 1}\mathrm{d}x	<math><mrow><mrow><mrow><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow><mo>+</mo><mrow displaystyle="true"><mo>∫</mo><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow><mo>+</mo><mrow displaystyle="true"><msubsup><mo>∫</mo><mrow><mn>0</mn></mrow><mrow><mi>∞</mi></mrow></msubsup><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow><mo>+</mo><mrow displaystyle="true"><mo>∫</mo><mrow><msup><mi>x</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn></mrow><mi>d</mi><mi>x</mi></mrow></mrow></math>	ERROR: No JavaScript for an integral
 sum(i^2-17,i=0,infinity)!=product(i^2-17,i\in T)	sum(i^{2}-17,i=0,∞)≠prod(i^{2}-17,i∈T)	["i","2","^","17","-","i","0","=","∞","3","\\sumidx","i","2","^","17","-","i","T","∈","2","\\prodidx","≠"]	\sum_{i = 0}^{\infty}{i^2 - 17} \neq \prod_{i \in T}{i^2 - 17}	<math><mrow><mrow displaystyle="true"><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mi>∞</mi></munderover><mrow><msup><mi>i</mi><mn>2</mn></msup><mo>−</mo><mn>17</mn></mrow></mrow><mo>≠</mo><mrow displaystyle="true"><munder><mo>∏</mo><mrow><mi>i</mi><mo>∈</mo><mi>T</mi></mrow></munder><mrow><msup><mi>i</mi><mn>2</mn></msup><mo>−</mo><mn>17</mn></mrow></mrow></mrow></math>	ERROR: No JavaScript for a product with no bounds to count between
-[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	["1","2","2","[]","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","17","23","2","[]","39","53","2","[]","2","[]","="]	[[1, 2], [3, 4]][[5, 6], [7, 8]] = [[17, 23], [39, 53]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>17</mn><mo>,</mo><mn>23</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>39</mn><mo>,</mo><mn>53</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	[[1, 2], [3, 4]] * [[5, 6], [7, 8]] == [[17, 23], [39, 53]]	false
-[{1,2},[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	[{1,2},[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]	["1","2","2","{}","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","17","23","2","[]","39","53","2","[]","2","[]","="]	[\{1, 2\}, [3, 4]][[5, 6], [7, 8]] = [[17, 23], [39, 53]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>}</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>17</mn><mo>,</mo><mn>23</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>39</mn><mo>,</mo><mn>53</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	[[1, 2], [3, 4]] * [[5, 6], [7, 8]] == [[17, 23], [39, 53]]	false
+[[1,2],[3,4]]*[[5,6],[7,8]]=[[19,22],[43,50]]	[[1,2],[3,4]]*[[5,6],[7,8]]=[[19,22],[43,50]]	["1","2","2","[]","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","19","22","2","[]","43","50","2","[]","2","[]","="]	[[1, 2], [3, 4]][[5, 6], [7, 8]] = [[19, 22], [43, 50]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>19</mn><mo>,</mo><mn>22</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>43</mn><mo>,</mo><mn>50</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	((a, b) => { const s = (x, y) => (Array.isArray(x) && Array.isArray(y) ? x.length === y.length && x.every((v, i) => s(v, y[i])) : x == y); return s(a, b); })(((a, b) => { const L = Array.isArray; const m = (v) => L(v) && v.length > 0 && v.every((r) => L(r) && r.length > 0 && r.length === v[0].length && !r.some(L)) && (v.length > 1 || v[0].length > 1); const l = (v) => L(v) && v.length > 0 && !v.some(L); const p = (A, B) => (A[0].length === B.length ? A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => s + x * B[k][j], 0))) : NaN); const e = (x, y) => (L(x) && L(y) ? (x.length === y.length ? x.map((t, i) => e(t, y[i])) : NaN) : L(x) ? x.map((t) => e(t, y)) : L(y) ? y.map((t) => e(x, t)) : x * y); if (m(a) && m(b)) return p(a, b); if (m(a) && l(b)) { const c = p(a, b.map((y) => [y])); return L(c) ? c.map((r) => r[0]) : c; } if (l(a) && m(b)) { const c = p([a], b); return L(c) ? c[0] : c; } return e(a, b); })([[1, 2], [3, 4]], [[5, 6], [7, 8]]), [[19, 22], [43, 50]])	true
+[{1,2},[3,4]]*[[5,6],[7,8]]=[[19,22],[43,50]]	[{1,2},[3,4]]*[[5,6],[7,8]]=[[19,22],[43,50]]	["1","2","2","{}","3","4","2","[]","2","[]","5","6","2","[]","7","8","2","[]","2","[]","*","19","22","2","[]","43","50","2","[]","2","[]","="]	[\{1, 2\}, [3, 4]][[5, 6], [7, 8]] = [[19, 22], [43, 50]]	<math><mrow><mrow><mrow><mo>[</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>}</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>]</mo></mrow><mo>]</mo></mrow><mo>⁢</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>5</mn><mo>,</mo><mn>6</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>7</mn><mo>,</mo><mn>8</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow><mo>=</mo><mrow><mo>[</mo><mrow><mo>[</mo><mn>19</mn><mo>,</mo><mn>22</mn><mo>]</mo></mrow><mo>,</mo><mrow><mo>[</mo><mn>43</mn><mo>,</mo><mn>50</mn><mo>]</mo></mrow><mo>]</mo></mrow></mrow></math>	((a, b) => { const s = (x, y) => (Array.isArray(x) && Array.isArray(y) ? x.length === y.length && x.every((v, i) => s(v, y[i])) : x == y); return s(a, b); })(((a, b) => { const L = Array.isArray; const m = (v) => L(v) && v.length > 0 && v.every((r) => L(r) && r.length > 0 && r.length === v[0].length && !r.some(L)) && (v.length > 1 || v[0].length > 1); const l = (v) => L(v) && v.length > 0 && !v.some(L); const p = (A, B) => (A[0].length === B.length ? A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => s + x * B[k][j], 0))) : NaN); const e = (x, y) => (L(x) && L(y) ? (x.length === y.length ? x.map((t, i) => e(t, y[i])) : NaN) : L(x) ? x.map((t) => e(t, y)) : L(y) ? y.map((t) => e(x, t)) : x * y); if (m(a) && m(b)) return p(a, b); if (m(a) && l(b)) { const c = p(a, b.map((y) => [y])); return L(c) ? c.map((r) => r[0]) : c; } if (l(a) && m(b)) { const c = p([a], b); return L(c) ? c[0] : c; } return e(a, b); })([[1, 2], [3, 4]], [[5, 6], [7, 8]]), [[19, 22], [43, 50]])	true
 x between 3 and 5	x∈[3,5]	["x","3","5","2","[]","∈"]	x \in [3, 5]	<math><mrow><mi>x</mi><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></math>	(x >= 3 && x <= 5)
 x is 7	x=7	["x","7","="]	x = 7	<math><mrow><mi>x</mi><mo>=</mo><mn>7</mn></mrow></math>	x == 7
 x is in {1,2,3,4}	x∈{1,2,3,4}	["x","1","2","3","4","4","{}","∈"]	x \in \{1, 2, 3, 4\}	<math><mrow><mi>x</mi><mo>∈</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>4</mn><mo>}</mo></mrow></mrow></math>	[1, 2, 3, 4].includes(x)
@@ -359,157 +349,3 @@ x^23^2	x^{23}^{2}	["x","23","2","^","^"]	x^{23^2}	<math><msup><mi>x</mi><msup><m
 \prod_{i=0}^10 x^{2}	\prodidx_{i=0}^{10}x^{2}	["x","2","^","i","0","=","10","3","\\prodidx"]	\prod_{i = 0}^{10}{x^2}	<math><mrow displaystyle="true"><munderover><mo>∏</mo><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow><mn>10</mn></munderover><msup><mi>x</mi><mn>2</mn></msup></mrow></math>	(()=>{let prod = 1; let loopCount = 0; for (let i=0;i<=10;i++) {if (loopCount++ > 1000000){break};prod *= Math.pow(x, 2);}; return prod;})()
 51 mod 3*4	51 mod 3*4	["51","3","mod","4","*"]	\left(51 \bmod 3\right) \cdot 4	<math><mrow><mrow><mo>(</mo><mrow><mn>51</mn><mo>mod</mo><mn>3</mn></mrow><mo>)</mo></mrow><mo>⋅</mo><mn>4</mn></mrow></math>	(51 % 3) * 4	0
 -2 mod -x	-2 mod -x	["-2","x","neg","mod"]	-2 \bmod -x	<math><mrow><mn>-2</mn><mo>mod</mo><mrow><mo>−</mo><mi>x</mi></mrow></mrow></math>	((-2 % -x) + -x) % -x
-
-# Code spellings (spreadsheet, SQL, numpy/math, SymPy, GLSL) that no other row used — added 2026-11-03
-=AND(a, b)	((a)&(b))	["a","b","&"]	a \land b
-=OR(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
-=NOT(a)	(!(a))	["a","\\not"]	\neg a
-=XOR(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
-=LOG(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
-=LOG(x, 2)	log_{2}(x)	["2","x","log"]	\log_{2}\left(x\right)
-=ATAN2(x, y)	atan2(y,x)	["y","x","atan2"]	\text{atan2}\left(y, x\right)
-=INT(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
-=FLOOR.MATH(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
-=CEILING.MATH(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
-=CEILING(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
-=FACT(5)	((5)!)	["5","!"]	5!
-=COMBIN(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
-=PERMUT(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
-=AVERAGE(a, b, c)	mean(a,b,c)	["a","b","c","3","mean"]	\frac{a + b + c}{3}
-=SUM(a, b, c)	sum(a,b,c)	["a","b","c","3","sum"]	a + b + c
-=PRODUCT(a, b, c)	prod(a,b,c)	["a","b","c","3","prod"]	a \cdot b \cdot c
-=MAX(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
-=MIN(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
-=MEDIAN(a, b, c)	median(a,b,c)	["a","b","c","3","\\:median"]	\operatorname{median}\left(a, b, c\right)
-=STDEV.P(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
-=STDEVP(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
-=RAND()	random()	["random"]	\text{random}\left(\right)
-=ISNUMBER(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
-=LOG10(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
-=FIXED(x, 1)	fixed(x,1)	["x","1","fixed"]	\text{fixed}\left(x, 1\right)
-=PI()	π	["pi"]	\pi
-=EXP(x)	e^(x)	["e","x","^"]	e^x
-=SQRT(x)	sqrt(x)	["x","sqrt"]	\sqrt{x}
-=ABS(x)	abs(x)	["x","abs"]	\left|x\right|
-=LN(x)	log_{e}(x)	["x","ln"]	\ln\left(x\right)
-=SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
-=ASIN(x)	arcsin(x)	["x","arcsin"]	\arcsin\left(x\right)
-=IF(x>0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
-POWER(x, 2)	pow(x,2)	["x","2","^"]	x^2
-ROUND(x, 2)	round(x,2)	["x","2","round"]	\text{round}\left(x, 2\right)
-SIN(x)	sin(x)	["x","sin"]	\sin\left(x\right)
-SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
-COMB(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
-TRUNC(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
-GREATEST(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
-LEAST(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
-MOD(a, b)	((a) mod (b))	["a","b","mod"]	a \bmod b
-CASE WHEN x > 0 THEN 1 ELSE 0 END	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
-np.maximum(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
-np.nanmedian(x)	median(x)	["x","1","\\:median"]	\operatorname{median}\left(x\right)
-np.isfinite(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
-np.logical_xor(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
-np.logical_and(a, b)	((a)&(b))	["a","b","&"]	a \land b
-np.logical_or(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
-np.logical_not(a)	(!(a))	["a","\\not"]	\neg a
-np.where(x > 0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
-np.isin(x, [1, 2])	((x)∈{1,2})	["x","1","2","2","{}","∈"]	x \in \{1, 2\}
-np.isclose(a, b)	((a)≈(b))	["a","b","≈"]	a \approx b
-np.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
-math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
-Math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
-math.factorial(5)	((5)!)	["5","!"]	5!
-scipy.special.perm(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
-scipy.special.comb(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
-sympy.factorial(n)	((n)!)	["n","!"]	n!
-sympy.Rational(1, 3)	((1)/(3))	["1","3","/"]	\frac{1}{3}
-sympy.And(a, b)	((a)&(b))	["a","b","&"]	a \land b
-sympy.Nand(a, b)	((a) \nand (b))	["a","b","\\nand"]	a \barwedge b
-sympy.Nor(a, b)	((a) \nor (b))	["a","b","\\nor"]	a \downarrow b
-sympy.Piecewise((1, x > 0), (0, True))	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
-sympy.Union(A, B)	((A)∪(B))	["A","B","∪"]	A \cup B
-sympy.summation(i**2, (i, 1, n))	(\sumidx_{i=1}^{n}(i^2))	["i","2","^","i","1","=","n","3","\\sumidx"]	\sum_{i = 1}^{n}{i^2}
-sympy.Interval.open(0, 1)	(0,1)	["0","1","2","()"]	(0, 1)
-sympy.Interval.Lopen(0, 1)	(0,1]	["0","1","2","(]"]	(0, 1]
-sympy.Interval.Ropen(0, 1)	[0,1)	["0","1","2","[)"]	[0, 1)
-sympy.Eq(a, b)	((a)=(b))	["a","b","="]	a = b
-sympy.Ne(a, b)	((a)≠(b))	["a","b","≠"]	a \neq b
-sympy.binomial(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
-sympy.ff(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
-sympy.limit(sympy.sin(x)/x, x, 0)	lim(sin(x)/x,x,0)	["x","sin","x","/","x","0","3","lim"]	\lim_{x\to 0}{\frac{\sin\left(x\right)}{x}}
-sympy.integrate(x**2, (x, 0, 1))	int(x^2,x,0,1)	["x","2","^","x","0","1","4","int"]	\int_{0}^{1}{x^2}\mathrm{d}x
-x in sympy.Rationals	x∈ℚ	["x","ℚ","∈"]	x \in \mathbb{Q}
-x in sympy.Complexes	x∈ℂ	["x","ℂ","∈"]	x \in \mathbb{C}
-vec2(a, b)	(a,b)	["a","b","2","()"]	(a, b)
-vec3(r, g, b)	(r,g,b)	["r","g","b","3","()"]	(r, g, b)
-inversesqrt(x)	(1/sqrt(x))	["1","x","sqrt","/"]	\frac{1}{\sqrt{x}}
-fract(x)	((x)-floor(x))	["x","x","floor","-"]	x - \lfloor x \rfloor
-mz_sq(x)	((x)^{2})	["x","2","^"]	x^2
-mz_cube(x)	((x)^{3})	["x","3","^"]	x^3
-
-# Plain English (src/parse/clean/english.js): comparisons, ranges, properties, and the words speech uses — added 2026-11-03
-x is between 3 and 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
-x is between 3 and 5 exclusive		["x","3","5","2","()","∈"]	x \in (3, 5)
-x is strictly between 0 and 1		["x","0","1","2","()","∈"]	x \in (0, 1)
-x is not between 3 and 5		["x","3","5","2","[]","∉"]	x \notin [3, 5]
-x is greater than 3		["x","3",">"]	x > 3
-x is more than 3		["x","3",">"]	x > 3
-x is at least 3		["x","3","≥"]	x \geq 3
-x is at most 3		["x","3","≤"]	x \leq 3
-x is no more than 3		["x","3","≤"]	x \leq 3
-x is greater than or equal to 3		["x","3","≥"]	x \geq 3
-x is less than or equal to 3		["x","3","≤"]	x \leq 3
-x is not equal to 3		["x","3","≠"]	x \neq 3
-x equals 3		["x","3","="]	x = 3
-x does not equal 3		["x","3","≠"]	x \neq 3
-x is not 3		["x","3","≠"]	x \neq 3
-x is approximately 3		["x","3","≈"]	x \approx 3
-x is greater than 3 and less than 7		["x","3",">","x","7","<","&"]	x > 3 \land x < 7
-x is at least 0 and at most 10		["x","0","≥","x","10","≤","&"]	x \geq 0 \land x \leq 10
-x is positive		["x","0",">"]	x > 0
-x is negative		["x","0","<"]	x < 0
-x is non-negative		["x","0","≥"]	x \geq 0
-x is zero		["x","0","="]	x = 0
-n is an integer		["n","ℤ","∈"]	n \in \mathbb{Z}
-n is a whole number		["n","ℤ","∈"]	n \in \mathbb{Z}
-x is a real number		["x","ℝ","∈"]	x \in \mathbb{R}
-n is even		["n","2","mod","0","="]	n \bmod 2 = 0
-n is odd		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
-n is not even		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
-n is a multiple of 3		["n","3","mod","0","="]	n \bmod 3 = 0
-n is divisible by 3		["n","3","mod","0","="]	n \bmod 3 = 0
-3 divides n		["n","3","mod","0","="]	n \bmod 3 = 0
-x is in the closed interval from 3 to 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
-x is in the open interval from 0 to 1		["x","0","1","2","()","∈"]	x \in (0, 1)
-x squared		["x","2","^"]	x^2
-x cubed		["x","3","^"]	x^3
-x to the fifth		["x","5","^"]	x^5
-x to the nth power		["x","n","^"]	x^n
-x to the n		["x","n","^"]	x^n
-e to the x		["e","x","^"]	e^x
-the square root of x		["x","sqrt"]	\sqrt{x}
-the square root of (x + 1)		["x","1","+","sqrt"]	\sqrt{x + 1}
-the cube root of x		["3","x","root"]	\sqrt[3]{x}
-the absolute value of x		["x","abs"]	\left|x\right|
-sine of x		["x","sin"]	\sin\left(x\right)
-the natural log of x		["x","ln"]	\ln\left(x\right)
-x plus y times 2		["x","y","2","*","+"]	x + y \cdot 2
-x divided by y		["x","y","/"]	\frac{x}{y}
-x over y		["x","y","/"]	\frac{x}{y}
-x minus y		["x","y","-"]	x - y
-half of x		["x","2","/"]	\frac{x}{2}
-twice x		["2","x","*"]	2x
-20 percent		["20%"]	20\%
-cost is more than budget		["cost","budget",">"]	\mathrm{cost} > \mathrm{budget}
-times + 1		["times","1","+"]	\mathrm{times} + 1
-x is within 0.001 of 7		["x","7","-","abs","0.001","≤"]	\left|x - 7\right| \leq 0.001
-x is within 1% of 7		["x","7","-","abs","1","100","/","7","*","≤"]	\left|x - 7\right| \leq \frac{1}{100} \cdot 7
-x is within 5 percent of y		["x","y","-","abs","5","100","/","y","abs","*","≤"]	\left|x - y\right| \leq \frac{5}{100}\left|y\right|
-x is not within 0.1 of 2		["x","2","-","abs","0.1",">"]	\left|x - 2\right| > 0.1
-# = before a conditional defines it when what follows the = is true or false: the whole conditional is the right side (parser.js equals()); brackets keep a test
-f(x) = x < 0 ? x^2 : x < 1 ? 1 : 2x - 1		["x","1","\\:f","x","0","<","x","2","^","x","1","<","1","2","x","*","1","-","?:","?:","="]
-y = x > 0 ? 1 : 2		["y","x","0",">","1","2","?:","="]
-y = x > 0 and z < 1 ? 1 : 2		["y","x","0",">","z","1","<","&","1","2","?:","="]
-(y = x > 0) ? 1 : 2		["y","x","0",">","=","1","2","?:"]
-a = b and c = d ? 1 : 2		["a","b","=","c","d","=","&","1","2","?:"]
-x = 1 ? a : b		["x","1","=","a","b","?:"]

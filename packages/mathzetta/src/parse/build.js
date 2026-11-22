@@ -212,5 +212,5 @@ function checkArity(name, args) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [RENAMES, SIDES]) Object.setPrototypeOf(table, null);

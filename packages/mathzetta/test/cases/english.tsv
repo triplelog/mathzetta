@@ -1,0 +1,63 @@
+# english.tsv — Plain English: comparisons, ranges, properties and the words speech uses, read as math.
+# Columns: Input, Clean, Postfix, Latex. A blank cell is not checked; a # line is a note.
+Input	Clean	Postfix	Latex
+
+# Comparisons, ranges, properties, and the words toSpeech uses (src/parse/clean/english.js)
+x is between 3 and 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
+x is between 3 and 5 exclusive		["x","3","5","2","()","∈"]	x \in (3, 5)
+x is strictly between 0 and 1		["x","0","1","2","()","∈"]	x \in (0, 1)
+x is not between 3 and 5		["x","3","5","2","[]","∉"]	x \notin [3, 5]
+x is greater than 3		["x","3",">"]	x > 3
+x is more than 3		["x","3",">"]	x > 3
+x is at least 3		["x","3","≥"]	x \geq 3
+x is at most 3		["x","3","≤"]	x \leq 3
+x is no more than 3		["x","3","≤"]	x \leq 3
+x is greater than or equal to 3		["x","3","≥"]	x \geq 3
+x is less than or equal to 3		["x","3","≤"]	x \leq 3
+x is not equal to 3		["x","3","≠"]	x \neq 3
+x equals 3		["x","3","="]	x = 3
+x does not equal 3		["x","3","≠"]	x \neq 3
+x is not 3		["x","3","≠"]	x \neq 3
+x is approximately 3		["x","3","≈"]	x \approx 3
+x is greater than 3 and less than 7		["x","3",">","x","7","<","&"]	x > 3 \land x < 7
+x is at least 0 and at most 10		["x","0","≥","x","10","≤","&"]	x \geq 0 \land x \leq 10
+x is positive		["x","0",">"]	x > 0
+x is negative		["x","0","<"]	x < 0
+x is non-negative		["x","0","≥"]	x \geq 0
+x is zero		["x","0","="]	x = 0
+n is an integer		["n","ℤ","∈"]	n \in \mathbb{Z}
+n is a whole number		["n","ℤ","∈","n","0","≥","&"]	n \in \mathbb{Z} \land n \geq 0
+x is a real number		["x","ℝ","∈"]	x \in \mathbb{R}
+n is even		["n","2","mod","0","="]	n \bmod 2 = 0
+n is odd		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
+n is not even		["n","2","mod","0","≠"]	n \bmod 2 \neq 0
+n is a multiple of 3		["n","3","mod","0","="]	n \bmod 3 = 0
+n is divisible by 3		["n","3","mod","0","="]	n \bmod 3 = 0
+3 divides n		["n","3","mod","0","="]	n \bmod 3 = 0
+x is in the closed interval from 3 to 5		["x","3","5","2","[]","∈"]	x \in [3, 5]
+x is in the open interval from 0 to 1		["x","0","1","2","()","∈"]	x \in (0, 1)
+x squared		["x","2","^"]	x^2
+x cubed		["x","3","^"]	x^3
+x to the fifth		["x","5","^"]	x^5
+x to the nth power		["x","n","^"]	x^n
+x to the n		["x","n","^"]	x^n
+e to the x		["e","x","^"]	e^x
+the square root of x		["x","sqrt"]	\sqrt{x}
+the square root of (x + 1)		["x","1","+","sqrt"]	\sqrt{x + 1}
+the cube root of x		["3","x","root"]	\sqrt[3]{x}
+the absolute value of x		["x","abs"]	\left|x\right|
+sine of x		["x","sin"]	\sin\left(x\right)
+the natural log of x		["x","ln"]	\ln\left(x\right)
+x plus y times 2		["x","y","2","*","+"]	x + y \cdot 2
+x divided by y		["x","y","/"]	\frac{x}{y}
+x over y		["x","y","/"]	\frac{x}{y}
+x minus y		["x","y","-"]	x - y
+half of x		["x","2","/"]	\frac{x}{2}
+twice x		["2","x","*"]	2x
+20 percent		["20%"]	20\%
+cost is more than budget		["cost","budget",">"]	\mathrm{cost} > \mathrm{budget}
+times + 1		["times","1","+"]	\mathrm{times} + 1
+x is within 0.001 of 7		["x","7","-","abs","0.001","≤"]	\left|x - 7\right| \leq 0.001
+x is within 1% of 7		["x","7","-","abs","1","100","/","7","*","≤"]	\left|x - 7\right| \leq \frac{1}{100} \cdot 7
+x is within 5 percent of y		["x","y","-","abs","5","100","/","y","abs","*","≤"]	\left|x - y\right| \leq \frac{5}{100}\left|y\right|
+x is not within 0.1 of 2		["x","2","-","abs","0.1",">"]	\left|x - 2\right| > 0.1

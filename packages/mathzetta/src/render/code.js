@@ -11,7 +11,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, substringTest, isStartsWith, startsWithArgs, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, substringTest, isStartsWith, startsWithArgs, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition, isListValued, mixedEquality } from '../common.js';
 import { firstVariable } from '../tree.js';
 import { JS_HELPERS, PY_HELPERS, NP_HELPERS } from '../js-helpers.js';
 
@@ -418,8 +418,12 @@ const PYTHON_KEYWORDS = new Set(['and', 'as', 'assert', 'async', 'await', 'break
  */
 function identifier(name, lang = JS) {
     const id = name.replace(/′/g, '_prime').replace('⁻¹', '_inverse');
+    // a name from a postfix array or tree is anything at all: one that isn't a name in the language is refused
+    if (!IDENTIFIER.test(id)) throw new Error(`No ${lang.title} for the name ${JSON.stringify(name)}: not a name in ${lang.title}`);
     return lang.python && PYTHON_KEYWORDS.has(id) ? id + '_' : id;
 }
+/** A name both JavaScript and Python accept: a letter or _, then letters, digits and _ (θ, Δx and x_1 included). */
+const IDENTIFIER = /^[\p{L}_][\p{L}\p{N}_]*$/u;
 
 /** A variable's name in generated Python: what a template's parameters must be called. */
 export const pythonName = (name) => identifier(name, PY);
@@ -523,6 +527,17 @@ function operation(node, render, lang) {
         const bracket = childPrec !== undefined && childPrec < (op === '\\not' ? operator('\\not').prec : 100);
         return bracket ? `(${render(child)})` : render(child);
     };
+
+    // 0 === false is false in every language (Python's 0 == False is True); 1 == true only JavaScript converts
+    const mixed = lang !== JS && mixedEquality(node);
+    if (mixed && !mixed.strict) throw new Error(`No ${lang.title} for ${mixed.refusal}`);
+    if (mixed && !(lang.noStrings && args.some((n) => n.type === 'string'))) return mixed.answer ? lang.true : lang.false;
+    // a list or a matrix: the matrix product, and = entry by entry, as evaluate() takes them ([[1, 2]] * [[3], [4]] is [[11]])
+    if (op === '*' && args.length === 2 && !isMinusOneTimes(node) && args.some(isListValued)) return listProduct(node, render, lang, side);
+    if ((op === '=' || op === '≠') && args.some(isListValued)) {
+        const same = listEquality(node, render, lang);
+        if (same) return op === '=' ? same : lang.not(same);
+    }
 
     const special = lang.ops?.[op]?.(args.map(render), node, render);
     if (special != null) return special;
@@ -691,6 +706,41 @@ function operation(node, render, lang) {
     throw new Error(`No ${lang.name} for '${op}'`);
 }
 
+/** A flat list written out, [1, 2]: entry by entry in a product (a list of rows is a matrix). */
+const isFlatList = (n) => n.type === 'op' && n.op === '[]' && n.args.length > 1 && !matrixRows(n);
+
+/**
+ * A product with a list or a matrix in it. JavaScript: an inline helper (js-helpers.js), as evaluate() works it out.
+ * Python and numpy: np.dot, the matrix product (a list as a column, or a row; a number scales), or np.multiply
+ * between flat lists, entry by entry — Python's own * repeats a list, and numpy's multiplies matrices entry by entry.
+ * SymPy: its Matrix product.
+ */
+function listProduct(node, render, lang, side) {
+    const [a, b] = node.args;
+    if (lang === JS) return `${JS_HELPERS.times}(${render(a)}, ${render(b)})`;
+    if (lang === SY) {
+        if ([a, b].some(isFlatList)) throw new Error('No SymPy for a product with a list (write the list as a matrix, bmatrix(…))');
+        const matrix = (n, s) => (n.type === 'op' && n.op === '[]' ? `sympy.Matrix(${render(n)})` : side(n, s));
+        return `${matrix(a, 'left')} * ${matrix(b, 'right')}`;
+    }
+    const flat = [a, b].every((n) => !isListValued(n) || isFlatList(n));
+    return `np.${flat ? 'multiply' : 'dot'}(${render(a)}, ${render(b)})`;
+}
+
+/** a = b between lists, entry by entry: JavaScript's == asks whether they are the same object, and numpy's compares
+ *  entry by entry into an array. Null where the language's own = already does it (Python's lists, SymPy's matrices). */
+function listEquality(node, render, lang) {
+    const [a, b] = node.args;
+    if (lang === JS) return `${JS_HELPERS.same}(${render(a)}, ${render(b)})`;
+    if (lang === SY) {   // a list of rows compared with a Matrix is a Matrix: Eq(Matrix, list) is not
+        const matrix = (n) => (n.type === 'op' && n.op === '[]' && matrixRows(n) ? `sympy.Matrix(${render(n)})` : render(n));
+        return `sympy.Eq(${matrix(a)}, ${matrix(b)})`;
+    }
+    const product = (n) => n.type === 'op' && n.op === '*' && isListValued(n);   // np.dot's answer is an array
+    if (lang === NP ? node.args.some(isListValued) : node.args.some(product)) return `np.array_equal(${render(a)}, ${render(b)})`;
+    return null;
+}
+
 /** x ∈ ℝ, ℤ, ℕ as code: is it a (whole, positive whole) number? */
 const NUMBER_SETS = {
     'ℝ': { javascript: (v) => `Number.isFinite(${v})`, python: (v) => `math.isfinite(${v})`, numpy: (v) => `np.isfinite(${v})` },
@@ -702,10 +752,18 @@ const NUMBER_SETS = {
     },
 };
 
+/** Sets a test in code can't decide (SymPy's flavour writes them as S.Rationals, S.Complexes). */
+const UNDECIDABLE_SETS = {
+    'ℚ': 'a number in code is a double, always a fraction, so whether it is rational can\'t be told ({ sympy: true } can)',
+    'ℂ': 'a number in code is never complex',
+};
+
 function membership(node, render, lang) {
     const [x, set] = node.args;
     const search = lang.substring && substringTest(node);   // "ab" ∈ name: is the text in the value?
     if (search) return lang.substring(render(search.within), render(search.text), node.op === '∉');
+    // a double is always a fraction, and never complex: whether it is in ℚ can't be told (SymPy, exact, can)
+    if (set.type === 'symbol' && UNDECIDABLE_SETS[set.value]) throw new Error(`No ${lang.title} for ∈ ${set.value}: ${UNDECIDABLE_SETS[set.value]}`);
     const v = render(x);
     const numbers = set.type === 'symbol' && NUMBER_SETS[set.value];
     if (numbers) {
@@ -788,5 +846,5 @@ function indexed(kind, args, render, lang) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
-for (const table of [JS, PY, NP_NAMES, COMPARISONS, NP, SY_SETS, SY_INTERVALS, SY, LANGUAGES, MATH_FUNCTIONS, RECIPROCALS, NUMBER_SETS, LIMIT_SIDES]) Object.setPrototypeOf(table, null);
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
+for (const table of [JS, PY, NP_NAMES, COMPARISONS, NP, SY_SETS, SY_INTERVALS, SY, LANGUAGES, MATH_FUNCTIONS, RECIPROCALS, NUMBER_SETS, UNDECIDABLE_SETS, LIMIT_SIDES]) Object.setPrototypeOf(table, null);

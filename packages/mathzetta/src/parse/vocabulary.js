@@ -74,17 +74,16 @@ export const RIGHT_ASSOCIATIVE = new Set(['^', '?:', '?', 'log']);
 export const OPENERS = ['(', '{', '['];
 export const CLOSERS = [')', '}', ']'];
 
-/** A run of digits and dots: 3, 0.5, .5, 1.333.. — no sign, no exponent. */
+/**
+ * A number as written: 3, 0.5, .5, 1., and a repeating decimal 1.333.. (the block ends the digits) — no exponent.
+ * With `allowSign`, a leading minus too (-3, -.5). Not '.', '-.' or '1.2.3'.
+ */
 export function isNumber(text, allowSign = false) {
-    if (!text) return false;
-    for (let i = 0; i < text.length; i++) {
-        if ('0123456789.'.includes(text[i])) continue;
-        if (allowSign && i === 0 && text[i] === '-' && text.length > 1) continue;
-        return false;
-    }
-    return true;
+    return typeof text === 'string' && (allowSign ? SIGNED_NUMBER : NUMBER).test(text);
 }
+const NUMBER = /^(?:\d+\.?\d*|\.\d+|\d*\.\d+\.\.)$/;
+const SIGNED_NUMBER = /^-?(?:\d+\.?\d*|\.\d+|\d*\.\d+\.\.)$/;
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [PARSE_PRECEDENCE]) Object.setPrototypeOf(table, null);

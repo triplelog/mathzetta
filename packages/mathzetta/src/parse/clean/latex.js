@@ -322,10 +322,17 @@ function spelledFunctions(input) {
         (word, arc, name) => (arc ? 'arc' : '') + SPELLED[name.toLowerCase()]);
 }
 
-/** f^{(4)}(x), f⁽⁴⁾(x): the fourth derivative, written as f′′′′(x) is (a count in brackets is not a power). */
+/**
+ * f^{(4)}(x), f⁽⁴⁾(x), f^{(12)}(x): the nth derivative, written as f′′′′(x) is (a count in brackets is not a power):
+ * the name f with n primes, for any whole n up to MAX_PRIMES (more is refused, so the name can't grow without bound).
+ */
 function nthDerivatives(input) {
-    return input.replace(/(?<![A-Za-z\\])([A-Za-z])\^\s*\{?\s*\(\s*([1-9])\s*\)\s*\}?(?=\s*\()/g, (_, f, n) => f + '′'.repeat(Number(n)));
+    return input.replace(/(?<![A-Za-z\\])([A-Za-z])\^\s*\{?\s*\(\s*([1-9]\d*)\s*\)\s*\}?(?=\s*\()/g, (_, f, n) => {
+        if (n.length > 3 || Number(n) > MAX_PRIMES) throw new Error(`A derivative f^{(n)} is read up to n = ${MAX_PRIMES}`);
+        return f + '′'.repeat(Number(n));
+    });
 }
+const MAX_PRIMES = 100;
 
 /** ₅C₂, {}_5C_2, {}_{n}P_{r}, _nC_r: n choose r and n permute r, as \binom and perm are. */
 function chooseNotation(input) {

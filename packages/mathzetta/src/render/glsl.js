@@ -30,7 +30,7 @@
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, CUSTOM_PREFIX } from '../operators.js';
-import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, isMinusOneTimes, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, withIndex, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition, mixedEquality } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -148,6 +148,9 @@ function operation(node, render, es3, filter = false) {
     const side = (child, s, parentOp = op) => (needsParens(parentOp, glslBracketOp(child), s) ? `(${render(child)})` : render(child));
     const list = () => args.map(render).join(', ');
     const binary = (symbol) => `${side(a, 'left')} ${symbol} ${side(b, 'right')}`;
+    // a condition is a bool in GLSL: a number in its place (if a then …, a && b) is "a is not 0", as JavaScript takes it
+    const truth = (n) => (isBool(n) ? render(n) : `${side(n, 'left', '≠')} != 0.0`);
+    const number = (n) => (isBool(n) ? `float(${render(n)})` : render(n));
     const unary = (child) => {
         const childOp = glslBracketOp(child);
         const prec = childOp ? needsParens('neg', childOp, 'right') : false;
@@ -155,6 +158,10 @@ function operation(node, render, es3, filter = false) {
         return prec || text.startsWith('-') || (child.type === 'op' && ['neg', 'pm'].includes(child.op)) ? `(${text})` : text;
     };
 
+    // 1.0 == true is no GLSL (a float is never a bool): 0 === false is known to be false, 1 = true is refused
+    const mixed = mixedEquality(node);
+    if (mixed && !mixed.strict) throw new Error(`No GLSL for ${mixed.refusal}`);
+    if (mixed && !args.some((n) => n.type === 'string')) return mixed.answer ? 'true' : 'false';
     // det([[1, 2], [3, 4]]): a list of rows is no GLSL matrix; written out as |1 2; 3 4| is
     if (op === 'det' && a && matrixRows(a)) return operation({ ...node, op: 'vmatrix', args: a.args }, render, es3, filter);
     const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
@@ -234,26 +241,29 @@ function operation(node, render, es3, filter = false) {
             return args.map((x, i) => side(x, i ? 'right' : 'left', '+')).join(' + ');
         case 'prod':
             return args.map((x, i) => side(x, i ? 'right' : 'left', '*')).join(' * ');
+        // && and || take bools only: with a number, a value as in JavaScript (2 && 3 is 3, 0 || x is x, x > 0 && y is
+        // y or false — 0.0 here), a bool beside it written float(…)
         case '&':
-            return `(${render(a)} && ${render(b)})`;
+            return isBool(a) && isBool(b) ? `(${render(a)} && ${render(b)})` : `mz_both(${number(a)}, ${number(b)})`;
         case '|':
-            return `(${render(a)} || ${render(b)})`;
+            return isBool(a) && isBool(b) ? `(${render(a)} || ${render(b)})` : `mz_either(${number(a)}, ${number(b)})`;
         case '\\xor':
-            return `(${render(a)} ^^ ${render(b)})`;
+            return `(${truth(a)} ^^ ${truth(b)})`;
         case '\\nand':
-            return `!(${render(a)} && ${render(b)})`;
+            return `!(${truth(a)} && ${truth(b)})`;
         case '\\implies':
-            return `(!(${render(a)}) || ${render(b)})`;
+            return `(!(${truth(a)}) || ${truth(b)})`;
         case '\\iff':
-            return `((${render(a)}) == (${render(b)}))`;
+            return `((${truth(a)}) == (${truth(b)}))`;
         case '\\nor':
-            return `!(${render(a)} || ${render(b)})`;
+            return `!(${truth(a)} || ${truth(b)})`;
         case '\\not':
-            return '!' + unary(a);
+            return isBool(a) ? '!' + unary(a) : `!(${truth(a)})`;
         case '?:': {
             const isUnchanged = (n) => filter && n.type === 'symbol' && n.value === 'unchanged';
             const branch = (n, other) => (isUnchanged(n) && !isUnchanged(other) ? `mz_unchanged(${render(other)})` : render(n));
-            return `(${conditionNeedsBrackets(a) ? `(${render(a)})` : render(a)} ? ${branch(b, args[2])} : ${branch(args[2], b)})`;   // (y == x > 0) ? …
+            const condition = !isBool(a) ? truth(a) : conditionNeedsBrackets(a) ? `(${render(a)})` : render(a);   // (y == x > 0) ? …
+            return `(${condition} ? ${branch(b, args[2])} : ${branch(args[2], b)})`;
         }
         case '≈':
             return `(abs(${render(a)} - ${side(b, 'right', '-')}) < 1e-5)`;   // a ≈ b - c: a - (b - c)
@@ -284,6 +294,9 @@ function operation(node, render, es3, filter = false) {
             throw new Error(`No GLSL for a ${n} by ${rows[0].length} matrix`);
         }
         case '()': case '[]': case '{}': case '(]': case '[)':
+            // [[1, 2], [3, 4]], a list of rows, is the matrix it is everywhere else: mat2 * mat2 is the matrix product
+            if (op === '[]' && matrixRows(node)) return operation({ ...node, op: 'bmatrix' }, render, es3, filter);
+            if (args.some((x) => x.type === 'op' && GROUPS.has(x.op) && x.args.length > 1)) throw new Error('No GLSL for a list of lists (only a matrix: rows of one length, at most 4 by 4)');   // vec2(vec2(…), vec2(…)) won't compile
             return args.length >= 2 && args.length <= 4 ? `vec${args.length}(${list()})` : `float[](${list()})`;
         case '→':
             return `${render(a)}, ${render(b)}`;
@@ -328,6 +341,20 @@ function power(node, render, side) {
     if (exp.type === 'op' && exp.op === '/' && exp.args[0].type === 'number' && exp.args[0].value === '1'
         && exp.args[1].type === 'number' && exp.args[1].value === '2') return `sqrt(${b})`;
     return `pow(${b}, ${render(exp)})`;
+}
+
+const GROUPS = new Set(['()', '[]', '{}', '(]', '[)']);
+/** Operators whose GLSL is a bool: comparisons, logic, membership. */
+const BOOLEAN_OPS = new Set([...Object.keys(COMPARISONS), '&', '|', '\\xor', '\\nand', '\\nor', '\\implies', '\\iff', '\\not', '∈', '∉', '≈', '≡']);
+/** Is this node a bool in GLSL (true, x > 0, a && b, a ≡ b (mod n), c ? (x > 0) : false), not a float? */
+function isBool(node) {
+    if (node.type === 'symbol') return node.value === 'true' || node.value === 'false';
+    if (node.type !== 'op') return false;
+    if (node.op === '&' || node.op === '|') return node.args.every(isBool);   // with a number, a number (mz_both, mz_either)
+    if (BOOLEAN_OPS.has(node.op)) return true;
+    if (node.op === 'pmod') return node.args[0].type === 'op' && ['≡', '='].includes(node.args[0].op);
+    if (node.op === '?:') return isBool(node.args[1]) && isBool(node.args[2]);
+    return Boolean(expandChain(node));
 }
 
 /** x ∈ ℝ, ℤ, ℕ: a test on the float itself. */
@@ -388,6 +415,8 @@ export const GLSL_HELPERS = [
     'float mz_factorial(float n) { float r = 1.0; for (int i = 2; i <= 170; i++) { if (float(i) > n) break; r *= float(i); } return r; }',
     'float mz_perm(float n, float k) { float r = 1.0; for (int i = 0; i < 170; i++) { if (float(i) >= k) break; r *= n - float(i); } return r; }',
     'float mz_comb(float n, float k) { return mz_perm(n, k) / mz_factorial(k); }',
+    'float mz_both(float a, float b) { return a != 0.0 ? b : a; }',     // a && b between numbers, as JavaScript has it
+    'float mz_either(float a, float b) { return a != 0.0 ? a : b; }',   // a || b
     'float mz_gcd(float a, float b) { a = abs(a); b = abs(b); for (int i = 0; i < 64; i++) { if (b == 0.0) break; float t = mod(a, b); a = b; b = t; } return a; }',
     // A hash of gl_FragCoord would be better per pixel; this is only a placeholder that compiles.
     // random(): a new value per pixel and per call; filterShader() seeds it with t, so it changes every frame.
@@ -419,6 +448,8 @@ export const GLSL_HELPERS = [
  *   source       the picture a chain started from, as a vec3; source(px, py) any pixel of it
  *   selected     1 inside the user's selection, 0 outside (a mask picture `selection`, white = in;
  *                1 everywhere when none is given) — selection(px, py) reads it elsewhere
+ *   away         how far this pixel is from the selection, in pixels: 0 inside it (and everywhere without one).
+ *                Read from a frame-sized picture `away` the caller binds (white = 0; see AWAY below)
  *   <name>       another picture named in options.images, the same way (both vec3); red(name) … alpha(name) luma(name)
  *   zoom(s) zoom(s, cx, cy) shift(dx, dy) rotate(a) crop(x0, y0, x1, y1) tile(n) flipx() flipy()
  *                the picture read from somewhere else (GEOMETRY): put t in them and it moves;
@@ -464,7 +495,7 @@ export const GLSL_HELPERS = [
  * @returns {string} fragment shader source
  */
 /** Names every filter expression can use, protected so `px` is not `p * x`; values are never calls, so `gray (1 - r)` is a product. */
-export const FILTER_VALUES = ['px', 'py', 'rgb', 'gray', 'unchanged', 'selected'];
+export const FILTER_VALUES = ['px', 'py', 'rgb', 'gray', 'unchanged', 'selected', 'away'];
 /** Functions over the pixels around this one; the GLSL for them is added to a shader only when it uses one. */
 export const NEIGHBORHOOD = ['blur', 'blurx', 'blury', 'gaussian', 'gaussianx', 'gaussiany', 'sobel', 'sobelx', 'sobely',
     'laplacian', 'sharpen', 'emboss', 'dilate', 'erode', 'convolve'];
@@ -479,6 +510,14 @@ export const COLOR_FUNCTIONS = COLOR_SPACES.filter((s) => s !== 'srgb').flatMap(
 export const FILTER_FUNCTIONS = ['pixel', 'red', 'green', 'blue', 'alpha', 'luma', 'source', 'selection', 'width', 'height', ...NEIGHBORHOOD, ...GEOMETRY, ...GLSL_BUILTINS, ...COLOR_FUNCTIONS];
 /** Pictures every filter has without declaring them: the frame a chain started from, and the user's selection (white = selected). */
 export const IMPLICIT_PICTURES = ['source', 'selection'];
+/**
+ * `away`, the distance from the selection, comes from a picture bound as `mz_img_away` (frame-sized, like the selection):
+ * red = 1 − min(d, 255)/255, green = 1 − min(d, 1020)/1020 — so white, a picture not given, is 0 everywhere. `decode` is
+ * the GLSL for d. (Not a picture the math names: `away` is a number, so it isn't in IMPLICIT_PICTURES.)
+ */
+export const AWAY = { picture: 'away', decode: 'float mz_away(vec4 v) { return v.r > 0.0 ? 255.0 * (1.0 - v.r) : 1020.0 * (1.0 - v.g); }' };
+/** Pictures the frame's size: no placement, never converted into a color space. */
+const FRAME_PICTURES = [...IMPLICIT_PICTURES, AWAY.picture];
 
 /**
  * The color conversions, all vec3 → vec3 with sRGB (0–1) on the other
@@ -703,6 +742,7 @@ export function filterShader(spec, options = {}) {
     const usesNeighborhood = new RegExp(`\\b(${NEIGHBORHOOD.join('|')})\\(`).test(lines.join('\n'));
     if (!images.includes('source') && /\b(source|mz_at_source|mz_px_source|mz_sample_source)\b/.test(lines.join('\n'))) images.push('source');
     if (!images.includes('selection') && /\b(selected|selection|mz_at_selection|mz_px_selection|mz_sample_selection)\b/.test(lines.join('\n'))) images.push('selection');
+    if (!images.includes(AWAY.picture) && /\baway\b/.test(lines.join('\n'))) images.push(AWAY.picture);
     const uv = 'vec2((px + 0.5) / resolution.x, 1.0 - (py + 0.5) / resolution.y)';
     const usesGeometry = /\bmz_(zoom|shift|rotate|crop|tile|flipx|flipy|at_image|sample_image)\(/.test(lines.join('\n'));
     const usesColor = space || new RegExp(`\\b(${COLOR_FUNCTIONS.join('|')})\\(`).test(lines.join('\n'));
@@ -722,7 +762,7 @@ export function filterShader(spec, options = {}) {
         options.blend ? 'uniform float mz_opacity;     // how much of the result shows over the input, 0–1' : '',
         ...declared,
         ...images.map((name) => `uniform sampler2D mz_img_${name};`),
-        ...images.filter((name) => !IMPLICIT_PICTURES.includes(name)).flatMap((name) => [`uniform vec2 mz_size_${name};        // its own width and height`, `uniform vec4 mz_place_${name};       // zoom, x, y, angle`]),
+        ...images.filter((name) => !FRAME_PICTURES.includes(name)).flatMap((name) => [`uniform vec2 mz_size_${name};        // its own width and height`, `uniform vec4 mz_place_${name};       // zoom, x, y, angle`]),
         es3 ? 'out vec4 fragColor;' : '',
         GLSL_HELPERS,
         `vec4 pixel(float px, float py) { return ${sample}(image, vec2((px + 0.5) / resolution.x, 1.0 - (py + 0.5) / resolution.y)); }`,
@@ -740,6 +780,7 @@ export function filterShader(spec, options = {}) {
         'vec2 mz_p() { return vec2(gl_FragCoord.x - 0.5, resolution.y - gl_FragCoord.y - 0.5); }   // (px, py)',
         ...(usesColor ? colorGlsl() : []),
         ...images.flatMap((name) => pictureGlsl(name, placements[name]?.place, sample, space)),
+        images.includes(AWAY.picture) ? AWAY.decode : '',
         ...(usesGeometry ? geometryGlsl(sample) : []),
         usesNeighborhood ? neighborhoodGlsl(sample) : '',
         // A color expression may come out as a number, a comparison, or a vector; these accept any.
@@ -775,8 +816,9 @@ export function filterShader(spec, options = {}) {
         `    float gray = dot(${space ? `from${space}(rgb)` : 'rgb'}, vec3(0.299, 0.587, 0.114));   // the brightness as seen`,
         '    vec4 color = c;',
         '    mz_seed = t;',
-        ...images.flatMap((name) => [`    vec4 mz_px_${name} = mz_sample_${name}(mz_p());`, `    vec3 ${name} = mz_px_${name}.rgb;`]),
+        ...images.flatMap((name) => [`    vec4 mz_px_${name} = mz_sample_${name}(mz_p());`, name === AWAY.picture ? '' : `    vec3 ${name} = mz_px_${name}.rgb;`]),
         images.includes('selection') ? '    float selected = mz_px_selection.r;      // 1 inside the selection, 0 outside; 1 everywhere without one' : '',
+        images.includes(AWAY.picture) ? '    float away = mz_away(mz_px_away);       // pixels from the selection; 0 inside it, and everywhere without one' : '',
         ...lines,
         options.blend ? '    color = mix(c, color, mz_opacity);' : '',
         `    ${es3 ? 'fragColor' : 'gl_FragColor'} = color;`,
@@ -794,10 +836,10 @@ export function filterShader(spec, options = {}) {
  */
 function pictureGlsl(name, place, sample, space = null) {
     // In a color space, a picture is converted as it is read, so the expression sees one space everywhere (a selection is a mask, not a color).
-    const converted = space && name !== 'selection';
+    const converted = space && name !== 'selection' && name !== AWAY.picture;
     const convert = converted ? [`vec4 mz_sample_${name}(vec2 p) { vec4 v = mz_raw_${name}(p); v.rgb = to${space}(v.rgb); return v; }`] : [];
     const raw = converted ? `mz_raw_${name}` : `mz_sample_${name}`;
-    if (IMPLICIT_PICTURES.includes(name)) {                         // the frame's size: no placement
+    if (FRAME_PICTURES.includes(name)) {                            // the frame's size: no placement
         return [
             `vec4 ${raw}(vec2 p) { vec2 q = p + 0.5; return ${sample}(mz_img_${name}, vec2(q.x / resolution.x, 1.0 - q.y / resolution.y)); }`,
             ...convert,
@@ -858,5 +900,5 @@ export function filterVertexShader(options = {}) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [CONSTANTS, GREEK_NAMES, BUILTIN, ES3_ONLY, RECIPROCALS, COMPARISONS, NUMBER_SETS, REACH, NO_GLSL]) Object.setPrototypeOf(table, null);

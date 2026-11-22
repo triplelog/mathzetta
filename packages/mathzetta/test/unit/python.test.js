@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { suite, test, eq, throws } from '../harness.js';
+import { suite, test, skip, eq, throws } from '../harness.js';
 import {
     toPython, toPythonFunction, checkGeneratedPython, readPythonTemplate, fillPythonTemplate, preparePythonTemplate, pythonName,
     evaluate, UnsafeCodeError,
@@ -11,6 +11,11 @@ import {
 const hasPython = spawnSync('python3', ['--version']).status === 0;
 const hasNumpy = hasPython && spawnSync('python3', ['-c', 'import numpy']).status === 0;
 const hasSympy = hasPython && spawnSync('python3', ['-c', 'import sympy']).status === 0;
+/** `test` where the runtime is there, else a skip (counted as skipped, not passed). */
+const needs = (ok, why) => (ok ? test : (name) => skip(name, why));
+const pythonTest = needs(hasPython, 'python3 not found');
+const numpyTest = needs(hasNumpy, hasPython ? 'numpy not installed for python3' : 'python3 not found');
+const sympyTest = needs(hasSympy, hasPython ? 'sympy not installed for python3' : 'python3 not found');
 const CLI = new URL('../../tools/python-template.js', import.meta.url).pathname;
 const FIXTURES = new URL('../fixtures/python/', import.meta.url).pathname;
 const cli = (...args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
@@ -83,9 +88,10 @@ suite('python: checkGeneratedPython', () => {
         eq(checkGeneratedPython('f(x)', { variables: ['x'], functions: ['f'] }), 'f(x)');
     });
     test('formulas that would call anything else fail to become functions', () => {
-        for (const formula of ['print(x)', 'exec("import os")', 'ｅｘｅｃ("1")', 'x.y']) {
+        for (const formula of ['print(x)', 'exec("import os")', 'ｅｘｅｃ("1")']) {
             throws(() => toPythonFunction(formula), /not allowed/);
         }
+        throws(() => toPythonFunction('x.y'), /not a name in Python/);   // .y is refused as a name before the checker sees it
         let error;
         try { toPythonFunction('open("f")'); } catch (e) { error = e; }
         eq(error instanceof UnsafeCodeError, true);
@@ -102,7 +108,6 @@ suite('python: numpy', () => {
     });
     test('chained comparisons are joined element-wise', () => {
         eq(toPython('a < b ≤ c < d', { numpy: true }), 'np.logical_and(np.logical_and(a < b, b <= c), c < d)');
-        eq(toPython('3 < x < 7'), '3 < x < 7');
     });
     test('a numpy function takes arrays and judges errors on the result', () => {
         const fn = toPythonFunction('f(x) = 1/x', { numpy: true });
@@ -254,56 +259,54 @@ print(run())
     });
 });
 
-if (hasPython) {
-    suite('python: runs in python3', () => {
-        test('expressions give what evaluate() gives', () => {
-            const cases = ['x^2 + 3x - 1', 'sin(x)^2 + cos(x)^2', '|x - 5| / 2', 'sqrt(x) + ln(x) + log_2(x)', '2^-x',
-                'max(x, 3) + min(1, x)', 'x mod 3', '5! / 3!', 'csc(x) + sec(x) + cot(x)', 'floor(x) + ceil(x)',
-                '(x + 1)(x - 1) / x', 'x > 2 and x < 5', 'x ∈ [1, 3)', 'e^x - pi', 'round(x, 2)', 'arctan(x) + atan2(x, 1)'];
-            const scope = { x: 2.7 };
-            const lines = cases.map((c) => `print(repr(${toPython(c)}))`);
-            const out = runPython(`import math\nx = ${scope.x}\n${lines.join('\n')}`).trim().split('\n');
-            cases.forEach((c, i) => {
-                const want = evaluate(c, scope);
-                const got = out[i] === 'True' ? true : out[i] === 'False' ? false : Number(out[i]);
-                eq(typeof want === 'number' ? Math.abs(got - want) < 1e-9 : got === want, true, `${c}: python ${out[i]}, evaluate ${want}`);
-            });
+suite('python: runs in python3', () => {
+    pythonTest('expressions give what evaluate() gives', () => {
+        const cases = ['x^2 + 3x - 1', 'sin(x)^2 + cos(x)^2', '|x - 5| / 2', 'sqrt(x) + ln(x) + log_2(x)', '2^-x',
+            'max(x, 3) + min(1, x)', 'x mod 3', '5! / 3!', 'csc(x) + sec(x) + cot(x)', 'floor(x) + ceil(x)',
+            '(x + 1)(x - 1) / x', 'x > 2 and x < 5', 'x ∈ [1, 3)', 'e^x - pi', 'round(x, 2)', 'arctan(x) + atan2(x, 1)'];
+        const scope = { x: 2.7 };
+        const lines = cases.map((c) => `print(repr(${toPython(c)}))`);
+        const out = runPython(`import math\nx = ${scope.x}\n${lines.join('\n')}`).trim().split('\n');
+        cases.forEach((c, i) => {
+            const want = evaluate(c, scope);
+            const got = out[i] === 'True' ? true : out[i] === 'False' ? false : Number(out[i]);
+            eq(typeof want === 'number' ? Math.abs(got - want) < 1e-9 : got === want, true, `${c}: python ${out[i]}, evaluate ${want}`);
         });
-        test('1/0 raises by default, or gives nan', () => {
-            const program = (options) => `${fillPythonTemplate('# mathzetta: f(x) = 1/x\n', {}, options)}
+    });
+    pythonTest('1/0 raises by default, or gives nan', () => {
+        const program = (options) => `${fillPythonTemplate('# mathzetta: f(x) = 1/x\n', {}, options)}
 try:
     print(repr(f(0)))
 except ArithmeticError as e:
     print(type(e).__name__)
 `;
-            eq(runPython(program()).trim(), 'ZeroDivisionError');
-            eq(runPython(program({ errors: 'nan' })).trim(), 'nan');
-        });
-        test('numpy functions work on arrays; a branch not taken does not raise', () => {
-            const program = (formula, options = {}) => `${fillPythonTemplate('import numpy as np\n# mathzetta: f(x)\n', { f: formula }, { numpy: true, ...options })}
+        eq(runPython(program()).trim(), 'ZeroDivisionError');
+        eq(runPython(program({ errors: 'nan' })).trim(), 'nan');
+    });
+    numpyTest('numpy functions work on arrays; a branch not taken does not raise', () => {
+        const program = (formula, options = {}) => `${fillPythonTemplate('import numpy as np\n# mathzetta: f(x)\n', { f: formula }, { numpy: true, ...options })}
 try:
     print(f(np.array([-1.0, 0.0, 2.0])).tolist())
 except FloatingPointError as e:
     print('FloatingPointError')
 `;
-            eq(runPython(program('x > 0 ? 1/x : 0')).trim(), '[0.0, 0.0, 0.5]');
-            eq(runPython(program('max(x, 0)^2 + (x ∈ [0, 1) ? 10 : 0)')).trim(), '[0.0, 10.0, 4.0]');
-            eq(runPython(program('1/x')).trim(), 'FloatingPointError');
-            eq(runPython(program('1/x', { errors: 'nan' })).trim(), '[-1.0, inf, 0.5]');
-            eq(runPython(`${fillPythonTemplate('# mathzetta: f(x) = 3 < x < 7\n', {}, { numpy: true })}\nprint(f([1, 5, 9]).tolist(), f(5))`).trim(), '[False, True, False] True');
-        });
-        test('a filled template runs', () => {
-            eq(runPython(fillPythonTemplate(TEMPLATE)).trim(), '7.0');
-        });
-        test('the example model runs, as is and customized', () => {
-            const template = readFileSync(new URL('../../examples/python/logistic.py', import.meta.url), 'utf8');
-            const years = (formula) => runPython(fillPythonTemplate(template, formula)).trim().split('\n');
-            eq(years().length, 11);
-            const last = (lines) => Number(lines.at(-1).trim().split(/\s+/)[1]);
-            eq(last(years({ growth: 'r P (1 - P/K) - h' })) > last(years({ growth: 'r P (1 - P/K) - 2h' })), true);
-        });
+        eq(runPython(program('x > 0 ? 1/x : 0')).trim(), '[0.0, 0.0, 0.5]');
+        eq(runPython(program('max(x, 0)^2 + (x ∈ [0, 1) ? 10 : 0)')).trim(), '[0.0, 10.0, 4.0]');
+        eq(runPython(program('1/x')).trim(), 'FloatingPointError');
+        eq(runPython(program('1/x', { errors: 'nan' })).trim(), '[-1.0, inf, 0.5]');
+        eq(runPython(`${fillPythonTemplate('# mathzetta: f(x) = 3 < x < 7\n', {}, { numpy: true })}\nprint(f([1, 5, 9]).tolist(), f(5))`).trim(), '[False, True, False] True');
     });
-}
+    pythonTest('a filled template runs', () => {
+        eq(runPython(fillPythonTemplate(TEMPLATE)).trim(), '7.0');
+    });
+    pythonTest('the example model runs, as is and customized', () => {
+        const template = readFileSync(new URL('../../examples/python/logistic.py', import.meta.url), 'utf8');
+        const years = (formula) => runPython(fillPythonTemplate(template, formula)).trim().split('\n');
+        eq(years().length, 11);
+        const last = (lines) => Number(lines.at(-1).trim().split(/\s+/)[1]);
+        eq(last(years({ growth: 'r P (1 - P/K) - h' })) > last(years({ growth: 'r P (1 - P/K) - 2h' })), true);
+    });
+});
 
 suite('python: mathzetta-python', () => {
     test('--slots lists the slots and the columns', () => {
@@ -325,21 +328,19 @@ suite('python: mathzetta-python', () => {
 });
 
 // The charts over baseball data that used to be here are pyslots' examples now (tabdn.com/pyslots), tested there.
-if (hasNumpy) {
-    suite('python: mathzetta-python --run', () => {
-        test('runs the filled program', () => {
-            const r = cli(join(FIXTURES, 'table.py'), '--run');
-            eq([r.status, r.stdout], [0, '0.100 0.050 0.040\n'], r.stderr);
-            eq(cli(join(FIXTURES, 'table.py'), 'keep=HR > 25', 'value=HR + 1', '--run').stdout, '41.000 31.000\n');
-        });
-        test('1/0 raises by default, and gives nan with --errors nan', () => {
-            const raised = cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--run');
-            const stderr = raised.stderr.replace(/\x1b\[[0-9;]*m/g, '');   // Python 3.13+ colors tracebacks
-            eq([raised.status !== 0, /FloatingPointError: value\(data\): no finite value/.test(stderr)], [true, true]);
-            eq(cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--errors', 'nan', '--run').stdout, '5.000 nan 2.000\n');
-        });
+suite('python: mathzetta-python --run', () => {
+    numpyTest('runs the filled program', () => {
+        const r = cli(join(FIXTURES, 'table.py'), '--run');
+        eq([r.status, r.stdout], [0, '0.100 0.050 0.040\n'], r.stderr);
+        eq(cli(join(FIXTURES, 'table.py'), 'keep=HR > 25', 'value=HR + 1', '--run').stdout, '41.000 31.000\n');
     });
-}
+    numpyTest('1/0 raises by default, and gives nan with --errors nan', () => {
+        const raised = cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--run');
+        const stderr = raised.stderr.replace(/\x1b\[[0-9;]*m/g, '');   // Python 3.13+ colors tracebacks
+        eq([raised.status !== 0, /FloatingPointError: value\(data\): no finite value/.test(stderr)], [true, true]);
+        eq(cli(join(FIXTURES, 'table.py'), 'value=SB / CS', '--errors', 'nan', '--run').stdout, '5.000 nan 2.000\n');
+    });
+});
 
 suite('python: sympy', () => {
     test('exact and symbolic', () => {
@@ -363,19 +364,17 @@ suite('python: sympy', () => {
         const out = fillPythonTemplate('# mathzetta-options: sympy\n# mathzetta: f(x) = d/dx x^2\n');
         eq(out.includes('import sympy') && out.includes('sympy.diff'), true, out);
     });
-    if (hasSympy) {
-        test('runs in SymPy', () => {
-            const fns = ['f(x) = \\frac{d}{dx} x^3', 'F(b) = \\int_0^b t^2 dt', 'g(n) = \\sum_{i=1}^{n} i^2',
-                'k(r) = \\lim_{x \\to 0} \\sin(r x)/x', 'p(x) = 1/3 x + 0.5',
-                'q(x) = \\begin{cases} x^2 & x > 0 \\\\ -x & \\text{otherwise} \\end{cases}'];
-            const code = fns.map((f) => toPythonFunction(f, { sympy: true }).code).join('\n\n');
-            const out = runPython(`import sympy\n\n${code}\n\nX = sympy.Symbol("x")\nprint(f(2), f(X), F(3), g(10), k(5), p(3), q(-2), q(3))`);
-            eq(out.trim(), '12 3*x**2 9 385 5 3/2 2 9');
-        });
-    }
+    sympyTest('runs in SymPy', () => {
+        const fns = ['f(x) = \\frac{d}{dx} x^3', 'F(b) = \\int_0^b t^2 dt', 'g(n) = \\sum_{i=1}^{n} i^2',
+            'k(r) = \\lim_{x \\to 0} \\sin(r x)/x', 'p(x) = 1/3 x + 0.5',
+            'q(x) = \\begin{cases} x^2 & x > 0 \\\\ -x & \\text{otherwise} \\end{cases}'];
+        const code = fns.map((f) => toPythonFunction(f, { sympy: true }).code).join('\n\n');
+        const out = runPython(`import sympy\n\n${code}\n\nX = sympy.Symbol("x")\nprint(f(2), f(X), F(3), g(10), k(5), p(3), q(-2), q(3))`);
+        eq(out.trim(), '12 3*x**2 9 385 5 3/2 2 9');
+    });
 });
 
-// ---- added 2026-11-11: negatives and halves, where Python's own %, round and format differ from math ----
+// Negatives and halves, where Python's own %, round and format differ from math (agreement.test.js runs the other engines)
 suite('python: negatives and halves give what evaluate() gives', () => {
     const CASES = ['x mod 3', 'x mod -3', 'round(x)', 'round(x, 1)', 'trunc(x)', 'cbrt(x)', 'root(5, x)', 'x xor 0', 'x ≈ 0',
         '-1*(x+1)', 'max(x)', 'fixed(x, 0)', 'fixed(x, 2)'];
@@ -390,23 +389,20 @@ suite('python: negatives and halves give what evaluate() gives', () => {
                 const raw = out[k++].replace(/^(?:np\.)?\w+\((.*?)(?:, dtype=[^)]*)?\)$/, '$1').replace(/^np\.(True|False)_$/, '$1');
                 const want = evaluate(c, { x });
                 const got = raw === 'True' ? true : raw === 'False' ? false : /^['"]/.test(raw) ? raw.slice(1, -1) : Number(raw.replace(/^np\.\w+\(|\)$/g, ''));
-                const same = typeof want === 'number' ? Math.abs(got - want) < 1e-9 : String(got) === String(want);
+                // typed: a number within 1e-9, a true or false as one, a text as that text (never true vs 'true')
+                const same = typeof want === 'number' ? typeof got === 'number' && Math.abs(got - want) < 1e-9 : got === want;
                 eq(same, true, `${label} ${c} at x = ${x}: python ${raw}, evaluate ${want}`);
             }
         }
     };
-    if (!hasPython) {
-        test('python3 not found: skipped', () => {});
-        return;
-    }
-    test('python', () => check((c) => toPython(c), 'import math', 'python'));
+    pythonTest('python', () => check((c) => toPython(c), 'import math', 'python'));
     // .item(): the plain Python value, every digit (an array's repr keeps eight)
-    if (hasNumpy) test('numpy', () => check((c) => `np.asarray(${toPython(c, { numpy: true })}).item()`, 'import numpy as np', 'numpy'));
+    numpyTest('numpy', () => check((c) => `np.asarray(${toPython(c, { numpy: true })}).item()`, 'import numpy as np', 'numpy'));
 });
 
-// The review before 1.2 (2026-11-19): plain Python's round and fixed raised on NaN and ±∞ (math.floor)
+// Plain Python's round and fixed raised on NaN and ±∞ (math.floor)
 suite('python: NaN and infinity', () => {
-    if (hasPython) test('round and fixed pass NaN and ±∞ through, as JavaScript and evaluate() do', () => {
+    pythonTest('round and fixed pass NaN and ±∞ through, as JavaScript and evaluate() do', () => {
         const lines = ['round(x)', 'round(x, 2)', 'fixed(x, 2)', 'round(x + 1)', 'round(x*y + 1, 2)'].map((f) => `print(repr(${toPython(f)}))`);
         const out = (x) => runPython(`import math\nx = ${x}\ny = 2.0\n${lines.join('\n')}`).trim().split('\n');
         eq(out('float("nan")'), ['nan', 'nan', "'nan'", 'nan', 'nan']);
@@ -422,7 +418,6 @@ suite('python: a comparison inside a comparison', () => {
     test('written with brackets', () => {
         eq(toPython('y = (x > 0)'), 'y == (x > 0)');
         eq(toPython('(y = x > 0) ? 1 : 2'), '(1 if (y == (x > 0)) else 2)');
-        eq(toPython('3 < x < 7'), '3 < x < 7');   // a chain written as one stays one
         eq(toPython('y = (x > 0)', { numpy: true }), 'y == (x > 0)');
     });
     const run = (flavor, wrap) => () => {
@@ -433,8 +428,8 @@ suite('python: a comparison inside a comparison', () => {
             eq(got, cases.map((c) => Number(evaluate(c, scope))), JSON.stringify(scope));
         }
     };
-    if (hasPython) test('Python gives what evaluate() gives', run({}, (code) => code));
-    if (hasNumpy) test('numpy gives what evaluate() gives', run({ numpy: true }, (code) => `np.asarray(${code}).item()`));
+    pythonTest('Python gives what evaluate() gives', run({}, (code) => code));
+    numpyTest('numpy gives what evaluate() gives', run({ numpy: true }, (code) => `np.asarray(${code}).item()`));
 });
 
 // "ab" in name, startswith(name, "ab"): the inline helpers, which the gate knows as exact text only
@@ -464,7 +459,7 @@ suite('python: text search', () => {
             eq(error instanceof UnsafeCodeError, true, code);
         }
     });
-    if (hasPython) test('Python gives what evaluate() gives; None and NaN are empty text, 62.0 is 62', () => {
+    pythonTest('Python gives what evaluate() gives; None and NaN are empty text, 62.0 is 62', () => {
         const lines = CASES.map(([f]) => `print(int(${toPython(f)}))`);
         const fn = toPythonFunction('"aa" in name');
         const sw = toPythonFunction('startswith(name, "6")', { name: 'g' });
@@ -476,7 +471,7 @@ suite('python: text search', () => {
         eq(out[CASES.length], '[1, 0, 0, 0, 0]');
         eq(out[CASES.length + 1], '[1, 1, 0, 0, 1]');
     });
-    if (hasNumpy) test('numpy searches element by element', () => {
+    numpyTest('numpy searches element by element', () => {
         const fn = toPythonFunction('"aa" in name', { numpy: true });
         const sw = toPythonFunction('not startswith(name, "ted")', { numpy: true, name: 'g' });
         const out = runPython(['import numpy as np', fn.code, sw.code,

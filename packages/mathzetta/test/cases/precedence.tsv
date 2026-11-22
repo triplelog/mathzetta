@@ -69,3 +69,23 @@ sin ( 2 + 3 ) * 4	sin(2+3)*4	["2","3","+","sin","4","*"]	\sin\left(2 + 3\right) 
 1-2-3	1-2-3	["1","2","-","3","-"]	1 - 2 - 3
 8/4/2	8/4/2	["8","4","/","2","/"]	\frac{\frac{8}{4}}{2}
 2^3^2^1	2^{3}^{2}^{1}	["2","3","2","1","^","^","^"]	2^{3^{2^1}}
+
+# mod and %: mod takes everything to its left (a + b mod n is (a + b) mod n), % binds like *
+2+3 mod 4		["2","3","+","4","mod"]	\left(2 + 3\right) \bmod 4
+a + b mod n		["a","b","+","n","mod"]	\left(a + b\right) \bmod n
+c = m^e mod n		["c","m","e","^","n","mod","="]	c = m^e \bmod n
+a mod 2n		["a","2","n","*","mod"]	a \bmod \left(2n\right)
+2 mod 3*4		["2","3","mod","4","*"]	\left(2 \bmod 3\right) \cdot 4
+a mod n + 1		["a","n","mod","1","+"]	a \bmod n + 1
+1 + (a mod n)		["1","a","n","mod","+"]	1 + \left(a \bmod n\right)
+a*b mod n		["a","b","*","n","mod"]	\left(ab\right) \bmod n
+2 + 3 % 4		["2","3","4","mod","+"]	2 + \left(3 \bmod 4\right)
+a % n * 2		["a","n","mod","2","*"]	\left(a \bmod n\right) \cdot 2
+
+# = before a conditional defines it when what follows the = is true or false: the whole conditional is the right side (parser.js equals()); brackets keep a test
+f(x) = x < 0 ? x^2 : x < 1 ? 1 : 2x - 1		["x","1","\\:f","x","0","<","x","2","^","x","1","<","1","2","x","*","1","-","?:","?:","="]
+y = x > 0 ? 1 : 2		["y","x","0",">","1","2","?:","="]
+y = x > 0 and z < 1 ? 1 : 2		["y","x","0",">","z","1","<","&","1","2","?:","="]
+(y = x > 0) ? 1 : 2		["y","x","0",">","=","1","2","?:"]
+a = b and c = d ? 1 : 2		["a","b","=","c","d","=","&","1","2","?:"]
+x = 1 ? a : b		["x","1","=","a","b","?:"]

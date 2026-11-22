@@ -3,16 +3,33 @@
  */
 import { createRequire } from 'node:module';
 import { suite, test, eq } from '../harness.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { parse } from '../../src/index.js';
 import { FLAVOURS, PLAIN_FLAVOURS, flavourFile } from '../../tools/flavours.js';
 
-// ---- from package.test.js ----
 const loadUmd = (file) => { const module = { exports: {} }; new Function('module', 'exports', readFileSync(new URL(file, root), 'utf8'))(module, module.exports); return module.exports; };
 
 const root = new URL('../../', import.meta.url);
 const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 const head = (file) => readFileSync(new URL(file, root), 'utf8').slice(0, 120);
+
+/** The names a .d.ts file exports: `export { … }` lists (re-exports too), `export declare …`, and `export *` followed. */
+const declared = (file) => {
+    const text = readFileSync(new URL(file, root), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const names = new Set();
+    for (const m of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+        for (const part of m[1].split(',')) { const name = part.trim().split(/\s+as\s+/).pop().trim(); if (name) names.add(name); }
+    }
+    for (const m of text.matchAll(/export\s+(?:declare\s+)?(?:const|let|var|function|class|type|interface|enum|namespace)\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
+    if (/export\s+default\b/.test(text)) names.add('default');
+    for (const m of text.matchAll(/export\s+\*\s+from\s+'([^']+)'/g)) {
+        for (const name of declared(new URL(m[1].replace(/\.js$/, '.d.ts'), new URL(file, root)).pathname.slice(root.pathname.length))) names.add(name);
+    }
+    return names;
+};
+/** Every file under build/, as 'build/…'. */
+const buildFiles = (dir = 'build/') => readdirSync(new URL(dir, root), { withFileTypes: true })
+    .flatMap((e) => (e.isDirectory() ? buildFiles(`${dir}${e.name}/`) : [`${dir}${e.name}`]));
 
 suite('package', () => {
     test('every export points at a file that exists', () => {
@@ -24,6 +41,18 @@ suite('package', () => {
     });
     test('the files list ships src, build, the types, the license and the readme', () => {
         for (const f of ['src/', 'build/', 'README.md', 'LICENSE']) eq(pkg.files.includes(f), true, f);
+        // the types: package.json's types and every export's types are files under src/ (shipped), one per entry
+        eq(existsSync(new URL(pkg.types, root)) && pkg.types.startsWith('src/'), true, `types: ${pkg.types}`);
+        for (const [key, target] of Object.entries(pkg.exports)) {
+            if (typeof target !== 'object') continue;
+            eq(typeof target.types === 'string' && target.types.startsWith('./src/') && target.types.endsWith('.d.ts'), true, `${key} has types`);
+            eq(existsSync(new URL(target.types, root)), true, `${key} → ${target.types}`);
+        }
+        for (const f of readdirSync(new URL('src/', root)).filter((f) => f.endsWith('.js'))) {
+            const types = f.replace(/\.js$/, '.d.ts');
+            const entry = Object.values(pkg.exports).some((t) => typeof t === 'object' && t.import === `./src/${f}`);
+            if (entry) eq(existsSync(new URL(`src/${types}`, root)), true, `src/${f} is an entry: src/${types}`);
+        }
         eq(existsSync(new URL('LICENSE', root)), true);
         eq(pkg.publishConfig?.access, 'public');
         eq(pkg.jsdelivr, 'build/mathzetta.min.js');
@@ -51,10 +80,29 @@ suite('package', () => {
         const files = ['build/esm/latex.js', 'build/esm/speech.js'].map((f) => readFileSync(new URL(f, root), 'utf8'));
         eq(files.every((c) => c.includes('./chunks/core.js')), true, 'both import the shared core chunk');
     });
+    test('every entry\'s types declare every name it exports', async () => {
+        for (const [key, target] of Object.entries(pkg.exports)) {
+            if (typeof target !== 'object' || !target.types) continue;
+            const names = declared(target.types.replace(/^\.\//, ''));
+            const runtime = Object.keys(await import(new URL(target.import, root)));
+            eq(runtime.filter((name) => !names.has(name)), [], `${key}: exported, but not in ${target.types}`);
+        }
+        // and what an entry's .d.ts re-exports from types.d.ts is declared there
+        const types = declared('src/types.d.ts');
+        for (const f of readdirSync(new URL('src/', root)).filter((f) => f.endsWith('.d.ts') && f !== 'types.d.ts')) {
+            const text = readFileSync(new URL(`src/${f}`, root), 'utf8');
+            const reexported = [...text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'\.\/types\.js'/g)]
+                .flatMap((m) => m[1].split(',').map((p) => p.trim().split(/\s+as\s+/)[0].trim()).filter(Boolean));
+            eq(reexported.filter((name) => !types.has(name)), [], `src/${f}: not declared in types.d.ts`);
+        }
+    });
     test('build/sizes.json lists every file in build/ for this version', () => {
         const sizes = JSON.parse(readFileSync(new URL('build/sizes.json', root), 'utf8'));
         eq(sizes.version, pkg.version);
-        for (const f of ['build/mathzetta.min.js', 'build/mathzetta.core.min.js', 'build/esm/latex.js', 'build/esm/chunks/core.js']) eq(typeof sizes.files[f]?.gz, 'number', f);
+        const files = buildFiles().filter((f) => f !== 'build/sizes.json').sort();
+        eq(files.filter((f) => typeof sizes.files[f]?.gz !== 'number'), [], 'in build/, not in sizes.json');
+        eq(Object.keys(sizes.files).filter((f) => !files.includes(f)), [], 'in sizes.json, not in build/');
+        eq(files.length > 80, true, `${files.length} files`);
         eq(sizes.files['build/esm/latex.js'].imports.includes('./chunks/core.js'), true);
     });
     test('each <script> flavour carries its outputs and no others', () => {

@@ -9,6 +9,7 @@
  *   np.logical_and(a, b), a ^^ b       ((a) & (b)), a \xor b
  *   np.isin(x, [1, 2]), [1, 2].includes(x), contains(S, x), x IN (1, 2)    x ∈ {1, 2}
  *   np.array([[1, 2], [3, 4]]), sympy.Matrix(…), np.linalg.det(A)          [[1, 2], [3, 4]], det(A)
+ *   np.dot(A, B), np.multiply(a, b), MMULT(A, B), np.array_equal(A, B)    ((A) * (B)), ((A) = (B))
  *   math.isclose(a, b)                 ((a) ≈ (b))
  *   Number.isInteger(x), float(x).is_integer(), Number.isFinite(x)          x ∈ ℤ, x ∈ ℝ
  *   math.factorial(n), mz_factorial(n), FACTORIAL(n)                        (n)!
@@ -93,7 +94,9 @@ function jsHelpers(text) {
             if (close < 0) continue;
             let args = text.slice(open + 1, close);
             if (name === 'gcd') args = args.trim().replace(/^\[|\]$/g, '');
-            const replacement = name === 'factorial' ? `((${args})!)` : `${name}(${args})`;
+            const pair = name === 'times' || name === 'same' ? splitArgs(args) : null;   // the matrix product, = between lists
+            const replacement = name === 'factorial' ? `((${args})!)`
+                : pair?.length === 2 ? `((${pair[0]}) ${name === 'times' ? '*' : '='} (${pair[1]}))` : `${name}(${args})`;
             text = text.slice(0, at) + replacement + text.slice(close + 1);
         }
     }
@@ -141,6 +144,7 @@ const SHEET_CALLS = {
     RAND: (a) => !a.length && 'random()',
     ISNUMBER: (a) => a.length === 1 && `((${a[0]}) ∈ ℝ)`,
     LOG10: (a) => a.length === 1 && `log_{10}(${a[0]})`,
+    MMULT: (a) => a.length === 2 && `((${a[0]}) * (${a[1]}))`,   // a spreadsheet's matrix product
 };
 
 /**
@@ -294,6 +298,7 @@ const NP_BARE = {
     nanmedian: 'median', nanstd: 'stdev', mod: 'mod', fmod: 'mod', where: 'where', isin: 'isin', isclose: 'isclose',
     isfinite: 'isfinite', logical_and: 'logical_and', logical_or: 'logical_or', logical_not: 'logical_not',
     logical_xor: 'logical_xor', prod: 'prod', sum: 'sum', trunc: 'trunc', union1d: 'union', intersect1d: 'intersection',
+    dot: 'np_times', matmul: 'np_times', multiply: 'np_times', array_equal: 'np_equal',
 };
 
 /** sorted(set(A) | set(B)), sorted(set(A) & set(B)): Python's ∪ and ∩ as the writer spells them. */
@@ -379,6 +384,10 @@ const bounds = (arg) => pieceOf(arg) ?? [arg];
 /** Calls the cleaner doesn't otherwise know, as math. */
 const CALLS = {
     where: (a) => a.length === 3 && `((${a[0]}) ? (${a[1]}) : (${a[2]}))`,
+    both: (a) => a.length === 2 && `((${a[0]}) & (${a[1]}))`,      // GLSL's mz_both, mz_either: && and || between numbers
+    either: (a) => a.length === 2 && `((${a[0]}) ∨ (${a[1]}))`,
+    np_times: (a) => a.length === 2 && `((${a[0]}) * (${a[1]}))`,   // np.dot, np.matmul, np.multiply: the product, as evaluate() takes it
+    np_equal: (a) => a.length === 2 && `((${a[0]}) = (${a[1]}))`,
     logical_and: (a) => a.length === 2 && `((${a[0]}) & (${a[1]}))`,
     logical_or: (a) => a.length === 2 && `((${a[0]}) ∨ (${a[1]}))`,
     logical_xor: (a) => a.length === 2 && `((${a[0]})  \\xor  (${a[1]}))`,
@@ -403,6 +412,9 @@ const CALLS = {
     exp2: (a) => a.length === 1 && `((2)^(${a[0]}))`,
     // toward zero: ceil below 0, floor above (x - (x mod 1) is floor when mod takes the divisor's sign)
     trunc: (a) => a.length === 1 && `((${a[0]}) < 0 ? (ceil(${a[0]})) : floor(${a[0]}))`,
+    // GLSL's matrices are column by column: mat2(a, b, c, d) is [[a, c], [b, d]]
+    ...Object.fromEntries([2, 3, 4].map((n) => [`mat${n}`, (a) => a.length === n * n
+        && `[${Array.from({ length: n }, (_, r) => `[${Array.from({ length: n }, (_, c) => a[c * n + r]).join(', ')}]`).join(', ')}]`])),
     vec2: (a) => `(${a.join(', ')})`,
     vec3: (a) => `(${a.join(', ')})`,
     vec4: (a) => `(${a.join(', ')})`,
@@ -501,10 +513,11 @@ function calls(text) {
         return [`int(${fn[2]}, ${fn[1]}, ${args[1]}, ${args[2]})`, index ? index[0].length : 0];
     });
     text = rewriteCalls(text, call(Object.keys(CALLS).join('|')), (args, m) => CALLS[m[1]](args) || null);
-    // float(x).is_integer() → x ∈ ℤ
+    // float(x).is_integer() → x ∈ ℤ; float(x) alone (GLSL's bool as a number, Python's cast) is x
     text = rewriteCalls(text, call('float'), (args, m, after) => {
+        if (args.length !== 1) return null;
         const method = /^\s*\.is_integer\(\s*\)/.exec(after);
-        return method && args.length === 1 ? [`((${args[0]}) ∈ ℤ)`, method[0].length] : null;
+        return method ? [`((${args[0]}) ∈ ℤ)`, method[0].length] : `(${args[0]})`;
     });
     // [1, 2].includes(x), S.includes(x) → x ∈ {1, 2}, x ∈ S
     for (let at = text.lastIndexOf('.includes('); at >= 0; at = at > 0 ? text.lastIndexOf('.includes(', at - 1) : -1) {
@@ -585,5 +598,5 @@ export function codeRewrites(text) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [SHEET_CALLS, SQL_NAMES, NP_AS_MATH, NP_BARE, SYMPY_CONSTANTS, SYMPY_SETS, SYMPY_CALLS, SYMPY_INTERVALS, CALLS, NP_CONSTANTS]) Object.setPrototypeOf(table, null);

@@ -42,8 +42,11 @@ const PROPERTIES = [
     ['is non-negative', '≥ 0'], ['is nonnegative', '≥ 0'], ['is not negative', '≥ 0'],
     ['is non-positive', '≤ 0'], ['is nonpositive', '≤ 0'], ['is not positive', '≤ 0'],
     ['is positive', '> 0'], ['is negative', '< 0'], ['is non-zero', '≠ 0'], ['is nonzero', '≠ 0'], ['is not zero', '≠ 0'], ['is zero', '= 0'],
-    ['is a whole number', '∈ ℤ'], ['is an integer', '∈ ℤ'], ['is not an integer', '∉ ℤ'], ['is a natural number', '∈ ℕ'],
+    ['is an integer', '∈ ℤ'], ['is not an integer', '∉ ℤ'], ['is a natural number', '∈ ℕ'],
     ['is a real number', '∈ ℝ'], ['is real', '∈ ℝ'], ['is a rational number', '∈ ℚ'], ['is rational', '∈ ℚ'],
+    // the sets as speech names them (render/speech.js): n is in the integers, x is not in the real numbers
+    ...[['the integers', 'ℤ'], ['the natural numbers', 'ℕ'], ['the real numbers', 'ℝ'], ['the rational numbers', 'ℚ'], ['the complex numbers', 'ℂ']]
+        .flatMap(([words, set]) => [[`is not in ${words}`, `∉ ${set}`], [`is in ${words}`, `∈ ${set}`]]),
 ];
 
 // Every rewrite below needs one of these words (`and`/`or`: `x > 3 and < 7`). Most input has none, and
@@ -55,7 +58,7 @@ export const TRIGGER = /(?<![A-Za-z])(?:is|between|exceeds|equals?|does|doesn't|
 export const PHRASES = [
     ...COMPARISONS.map(([w]) => w), ...PROPERTIES.map(([w]) => w), ...FUNCTION_WORDS.map(([w]) => `${w} of`),
     'is not strictly between', 'is not between', 'is strictly between', 'is between', 'between', 'is in the closed interval from',
-    'is within', 'is a multiple of', 'is divisible by', 'divides', 'is even', 'is odd', 'is not in', 'is in', 'is an element of',
+    'is within', 'is a whole number', 'is not a whole number', 'is a multiple of', 'is divisible by', 'divides', 'is even', 'is odd', 'is not in', 'is in', 'is an element of',
     'is not', 'is', 'and <', 'or >', 'the absolute value of', 'the square root of', 'the cube root of', 'to the power of',
     'to the third', 'to the n', 'squared', 'cubed', 'half of', 'twice', 'percent', 'divided by', 'over', 'multiplied by',
     'times', 'plus', 'minus', 'modulo',
@@ -97,6 +100,9 @@ export function englishRewrites(text) {
     t = t.replace(new RegExp(SUBJECT + String.raw`is\s+(not\s+)?(even|odd)(?![\w.])`, 'gi'),
         (w, x, not, kind) => `((${x}) mod 2 ${(kind.toLowerCase() === 'even') !== Boolean(not) ? '=' : '≠'} 0)`);
 
+    // a whole number is 0, 1, 2, … (as US schools use the words): an integer that is not negative. (ℕ is 1, 2, 3, …)
+    t = t.replace(new RegExp(SUBJECT + String.raw`is\s+(not\s+)?a\s+whole\s+number(?![\w.])`, 'gi'),
+        (w, x, not) => (not ? `((${x}) ∉ ℤ ∨ (${x}) < 0)` : `((${x}) ∈ ℤ & (${x}) ≥ 0)`));
     for (const [words, symbol] of PROPERTIES) t = t.replace(phrase(words), ` ${symbol} `);
     t = t.replace(phrase('is not in'), ' ∉ ').replace(phrase('is in'), ' ∈ ').replace(phrase('is an element of'), ' ∈ ');
     for (const [words, symbol] of COMPARISONS) t = t.replace(phrase(words), ` ${symbol} `);

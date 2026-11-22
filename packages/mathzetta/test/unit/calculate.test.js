@@ -1,16 +1,18 @@
-import { suite, test, eq } from '../harness.js';
-import { calculate, calculateBlock, MathError, UnknownError, parse, clean } from '../../src/all.js';
+/**
+ * calculate(): exact answers (BigInt fractions, surds, π, complex numbers, polynomials, matrices) and numeric
+ * calculus; its options, {{blocks}} and {{≈…}}, and where it gives no answer.
+ */
+import { suite, test, eq, throws } from '../harness.js';
+import { MathError, UnknownError, calculate, calculateBlock, clean, evaluate, parse, toLaTeX } from '../../src/all.js';
 
 const T = (s, scope, options) => calculate(s, scope, options).text;
-/** Throws an error of this class. */
-const throws = (body, Kind) => {
-    try {
-        body();
-    } catch (error) {
-        if (!(error instanceof Kind)) throw new Error(`threw ${error.constructor.name} "${error.message}", expected ${Kind.name}`);
-        return;
+
+const V = (s, scope, options) => calculate(s, scope, options).value;
+
+const near = (actual, expected, label = '') => {
+    if (typeof actual !== 'number' || Math.abs(actual - expected) > 1e-12 * Math.max(1, Math.abs(expected))) {
+        throw new Error(`${label ? label + ': ' : ''}expected ≈ ${expected}, got ${actual}`);
     }
-    throw new Error('expected an error');
 };
 
 suite('calculate: fixed', () => {
@@ -165,7 +167,7 @@ suite('calculate: calculus, numerically', () => {
     });
 });
 
-suite('{{blocks}}', () => {
+suite('calculate: {{blocks}}', () => {
     const P = (s, options) => parse(s, options);
     test('values replace the block', () => {
         eq(P('3+4={{3+4}}'), ['3', '4', '+', '7', '=']);
@@ -195,7 +197,6 @@ suite('{{blocks}}', () => {
     });
 });
 
-// ---- added 2026-11-03 ----
 suite('calculate: options and lists', () => {
     test('digits: significant digits of an inexact answer', () => {
         eq(calculate('sin(1)', {}, { digits: 4 }).text, '0.8415');
@@ -338,4 +339,273 @@ suite('calculate: polynomials', () => {
         eq(parse('{{a/b}}').join(' '), 'a b /', 'a fraction of unknowns is left as written');
     });
     test('a polynomial too big to write is refused', () => throws(() => calculate('(a+b+c+d+e+f)^40'), UnknownError));
+    test('a power with too many terms is refused before the work (it took 3 s); powers that fit stay exact', () => {
+        const start = Date.now();
+        throws(() => calculate('(a+b+c+d+e+f)^40'), /too many terms/);
+        throws(() => calculate('(a+b+c+d)^40'), /too many terms/);
+        eq(Date.now() - start < 200, true, `took ${Date.now() - start} ms`);
+        eq(T('(a+b)^10').split(' + ').length, 11);
+        eq(T('(x+1)^20').startsWith('x^20 + 20*x^19 + 190*x^18'), true);
+        eq(T('(x+1)^20').endsWith('20*x + 1'), true);
+        eq(T('(1+x+x^2+x^3+x^4+x^5+x^6+x^7+x^8+x^9)^10').split(' + ').length, 91);   // 10 terms, but one unknown: x^0 … x^90
+    });
+});
+
+suite('calculate: arcsec, arccsc, arccot exactly', () => {
+    test('the special angles in π', () => {
+        eq(T('arcsec(2)'), 'pi/3');
+        eq(T('arcsec(-2)'), '(2*pi)/3');
+        eq(T('arccsc(2)'), 'pi/6');
+        eq(T('arccsc(-2)'), '-pi/6');
+        eq(T('arccot(1)'), 'pi/4');
+        eq(T('arccot(-1)'), '(3*pi)/4');
+        eq(T('arccot(0)'), 'pi/2');
+        eq(calculate('arcsec(2)').exact, true);
+    });
+    test('outside the domain: refused', () => {
+        throws(() => calculate('arcsec(0.5)'), /not a real number/);
+    });
+});
+
+suite('calculate: complex logarithms', () => {
+    test('ln of a negative number is no real number, unless complex numbers are in play', () => {
+        throws(() => calculate('ln(-1)'), /not a real number/);
+        eq(T('ln(-1)', {}, { complex: true }), '(pi)*i');
+        eq(T('ln(-1) + 0i'), '(pi)*i');   // an i in the input turns complex results on
+    });
+    test('ln(i) = πi/2, exactly', () => {
+        const r = calculate('ln(i)');
+        eq(r.text, '(pi/2)*i');
+        eq(r.exact, true);
+        eq(r.value.re, 0);
+        near(r.value.im, Math.PI / 2);
+    });
+    test('ln(1+i) = ln(2)/2 + πi/4, as a decimal', () => {
+        const r = calculate('ln(1+i)');
+        eq(r.exact, false);
+        near(r.value.re, Math.log(2) / 2);
+        near(r.value.im, Math.PI / 4);
+    });
+    test("e^(iπ) = -1", () => eq(T('e^(iπ)'), '-1'));
+    test('evaluate() is real: i is just a name it has no value for', () => {
+        eq(Number.isNaN(evaluate('ln(-1)')), true);
+        throws(() => evaluate('ln(i)'), /No value for 'i'/);
+    });
+});
+
+suite('calculate: the gamma function (factorials of non-integers)', () => {
+    test('0.5! = √π/2', () => {
+        const r = calculate('0.5!');
+        eq(r.exact, false);
+        near(r.value, Math.sqrt(Math.PI) / 2);
+    });
+    test('1.5! = 3√π/4, (-0.5)! = √π', () => {
+        near(V('1.5!'), 3 * Math.sqrt(Math.PI) / 4);
+        near(V('(-0.5)!'), Math.sqrt(Math.PI));
+    });
+    test('evaluate() has factorials of whole numbers only (NaN)', () => eq(Number.isNaN(evaluate('0.5!')), true));
+});
+
+suite('calculate: functions of several arguments', () => {
+    test('atan2(y, x)', () => {
+        near(V('atan2(1,1)'), Math.PI / 4);
+        near(V('atan2(1,0)'), Math.PI / 2);
+        near(evaluate('atan2(1,1)'), Math.PI / 4);
+    });
+    test('prod, min, gcd', () => {
+        eq(T('prod(2,3,4)'), '24');
+        eq(T('min(3,1,2)'), '1');
+        eq(T('gcd(12,18)'), '6');
+        eq(T('gcd(12,18,8)'), '2');
+        eq(evaluate('prod(2,3,4)'), 24);
+        eq(evaluate('min(3,1,2)'), 1);
+        eq(evaluate('gcd(12,18,8)'), 2);
+    });
+});
+
+suite('calculate: comparisons and logic', () => {
+    const both = (s, expected) => {
+        eq(V(s), expected, `calculate ${s}`);
+        eq(evaluate(s), expected, `evaluate ${s}`);
+    };
+    test('≈ (close enough for doubles)', () => {
+        both('0.1+0.2 ≈ 0.3', true);
+        both('1 ≈ 2', false);
+    });
+    test('≤ ≥ ≠', () => {
+        both('2 ≤ 2', true);
+        both('3 ≤ 2', false);
+        both('3 ≥ 4', false);
+        both('4 ≥ 4', true);
+        both('1 ≠ 2', true);
+        both('2 ≠ 2', false);
+    });
+    test('=== compares values, not spellings', () => {
+        both('2 === 2', true);
+        both('2 === 2.0', true);
+        both('1/2 === 0.5', true);
+        both('1 === 2', false);
+    });
+    test('| \\xor \\nor \\nand \\implies: their truth tables', () => {
+        for (const [a, b, or, xor, nor, nand, implies] of [
+            [true, true, true, false, false, false, true],
+            [true, false, true, true, false, true, false],
+            [false, true, true, true, false, true, true],
+            [false, false, false, false, true, true, true],
+        ]) {
+            both(`${a} | ${b}`, or);
+            both(`${a} \\xor ${b}`, xor);
+            both(`${a} \\nor ${b}`, nor);
+            both(`${a} \\nand ${b}`, nand);
+            both(`${a} \\implies ${b}`, implies);
+        }
+    });
+});
+
+suite('calculate: named constants', () => {
+    test('tau and τ are 2π, exactly', () => {
+        eq(T('tau'), '2*pi');
+        eq(T('τ'), '2*pi');
+        eq(T('2τ'), '4*pi');
+        near(V('tau'), 2 * Math.PI);
+        near(evaluate('τ'), 2 * Math.PI);
+    });
+    test('π', () => {
+        eq(T('π'), 'pi');
+        eq(calculate('π').exact, true);
+        near(evaluate('π'), Math.PI);
+    });
+    test('true and false', () => {
+        eq(calculate('true'), { value: true, text: 'true', exact: true });
+        eq(calculate('false'), { value: false, text: 'false', exact: true });
+        eq(evaluate('true'), true);
+    });
+});
+
+suite('calculate: options', () => {
+    test('places: that many decimals, rounded', () => {
+        eq(T('1/3', {}, { places: 3 }), '0.333');
+        eq(T('2/3', {}, { places: 0 }), '1');
+        eq(calculate('1/3', {}, { places: 3 }).exact, true);   // the value is exact; only the text is rounded
+        eq(T('1/3', {}, { places: undefined }), '1/3');       // undefined is no option
+    });
+    test('places must be a whole number from 0 to 10000', () => {
+        for (const places of [-1, 1.5, 10001, '2', NaN]) {
+            throws(() => calculate('1/3', {}, { places }), /places is a whole number from 0 to 10000/);
+        }
+    });
+    test('decimal: a decimal instead of a fraction', () => eq(T('1/3', {}, { decimal: true }), '0.333333333333'));
+    test('complex: false keeps to real numbers even with an i in the input', () => {
+        throws(() => calculate('sqrt(-4)'), /not a real number/);
+        eq(T('sqrt(-4)', {}, { complex: true }), '2*i');
+        throws(() => calculate('sqrt(-4) + i', {}, { complex: false }), /not a real number/);
+        throws(() => calculate('ln(-1)', {}, { complex: false }), /not a real number/);
+    });
+});
+
+suite('calculate: {{≈…}} blocks', () => {
+    // calculateBlock: a leading ~ or ≈ asks for a decimal, ~3 / ≈3 for three places
+    test('≈ with places, like ~', () => {
+        eq(calculateBlock('≈3 1/3'), '0.333');
+        eq(calculateBlock('~3 1/3'), '0.333');
+        eq(calculateBlock('≈2 pi'), '3.14');
+        eq(calculateBlock('≈ pi'), '3.14159265359');
+    });
+    test('in parsed text', () => {
+        eq(parse('{{≈3 1/3}}'), ['0.333']);
+        eq(parse('{{~3 1/3}}'), ['0.333']);
+        eq(parse('{{≈2 pi}}'), ['3.14']);
+        eq(parse('{{~ pi}}'), ['3.14159265359']);
+        eq(parse('x = {{≈3 1/3}}'), ['x', '0.333', '=']);
+        eq(toLaTeX('x = {{≈3 1/3}}'), 'x = 0.333');
+    });
+    test('without ≈ the answer stays exact', () => eq(parse('{{1/3}}'), ['1', '3', '/']));
+    test('{{≈ 1/3}}: a number after "≈ " is the question, not the places', () => {
+        eq(calculateBlock('≈ 1/3'), '0.333333333333');
+        eq(calculateBlock('~ 1/3'), '0.333333333333');
+        eq(parse('{{≈ 1/3}}'), ['0.333333333333']);
+    });
+});
+
+suite('calculate: what underflows inside a limit or an integral is 0 there', () => {
+    test('limits and improper integrals of e^-x', () => {
+        eq(T('\\lim_{x\\to -\\infty} e^x'), '0');
+        eq(T('\\lim_{x\\to\\infty} x e^{-x}'), '0');
+        eq(T('\\int_0^{\\infty} e^{-x} dx'), '1');
+        eq(Math.abs(calculate('\\int_{-\\infty}^{\\infty} e^{-x^2} dx').value - Math.sqrt(Math.PI)) < 1e-9, true);
+    });
+    test('…and a number typed too small is still refused', () => throws(() => calculate('10^{-50000}'), /too small/));
+});
+
+suite('calculate: exact comparisons, series, limits, integrals, tiny and huge answers', () => {
+    const text = (s) => calculate(s).text;
+    test('exact values are compared to every digit: e^-30 is not 0', () => {
+        eq(text('e^(-30) > 0'), 'true');
+        eq(text('10^(-13)*pi = 0'), 'false');
+        eq(text('sqrt(2)/10^13 > 0'), 'true');
+        eq(text('0.1+0.2 = 0.3'), 'true');
+        eq(text('sin(1)^2+cos(1)^2 = 1'), 'true');
+    });
+    test('congruence and membership are exact', () => {
+        eq(text('2^100 ≡ 1 (mod 3)'), 'true');
+        eq(text('10^20 ≡ 1 (mod 3)'), 'true');
+        eq(text('10^20+1 ∈ {10^20}'), 'false');
+        eq(text('0.1+0.2 ∈ {0.3}'), 'true');
+        eq(text('pi ∈ ℚ'), 'false');
+        eq(text('-2 ∈ ℤ'), 'true');
+    });
+    test('series: terms that do not shrink diverge; a slow one gets no verdict', () => {
+        throws(() => calculate('\\sum_{n=1}^{\\infty} (-1)^n'), /diverges/);
+        throws(() => calculate('\\sum_{n=1}^{\\infty} sin(n)'), /diverges/);
+        throws(() => calculate('\\sum_{n=1}^{\\infty} 1/n^1.01'), /too slowly to tell/);
+        eq(text('\\sum_{n=1}^{\\infty} 1/n^2'), 'pi^2/6');
+    });
+    test('a limit that oscillates has none (two sequences of points must agree)', () => {
+        for (const f of ['sin(x)', 'cos(x)', 'x sin(x)', '(-1)^{floor(x)}']) throws(() => calculate(`\\lim_{x\\to\\infty} ${f}`), /limit/);
+        eq(text('\\lim_{x\\to\\infty} sin(x)/x'), '0');
+        eq(text('\\lim_{x\\to 0^+} sqrt(x)'), '0');
+        eq(text('\\lim_{x\\to 0^+} x^(1/3)'), '0');
+    });
+    test('integrals over a kink or many waves, and tiny ones', () => {
+        eq(text('\\int_{-1}^{1} abs(x) dx'), '1');
+        eq(Math.abs(calculate('\\int_0^{1000} cos(x) dx').value - Math.sin(1000)) < 1e-6, true);
+        eq(Math.abs(calculate('\\int_0^{0.00001} x dx').value - 5e-11) < 1e-15, true);
+    });
+    test('tiny and huge exact answers are written as what they are', () => {
+        eq(text('10^(-400)'), '1*10^(-400)');
+        eq(text('10^400/7'), '1.42857142857*10^(399)');
+        throws(() => calculate('10^(-50000)'), /too small/);
+        eq(text('round(pi, 400)'), '3.14159265359');
+        eq(text('fixed(pi, 120)').length, 124);
+        eq(text('1 = "a"'), 'false');
+    });
+});
+
+suite('calculate: numeric integrals and tiny negative fractions', () => {
+    test('a numeric integral shows the digits its error leaves (not 2.49999985339)', () => {
+        eq(calculate('int(abs(x), x, -1, 2)').text, '2.5');
+        eq(calculate('int(abs(x-0.3), x, 0, 1)').text, '0.29');
+    });
+    test('a tiny negative fraction is a tiny negative double (>> rounds a negative BigInt down)', () => {
+        eq(calculate("-1/10^400").value === 0, true);   // -0: it was -1.09e-301
+        eq(calculate('-1/10^400').text, '-1*10^(-400)');
+        eq(Math.abs(calculate('-(2^2000)/3^1000').value / -8.68433580377441e124 - 1) < 1e-12, true);
+    });
+});
+
+suite('calculate: roots of numbers past the largest double', () => {
+    const near = (a, b) => Math.abs(a / b - 1) < 1e-9;
+    test('a root of a number past the largest double has a value (it was ∞, and its reciprocal NaN)', () => {
+        eq(near(calculate('root(12, 3^2000 + 2)').value, 3 ** (2000 / 12)), true);
+        eq(near(calculate('1 / root(12, 3^2000 + 2)').value, 3 ** (-2000 / 12)), true);
+        eq(near(calculate('1/root(12, 3^100+2)').value, 3 ** (-100 / 12)), true);     // exact: ¹²√(…)/(3¹⁰⁰+2), huge over huge
+        eq(near(calculate('-1/root(12, 3^100+2)').value, -(3 ** (-100 / 12))), true);
+        eq(near(calculate('pi*root(3,10^400)').value, Math.PI * 10 ** (400 / 3)), true);
+    });
+    test('…and small roots are as they were, exactly', () => {
+        eq(calculate('1/root(3,2)').text, 'root(3, 4)/2');
+        eq(calculate('1/root(12,5)').text, 'root(12, 48828125)/5');
+        eq(calculate('sqrt(2)').value, Math.SQRT2);
+        eq(calculate('1/sqrt(2)').text, calculate('sqrt(2)/2').text);
+    });
 });

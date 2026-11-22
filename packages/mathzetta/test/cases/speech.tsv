@@ -42,7 +42,7 @@ x^4	x to the fourth	x to the fourth
 \frac{1}{2}	one half	one half
 \frac{3}{4}x	three quarters x	three quarters x
 \frac{x+1}{x-1}	the quantity x plus 1, over the quantity x minus 1	the quantity x plus 1, over the quantity x minus 1
-\frac{1}{2\sqrt{x}}	1 over 2 times the square root of x	1 over 2 times the square root of x
+\frac{1}{2\sqrt{x}}	1 over 2 times the square root of x	1 over the quantity 2 times the square root of x
 \frac{-b \pm \sqrt{b^2-4ac}}{2a}	the quantity negative b plus or minus the square root of b squared minus 4 a c, over 2 a	the quantity negative b plus or minus the square root of the quantity b squared minus 4 a c, end root, over 2 a
 -x^2	negative x squared	negative x squared
 -(a+b)	negative the quantity a plus b	negative the quantity a plus b

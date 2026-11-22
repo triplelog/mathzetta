@@ -130,16 +130,25 @@ function topLevelParts(text) {
 
 /**
  * Remove whitespace — except one space between two letters, which keeps
- * words apart: `cos t` must not become `cost`, nor `x y` the word `xy`.
+ * words apart: `cos t` must not become `cost`, nor `x y` the word `xy`; and between a letter and a
+ * command, which keeps the command one: `x \int` must not become `xint`.
  */
 function squeeze(text) {
+    // digits in groups of three are one number (1 000, 12 345 678.5): the SI way of writing thousands
+    text = text.replace(/(?<![\d.])\d{1,3}(?:[ \u00A0\u202F]\d{3})+(?![\d])/g, (m) => m.replace(/[ \u00A0\u202F]/g, ''));
     return text.replace(/\s+/g, (space, at) => {
         const before = text[at - 1] ?? '';
         const after = text[at + space.length] ?? '';
         if (before === 'Δ') return '';   // Δ x is the one quantity Δx
         if (/[A-Za-z\u0370-\u03FF′]/.test(before) && /[A-Za-z\u0370-\u03FF]/.test(after)) return ' ';
+        // a name, a space, a command: the command stays one (x \int … is x·∫, not the word xint read as ξ·n·t)
+        if (/[A-Za-z\u0370-\u03FF′]/.test(before) && /^\\[A-Za-z]/.test(text.slice(at + space.length, at + space.length + 2))
+            && !/\\[A-Za-z]+$/.test(text.slice(0, at))) return ' ';
         // a name, a space, a number: two factors (n 3^n is n·3ⁿ, not a name n3), except after a command (\frac 1 2)
         if (/[A-Za-z\u0370-\u03FF′]/.test(before) && /\d/.test(after) && !/\\[A-Za-z]+$/.test(text.slice(0, at))) return ' ';
+        // two numbers side by side that aren't grouped thousands (2 3, 1 23) multiply, as 2x 3 does; they were the
+        // number 23. TeX's own \frac 1 2 (digits as a command's arguments) is left as it was
+        if (/\d/.test(before) && /\d/.test(after) && !/\\[A-Za-z]+\s*\d*$/.test(text.slice(0, at))) return '*';
         return '';
     });
 }

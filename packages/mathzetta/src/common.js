@@ -32,15 +32,33 @@ export function evaluationDifference(node) {
     return { type: 'op', op: '-', args: [substitute(body, variable.value, hi), substitute(body, variable.value, lo)] };
 }
 
-/** A copy of `tree` with `value` for the name (where nothing inside binds it again: ∫ … dx keeps its own x). */
+/**
+ * A copy of `tree` with `value` for the name (where nothing inside binds it again: ∫ … dx keeps its own x).
+ * A binding's bounds are outside its scope and do get the value: [∑_{x=1}^{x} x]_0^2 puts 2 and 0 in the upper
+ * bound, not in the body; the same for ∫_a^b's a and b, lim's point, d/dx at x = a, [ ]_a^b and {x ∈ S | P}'s S.
+ */
 export function substitute(tree, name, value) {
     const put = (n) => {
         if (n.type === 'symbol') return n.value === name ? value : n;
         if (n.type !== 'op') return n;
-        if (['der', 'int', 'lim', '\\sumidx', '\\prodidx', 'evaluated', 'setbuilder'].includes(n.op) && bindsName(n, name)) return n;
+        if (BINDERS.has(n.op) && bindsName(n, name)) return { ...n, id: undefined, args: n.args.map((a, i) => boundsOnly(n.op, a, i, put)) };
         return { ...n, id: undefined, args: n.args.map(put) };
     };
     return put(tree);
+}
+
+const BINDERS = new Set(['der', 'int', 'lim', '\\sumidx', '\\prodidx', 'evaluated', 'setbuilder']);
+
+/** Operand `i` of a binder of the name: the body and the bound name stay; what lies outside the scope gets `put`. */
+function boundsOnly(op, arg, i, put) {
+    if (op === 'setbuilder') {   // {x | P}: nothing outside; {x ∈ S | P}: S is
+        return i === 0 && arg.type === 'op' && arg.op === '∈' ? { ...arg, id: undefined, args: [arg.args[0], put(arg.args[1])] } : arg;
+    }
+    if (i === 0) return arg;                                  // the body
+    if (i === 1) {                                            // x, or x = a / x → a: the point is outside
+        return arg.type === 'op' && (arg.op === '=' || arg.op === '→') ? { ...arg, id: undefined, args: [arg.args[0], ...arg.args.slice(1).map(put)] } : arg;
+    }
+    return put(arg);                                          // bounds, lim's side (a constant)
 }
 
 /**
@@ -381,7 +399,7 @@ export function expandChain(node) {
 export const isText = (node) => node.type === 'string' || (node.type === 'op' && node.op === '+' && node.args.some(isText));
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [GREEK]) Object.setPrototypeOf(table, null);
 
 /**
@@ -403,6 +421,46 @@ export const MATRICES = { pmatrix: ['(', ')'], bmatrix: ['[', ']'], vmatrix: ['|
  * argument that isn't a [] list is a row of one entry), or for a list of equally long lists
  * written as one, [[1, 2], [3, 4]] (two rows or more, or one row of two or more). Else null.
  */
+/**
+ * Is this node's value a list or a matrix, as written: [1, 2], [[1, 2], [3, 4]], bmatrix(…), or a product
+ * with one in it. (A name may hold one too; only what is written can be told.) Code outputs write a product
+ * or an equality of these as the language's matrix product and entry-by-entry comparison.
+ */
+export function isListValued(node) {
+    if (!node || node.type !== 'op') return false;
+    // a lone [x] is brackets, not a list of one
+    if ((node.op === '[]' && (node.args.length > 1 || matrixRows(node))) || (Object.prototype.hasOwnProperty.call(MATRICES, node.op) && node.op !== 'vmatrix')) return true;
+    return node.op === '*' && node.args.length === 2 && node.args.some(isListValued);
+}
+
+/** What kind of value a literal is: 'number', 'boolean' (true, false) or 'text'; null for anything else. */
+export function literalKind(node) {
+    if (node.type === 'number' || (node.type === 'op' && node.op === 'neg' && node.args[0]?.type === 'number')) return 'number';
+    if (node.type === 'symbol' && (node.value === 'true' || node.value === 'false')) return 'boolean';
+    if (node.type === 'string') return 'text';
+    return null;
+}
+
+const KIND_WORDS = { __proto__: null, number: 'a number', boolean: 'true or false', text: 'text' };
+/**
+ * `1 == true`, `"1" = 1`, `0 === false`: an equality between literals of two different kinds, or null.
+ * Strictly (=== and !==) the answer is known, `false` and `true`, in every language. Loosely, only
+ * JavaScript's == converts one kind to the other (and calculate() never does): Python says "1" == 1 is
+ * False, PostgreSQL refuses 1 = TRUE, a spreadsheet says =1=TRUE is FALSE. So a code output that isn't
+ * JavaScript refuses it by name (`refusal`), and writes the known answer for a strict one.
+ * @returns {{ strict: boolean, answer: boolean, refusal: string } | null}
+ */
+export function mixedEquality(node) {
+    if (node.type !== 'op' || !['=', '===', '≠', '≠='].includes(node.op) || node.args.length !== 2) return null;
+    const [k1, k2] = node.args.map(literalKind);
+    if (!k1 || !k2 || k1 === k2) return null;
+    const strict = node.op === '===' || node.op === '≠=';
+    return {
+        strict, answer: node.op === '≠=',
+        refusal: `= between ${KIND_WORDS[k1]} and ${KIND_WORDS[k2]} (only JavaScript's loose == converts one to the other; === compares them strictly)`,
+    };
+}
+
 export function matrixRows(node) {
     if (!node || node.type !== 'op') return null;
     if (Object.prototype.hasOwnProperty.call(MATRICES, node.op)) {

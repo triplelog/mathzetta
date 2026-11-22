@@ -7,7 +7,7 @@
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition, mixedEquality, isListValued } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -127,6 +127,17 @@ function operation(node, render, options) {
         ? `(${render(child)})` : render(child));
     const side = (child, s) => sideOf(op, child, s);
     const list = () => args.map(render).join(', ');
+    // 0 === false is FALSE (SQLite's 0 = FALSE is true; PostgreSQL has no integer = boolean); 1 = TRUE loosely, refused
+    const mixed = mixedEquality(node);
+    if (mixed && !mixed.strict) throw new Error(`No SQL for ${mixed.refusal}`);
+    if (mixed) return mixed.answer ? 'TRUE' : 'FALSE';
+    if (op === '*' && !isMinusOneTimes(node) && args.some(isListValued)) {   // ARRAY * ARRAY is no SQL operator
+        throw new Error(`No SQL for ${args.some((n) => matrixRows(n)) ? 'a matrix product' : 'a product with a list'}`);
+    }
+    // ℚ and ℂ: a number in SQL is a double or a decimal, never complex; IN (ℚ) would be no SQL at all
+    if ((op === '∈' || op === '∉') && b?.type === 'symbol' && (b.value === 'ℚ' || b.value === 'ℂ')) {
+        throw new Error(`No SQL for ∈ ${b.value}: ${b.value === 'ℚ' ? 'a number in SQL is always a fraction, so whether it is rational can\'t be told' : 'a number in SQL is never complex'}`);
+    }
 
     if (options.sqlite) {
         const out = sqliteOperation(node, render, side, list, sideOf);
@@ -142,6 +153,8 @@ function operation(node, render, options) {
     if (NO_SQL[op]) throw new Error(`No SQL for ${NO_SQL[op]}`);
     const inverse = inverseReciprocal(node) ?? evaluationDifference(node);   // [F]_a^b: F(b) - F(a)
     if (inverse) return `(${render(inverse)})`;   // arcsec u: ACOS(1.0 / u)
+    // PostgreSQL's GCD takes two numbers: gcd(a, b, c) is GCD(GCD(a, b), c), and gcd(a) is |a|, as evaluate() has it
+    if (op === 'gcd') return args.length === 1 ? `ABS(${render(a)})` : args.map(render).reduce((acc, x) => `GCD(${acc}, ${x})`);
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
     if (MATRICES[op]) return `ARRAY[${matrixRows(node).map((r) => `ARRAY[${r.map(render).join(', ')}]`).join(', ')}]`;
@@ -361,9 +374,12 @@ function membership(node, render) {
         return negate ? `NOT ${test}` : test;
     }
     const items = set.type === 'op' && set.op in GROUPS ? `(${set.args.map(render).join(', ')})` : `(${render(set)})`;
+    // a missing value (NULL) IN (…) is NULL, not false: a column or expression is tested with IS TRUE, so a missing
+    // value is in no set and not in every one, as in JavaScript (([…].includes(null)) is false)
+    if (x.type !== 'number' && x.type !== 'string') return `(${v} IN ${items}) ${negate ? 'IS NOT TRUE' : 'IS TRUE'}`;
     return `${v} ${negate ? 'NOT IN' : 'IN'} ${items}`;
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [CONSTANTS, SQLITE_CONSTANTS, FUNCTIONS, INFIX, GROUPS, SQLITE_FUNCTIONS, SQLITE_RECIPROCALS, POSTGRES_NUMBER_SETS, NO_SQL, SQLITE_WORDS]) Object.setPrototypeOf(table, null);

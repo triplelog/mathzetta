@@ -499,7 +499,12 @@ class Speaker {
         const isOp = (n, ...ops) => n.type === 'op' && ops.includes(n.op) && !isMinusOneTimes(n);
         const top = this.grouped(a, null, isOp(a, '/'));   // "over" closes the numerator; (a/b)/c is not a/(b/c)
         const pause = this.isCall(a) ? [me(w.comma)] : [];
-        return [...top, ...pause, me(w.over), ...this.grouped(b, 'endFraction', isOp(b, '/'))];   // a/(b/c) is not (a/b)/c
+        // a/(b/c) is not (a/b)/c; and alone, 1/(2·√x) is not (1/2)·√x: a denominator said with "times" is fenced
+        // ("1 over the quantity 2 times the square root of x"), where "1 over 2 x" needs nothing
+        const bottom = this.speak(b);
+        const tight = isOp(b, '/') || (this.audio && isOp(b, '*') && bottom.some((s) => s.id === b.id && s.text === w.times));
+        const fenced = this.isCompound(b) || (this.audio && tight);
+        return [...top, ...pause, me(w.over), ...(fenced ? [this.seg(b, w.quantity), ...bottom, ...this.closer(b, 'endFraction')] : bottom)];
     }
 
     /** "x squared", "e to the 2 x", "x to the n minus 1, power", "the quantity x plus 1, squared". */
@@ -614,5 +619,5 @@ class Speaker {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [WORDS, NAMES, COMPARISONS, SETS, GREEK_NAMES]) Object.setPrototypeOf(table, null);

@@ -394,7 +394,7 @@ export interface Unified {
     postfix: Postfix;
 }
 export function toUnified(input: Input): Unified;
-export function convert(input: Input, format: 'javascript' | 'js' | 'python' | 'py' | 'latex' | 'tex' | 'mathml' | 'mml' | 'speech' | 'glsl' | 'sql' | 'text'): string;
+export function convert(input: Input, format: 'javascript' | 'js' | 'python' | 'py' | 'latex' | 'tex' | 'mathml' | 'mml' | 'speech' | 'glsl' | 'sql' | 'excel' | 'sheets' | 'text'): string;
 export function getMathMLIdMap(): Map<string, Unified>;
 export function resetIdTracking(): void;
 export const MathZetta: Record<string, unknown>;

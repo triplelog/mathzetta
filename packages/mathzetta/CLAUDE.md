@@ -17,7 +17,7 @@ them, and nothing here about the closed projects beyond a public link.
 ## Commands
 
 ```bash
-npm test          # node test/run.js — unit tests (test/unit/*.test.js, 11 files by subject) + every TSV in test/cases
+npm test          # node test/run.js — unit tests (test/unit/*.test.js, 16 files by subject) + every TSV in test/cases
 npm run coverage  # tools/test-coverage.js: what the tables cover — checks per output column, operators no row uses,
                   # rows with no expected value, code spellings the reader knows that no input uses
 npm run build     # rollup → build/ (bundles, flavours, split ES modules and CommonJS; gitignored, shipped to npm)
@@ -46,9 +46,15 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
 - `src/render/` — tree → string, one file per format. speech.js is what the calculus videos read aloud (`toSpeech`, the drawing in view) and, with its `audio` flag, what a screen reader hears (`toAudioSpeech`: compound groups opened with "the quantity" and closed with an end word, dropped at the very end) — one Speaker, two entry points; Inline Math's aria-label uses the audio one. Phrasing is in test/cases/speech.tsv (Speech and Audio columns); keep the video wording unchanged when touching the audio rules.
 - `src/evaluate.js` — doubles; `src/calculate.js` — exact (BigInt fractions, surds, π) and numeric calculus.
 - `src/formulas.js` — strToFunction / strToSQL for formulas over table columns (tabview, sqldn). Column-name matching is `src/columns.js`, shared with Python.
-- `test/cases/` — the table tests, one file per subject (consolidated 2026-11-02 from 24 files; every distinct check kept):
-  `reading.tsv` (how input is read: text, LaTeX, unicode, code spellings, words), `precedence.tsv`, `functions-and-sets.tsv`,
-  `every-output.tsv` (155 inputs through JavaScript, LaTeX, MathML, SQL), `operators.tsv`, `calculus.tsv`, `speech.tsv`,
+- `test/unit/` — one file per subject: `parse` (reading: text, LaTeX, code spellings, English), `tree` (postfix ⇄ tree and the
+  operator-table API), `evaluate`, `calculate`, `display` (LaTeX, MathML, text, convert/toUnified), `speech`, `code` (JavaScript,
+  Python, SQL, spreadsheets), `glsl` (and filter shaders), `formulas` (strToFunction/strToSQL/strToExcel), `security` (untrusted
+  input and the limits), `agreement` (engines that must give one value), `roundtrip`, `operators` (every operator in every
+  format), `bindings`, `python` (runs python3), `package` (the build). Shared helpers (`quick`, SQLite) are in `test/helpers.js`.
+- `test/cases/` — the table tests, one file per subject:
+  `reading.tsv` (how input is read: text, LaTeX, unicode, names), `code-spellings.tsv` (spreadsheets, SQL, numpy, SymPy, GLSL),
+  `english.tsv` (plain English), `ambiguity.tsv` (input with two readings: the rows of docs/how-it-works.md's "When math can be read two ways" — change both together), `precedence.tsv`, `every-output.tsv` (237 inputs through JavaScript, LaTeX, MathML, SQL,
+  Python, a spreadsheet, text: arithmetic, logic, named functions, sets), `operators.tsv`, `calculus.tsv`, `speech.tsv`,
   `glsl.tsv`, `formulas.tsv` (over formula-data.csv). Columns: Clean, Postfix, Latex, MathML, JavaScript, Python, SQL, Excel,
   Text, Evaluated, Speech, GLSL — a blank cell isn't checked (test/checks.js). The website's test runner (mathzetta-website, private; its dev server edits these files) changes
   them in place: "Accept output", "Fill from current output" for rows with no expectations, "Mark known…" for test/known-failures.json. The run fails if a known failure starts passing.
@@ -81,10 +87,10 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
 - Every operator in the table must render in every format, or be refused by name ("No JavaScript for a
   derivative") where the language has no such function and none can be written inline (as JavaScript's
   factorial, gcd, det and union helpers are) — never a call to a function that doesn't exist. test/unit/operators.test.js
-  lists the refusals per format; agreement.test.js checks every name each output calls exists in its language.
+  lists the refusals per format and checks every name each output calls exists in its language (SQLite runs it).
 - A new export goes in `src/types.d.ts` and the entry's `.d.ts`.
 - **Input is untrusted** (typed into pages, stored in embeds, carried in links); the checks are in
-  `test/unit/formulas.test.js` ("security: untrusted formulas"). Keep to them: a value written inside quotes in
+  `test/unit/security.test.js` (the "untrusted: …" suites). Keep to them: a value written inside quotes in
   code is validated, never pasted (`lim`'s side is r or l); SQL and spreadsheet output write `f(…)` only for
   functions the caller lists (`functions`: a list or `(name) => boolean`); `strToSQL` refuses names that
   aren't columns; generated JS passes `checkGeneratedJs` (helpers matched as exact text, `keywords: false` for
@@ -92,13 +98,13 @@ Rebuild after changing `src/`: the website's pages, tabc/sqldn and `npm test` (p
   `Object.setPrototypeOf(table, null)` for each) — a new table goes in that list, and an object literal looked up
   inside a function (`{ r: …, l: … }[value]`) gets `__proto__: null` or becomes a Map; names from a postfix array
   or tree are escaped in MathML and LaTeX; `filterShader` takes only GLSL identifiers for uniforms and pictures.
-- **Nothing runs for long or grows without bound** (suite "limits: work, size and depth"): `parse` reads at most
+- **Nothing runs for long or grows without bound** (the "limits: …" suites in test/unit/security.test.js): `parse` reads at most
   5000 characters (`maxLength`), trees are at most 1000 levels (`MAX_DEPTH`, src/tree.js), `evaluate` and
   `calculate` have a step budget (5,000,000 nodes per call, nested calls share it), perm/comb stop at ∞, a
   cleaning phase that grows past 100k characters and an output past a million (`guardLength`) are refused, a
   filter pass has at most 24 neighborhood calls, `§` is refused outside quoted strings (it marks protected names; in a string it is held as U+E000 until the strings are back), at most 100 `\int` are
   read, `calculate` charges big-number gcds to its step budget and caps decimal places at 10,000, and generated
-  JS factorial/perm/comb stop where a double reaches ∞ (test/unit/untrusted.test.js has these and the checker holes). A regex that starts with an operand anchors it to the start of
+  JS factorial/perm/comb stop where a double reaches ∞ (test/unit/security.test.js has these and the checker holes). A regex that starts with an operand anchors it to the start of
   a word (english.js), or a long word makes it quadratic. Generated JS sum loops cap each loop at a million but
   checkGeneratedJs refuses them, so only a caller running toJavaScript itself meets them.
   Each renderer writes a node once (`written`, a Map in toCode / toSQL / toExcel / toGLSL): a rule may read an operand

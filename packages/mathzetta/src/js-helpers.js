@@ -11,6 +11,11 @@ export const JS_HELPERS = {
     gcd: '((args)=>{let gcd = function(a,b) { return (!b)?a:gcd(b,a%b); }; return Math.abs(args.reduce(gcd));})',
     // a determinant by elimination (rows swapped for the largest pivot), as evaluate() works it out
     det: '((m) => { const a = m.map((r) => r.slice()); const n = a.length; let d = 1; for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(a[r][i]) > Math.abs(a[p][i])) p = r; if (a[p][i] === 0) return 0; if (p !== i) { const t = a[p]; a[p] = a[i]; a[i] = t; d = -d; } d *= a[i][i]; for (let r = i + 1; r < n; r++) { const f = a[r][i] / a[i][i]; for (let c = i; c < n; c++) a[r][c] -= f * a[i][c]; } } return d; })',
+    // a product with a list or a matrix in it, as evaluate() takes it: matrix times matrix (or a list as a column, or a row)
+    // is the matrix product, anything else entry by entry (2 [1, 2] is [2, 4]); shapes that don't fit give NaN
+    times: '((a, b) => { const L = Array.isArray; const m = (v) => L(v) && v.length > 0 && v.every((r) => L(r) && r.length > 0 && r.length === v[0].length && !r.some(L)) && (v.length > 1 || v[0].length > 1); const l = (v) => L(v) && v.length > 0 && !v.some(L); const p = (A, B) => (A[0].length === B.length ? A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => s + x * B[k][j], 0))) : NaN); const e = (x, y) => (L(x) && L(y) ? (x.length === y.length ? x.map((t, i) => e(t, y[i])) : NaN) : L(x) ? x.map((t) => e(t, y)) : L(y) ? y.map((t) => e(x, t)) : x * y); if (m(a) && m(b)) return p(a, b); if (m(a) && l(b)) { const c = p(a, b.map((y) => [y])); return L(c) ? c.map((r) => r[0]) : c; } if (l(a) && m(b)) { const c = p([a], b); return L(c) ? c[0] : c; } return e(a, b); })',
+    // = between lists, entry by entry, as evaluate() compares them (JavaScript's == only asks if they are the same object)
+    same: '((a, b) => { const s = (x, y) => (Array.isArray(x) && Array.isArray(y) ? x.length === y.length && x.every((v, i) => s(v, y[i])) : x == y); return s(a, b); })',
     // sets as lists, a number being a list of one, as evaluate() takes them
     union: '((a, b) => [...new Set([].concat(a, b))])',
     intersection: '((a, b) => [].concat(a).filter((x) => [].concat(b).includes(x)))',
@@ -49,5 +54,5 @@ export const NP_HELPERS = {
 };
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [JS_HELPERS, PY_HELPERS, NP_HELPERS]) Object.setPrototypeOf(table, null);

@@ -20,7 +20,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition, mixedEquality, isListValued } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -129,6 +129,15 @@ function operation(node, render, opts) {
         ? `(${render(child)})` : render(child));
     const list = () => args.map(render).join(', ');
     if (UNSUPPORTED[op]) fail(UNSUPPORTED[op]);
+    // =1=TRUE is FALSE in a spreadsheet (a number is never a logical value): loosely refused, strictly known
+    const mixed = mixedEquality(node);
+    if (mixed && !mixed.strict) fail(mixed.refusal);
+    if (mixed) return mixed.answer ? 'TRUE' : 'FALSE';
+    // a matrix times a matrix is MMULT: {1,2;3,4}*{5,6;7,8} multiplies entry by entry
+    const isMatrix = (n) => (n.type === 'op' && MATRICES[n.op] && n.op !== 'vmatrix') || (n.type === 'op' && n.op === '*' && isListValued(n) && n.args.every(isMatrix));
+    if (op === '*' && args.length === 2 && args.every(isMatrix)) return `MMULT(${render(a)}, ${render(b)})`;
+    // {1,2}={1,2} is an array of answers, one per entry (and AND over it needs an array formula in older spreadsheets)
+    if (COMPARE[op] && args.some(isMatrix)) fail('a comparison of matrices');
 
     if (AGGREGATES[op] && args.length === 1) {
         const range = a.type === 'symbol' ? opts.range(a.value) : undefined;
@@ -293,5 +302,5 @@ export function forXlsxFile(formula) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [CONSTANTS, FUNCTIONS, RECIPROCALS, COMPARE, AGGREGATES, UNSUPPORTED]) Object.setPrototypeOf(table, null);

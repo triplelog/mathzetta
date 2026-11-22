@@ -97,7 +97,7 @@ const idMap = new Map();
 export function toUnified(input) {
     idMap.clear();
     if (isEmpty(input)) {
-        return { latex: '[empty]', mathml: '<math><mi>empty</mi></math>', javascript: '0', python: '0', sql: '0', exp: '[empty]', speech: '', glsl: '0.0', op: '', postfix: [] };
+        return { latex: '', mathml: '<math><mi>empty</mi></math>', javascript: '0', python: '0', sql: '0', exp: '', speech: '', glsl: '0.0', op: '', postfix: [] };
     }
     const tree = treeOf(input);
     walk(tree, (node) => {
@@ -154,5 +154,5 @@ export const MathZetta = {
 if (typeof window !== 'undefined') window.MathZetta = MathZetta;
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [FORMATS]) Object.setPrototypeOf(table, null);

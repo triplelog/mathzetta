@@ -50,6 +50,10 @@ export const SYMBOL_REPLACEMENTS = [
     ["random.random()", "random(1)"],
     ["Math.log2(", "log_{2}("],
     ["Math.log10(", "log_{10}("],
+    // the functions without a call: log base 2 or 10 of what follows (Math.log10 5), never ln(10) — 3Math.log10 is
+    // 3 log₁₀ of nothing, refused; Math.LN10 (the constant ln 10) is below
+    ["Math.log2", "log_{2}"],
+    ["Math.log10", "log_{10}"],
     ["Math.log_{", "log_{"],
     ["Math.log", "log_{e}"],
     ["Math.ln", "log_{e}"],

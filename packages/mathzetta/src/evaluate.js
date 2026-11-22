@@ -289,5 +289,5 @@ function membership(node, scope) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [CONSTANTS, ONE, TWO, MANY, NUMBER_SETS, MATRIX_FUNCTIONS]) Object.setPrototypeOf(table, null);

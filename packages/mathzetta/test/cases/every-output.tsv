@@ -1,5 +1,5 @@
-# every-output.tsv — Arithmetic, comparisons, strings, logic, functions, conditionals and edge cases, each through JavaScript (and its value), LaTeX, MathML and SQL.
-# Columns: Input, Clean, Postfix, Latex, MathML, JavaScript, SQL, Evaluated, Python, Excel, Text, HTML. A blank cell is not checked; ERROR (or ERROR: text) expects a refusal; a # line is a note.
+# every-output.tsv — Arithmetic, comparisons, strings, logic, named functions, sets and membership, conditionals and edge cases, each through JavaScript (and its value), LaTeX, MathML, SQL, Python, a spreadsheet and text.
+# Columns: Input, Clean, Postfix, Latex, MathML, JavaScript, SQL, Evaluated, Python, Excel, Text. A blank cell is not checked; ERROR (or ERROR: text) expects a refusal; a # line is a note.
 Input	Clean	Postfix	Latex	MathML	JavaScript	SQL	Evaluated	Python	Excel	Text
 
 # Arithmetic Operations - Integers
@@ -10,6 +10,13 @@ Input	Clean	Postfix	Latex	MathML	JavaScript	SQL	Evaluated	Python	Excel	Text
 10%3	10%3	["10","3","mod"]	10 \bmod 3	<math><mrow><mn>10</mn><mo>mod</mo><mn>3</mn></mrow></math>	10 % 3	MOD(10, 3)	1	10 % 3	=MOD(10, 3)	10 mod 3
 2^3	2^{3}	["2","3","^"]	2^3	<math><msup><mn>2</mn><mn>3</mn></msup></math>	Math.pow(2, 3)	POWER(2, 3)	8	2 ** 3	=2^3	2^3
 (-5)	(-5)	["-5"]	-5	<math><mn>-5</mn></math>	-5	-5	-5	-5	=-5	-5
++7+(+8)*+9	+7+(+8)*+9	["7","8","9","*","+"]	7 + 8 \cdot 9	<math><mrow><mn>7</mn><mo>+</mo><mrow><mn>8</mn><mo>⋅</mo><mn>9</mn></mrow></mrow></math>	7 + 8 * 9	7 + 8 * 9	79	7 + 8 * 9	=7+8*9	7 + 8 * 9
++7	+7	["7"]			7	7	7	7	=7	7
+2+2	2+2	["2","2","+"]	2 + 2	<math><mrow><mn>2</mn><mo>+</mo><mn>2</mn></mrow></math>	2 + 2	2 + 2	4	2 + 2	=2+2	2 + 2
+2-2	2-2	["2","2","-"]	2 - 2	<math><mrow><mn>2</mn><mo>−</mo><mn>2</mn></mrow></math>	2 - 2	2 - 2	0	2 - 2	=2-2	2 - 2
+2*2	2*2	["2","2","*"]	2 \cdot 2	<math><mrow><mn>2</mn><mo>⋅</mo><mn>2</mn></mrow></math>	2 * 2	2 * 2	4	2 * 2	=2*2	2 * 2
+2/2	2/2	["2","2","/"]	\frac{2}{2}	<math><mfrac><mn>2</mn><mn>2</mn></mfrac></math>	2 / 2	2.0 / 2	1	2 / 2	=2/2	2 / 2
+2 * 2	2*2		2 \cdot 2			2 * 2		2 * 2	=2*2	2 * 2
 
 # Arithmetic Operations - Floats
 1.5+2.5	1.5+2.5	["1.5","2.5","+"]	1.5 + 2.5	<math><mrow><mn>1.5</mn><mo>+</mo><mn>2.5</mn></mrow></math>	1.5 + 2.5	1.5 + 2.5	4	1.5 + 2.5	=1.5+2.5	1.5 + 2.5
@@ -50,8 +57,6 @@ Input	Clean	Postfix	Latex	MathML	JavaScript	SQL	Evaluated	Python	Excel	Text
 1.8<=1.5	1.8≤1.5	["1.8","1.5","≤"]	1.8 \leq 1.5	<math><mrow><mn>1.8</mn><mo>≤</mo><mn>1.5</mn></mrow></math>	1.8 <= 1.5	1.8 <= 1.5	false	1.8 <= 1.5	=1.8<=1.5	1.8 ≤ 1.5
 3.14==3.15	3.14=3.15	["3.14","3.15","="]	3.14 = 3.15	<math><mrow><mn>3.14</mn><mo>=</mo><mn>3.15</mn></mrow></math>	3.14 == 3.15	3.14 = 3.15	false	3.14 == 3.15	=3.14=3.15	3.14 = 3.15
 2.5!=2.5	2.5≠2.5	["2.5","2.5","≠"]	2.5 \neq 2.5	<math><mrow><mn>2.5</mn><mo>≠</mo><mn>2.5</mn></mrow></math>	2.5 != 2.5	2.5 <> 2.5	false	2.5 != 2.5	=2.5<>2.5	2.5 ≠ 2.5
-'world'=="world"	'world'="world"	["'world'","\"world\"","="]	\text{'world'} = \text{"world"}	<math><mrow><mtext>'world'</mtext><mo>=</mo><mtext>"world"</mtext></mrow></math>	"world" == "world"	'world' = 'world'	true	"world" == "world"	="world"="world"	'world' = "world"
-"test123"	"test123"	["\"test123\""]	\text{"test123"}	<math><mtext>"test123"</mtext></math>	"test123"	'test123'	test123	"test123"	="test123"	"test123"
 
 # String Comparisons (True Cases)
 "apple"=="apple"	"apple"="apple"	["\"apple\"","\"apple\"","="]	\text{"apple"} = \text{"apple"}	<math><mrow><mtext>"apple"</mtext><mo>=</mo><mtext>"apple"</mtext></mrow></math>	"apple" == "apple"	'apple' = 'apple'	true	"apple" == "apple"	="apple"="apple"	"apple" = "apple"
@@ -60,6 +65,7 @@ Input	Clean	Postfix	Latex	MathML	JavaScript	SQL	Evaluated	Python	Excel	Text
 "xyz">"abc"	"xyz">"abc"	["\"xyz\"","\"abc\"",">"]	\text{"xyz"} > \text{"abc"}	<math><mrow><mtext>"xyz"</mtext><mo>&gt;</mo><mtext>"abc"</mtext></mrow></math>	"xyz" > "abc"	'xyz' > 'abc'	true	"xyz" > "abc"	="xyz">"abc"	"xyz" > "abc"
 "same">="same"	"same"≥"same"	["\"same\"","\"same\"","≥"]	\text{"same"} \geq \text{"same"}	<math><mrow><mtext>"same"</mtext><mo>≥</mo><mtext>"same"</mtext></mrow></math>	"same" >= "same"	'same' >= 'same'	true	"same" >= "same"	="same">="same"	"same" ≥ "same"
 "hello"<="world"	"hello"≤"world"	["\"hello\"","\"world\"","≤"]	\text{"hello"} \leq \text{"world"}	<math><mrow><mtext>"hello"</mtext><mo>≤</mo><mtext>"world"</mtext></mrow></math>	"hello" <= "world"	'hello' <= 'world'	true	"hello" <= "world"	="hello"<="world"	"hello" ≤ "world"
+'world'=="world"	'world'="world"	["'world'","\"world\"","="]	\text{'world'} = \text{"world"}	<math><mrow><mtext>'world'</mtext><mo>=</mo><mtext>"world"</mtext></mrow></math>	"world" == "world"	'world' = 'world'	true	"world" == "world"	="world"="world"	'world' = "world"
 
 # String Comparisons (False Cases)
 "apple"=="orange"	"apple"="orange"	["\"apple\"","\"orange\"","="]	\text{"apple"} = \text{"orange"}	<math><mrow><mtext>"apple"</mtext><mo>=</mo><mtext>"orange"</mtext></mrow></math>	"apple" == "orange"	'apple' = 'orange'	false	"apple" == "orange"	="apple"="orange"	"apple" = "orange"
@@ -84,6 +90,7 @@ false||false	false||false	["false","false","|"]	\mathrm{false} \lor \mathrm{fals
 !true	!true	["true","\\not"]	\neg \mathrm{true}	<math><mrow><mo>¬</mo><mi>true</mi></mrow></math>	!true	NOT TRUE	false	not True	=NOT(TRUE)	¬true
 (5<3)&&(2>4)	(5<3)&(2>4)	["5","3","<","2","4",">","&"]	5 < 3 \land 2 > 4	<math><mrow><mrow><mn>5</mn><mo>&lt;</mo><mn>3</mn></mrow><mo>∧</mo><mrow><mn>2</mn><mo>&gt;</mo><mn>4</mn></mrow></mrow></math>	(5 < 3 && 2 > 4)	(5 < 3 AND 2 > 4)	false	(5 < 3 and 2 > 4)	=AND(5<3, 2>4)	5 < 3 ∧ 2 > 4
 (1==2)&&(3==3)	(1=2)&(3=3)	["1","2","=","3","3","=","&"]	1 = 2 \land 3 = 3	<math><mrow><mrow><mn>1</mn><mo>=</mo><mn>2</mn></mrow><mo>∧</mo><mrow><mn>3</mn><mo>=</mo><mn>3</mn></mrow></mrow></math>	(1 == 2 && 3 == 3)	(1 = 2 AND 3 = 3)	false	(1 == 2 and 3 == 3)	=AND(1=2, 3=3)	1 = 2 ∧ 3 = 3
+!(3>2||4<5)	!(3>2||4<5)	["3","2",">","4","5","<","|","\\not"]	\neg \left(3 > 2 \lor 4 < 5\right)	<math><mrow><mo>¬</mo><mrow><mo>(</mo><mrow><mrow><mn>3</mn><mo>&gt;</mo><mn>2</mn></mrow><mo>∨</mo><mrow><mn>4</mn><mo>&lt;</mo><mn>5</mn></mrow></mrow><mo>)</mo></mrow></mrow></math>	!(3 > 2 || 4 < 5)	NOT ((3 > 2 OR 4 < 5))	false	not (3 > 2 or 4 < 5)	=NOT(OR(3>2, 4<5))	¬(3 > 2 ∨ 4 < 5)
 
 # Mathematical Functions
 abs(-5)	abs(-5)	["-5","abs"]	\left|-5\right|	<math><mrow><mo>|</mo><mn>-5</mn><mo>|</mo></mrow></math>	Math.abs(-5)	ABS(-5)	5	abs(-5)	=ABS(-5)	|-5|
@@ -94,12 +101,21 @@ round(3.7)	round(3.7)	["3.7","0","round"]	\text{round}\left(3.7, 0\right)	<math>
 round(3.2)	round(3.2)	["3.2","0","round"]	\text{round}\left(3.2, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>3.2</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Math.round(3.2)	ROUND(CAST(3.2 AS NUMERIC), 0)	3	math.floor(3.2 + 0.5)	=ROUND(3.2, 0)	round(3.2, 0)
 floor(3.9)	floor(3.9)	["3.9","floor"]	\lfloor 3.9 \rfloor	<math><mrow><mo>⌊</mo><mn>3.9</mn><mo>⌋</mo></mrow></math>	Math.floor(3.9)	FLOOR(3.9)	3	math.floor(3.9)	=INT(3.9)	⌊3.9⌋
 ceil(3.1)	ceil(3.1)	["3.1","ceil"]	\lceil 3.1 \rceil	<math><mrow><mo>⌈</mo><mn>3.1</mn><mo>⌉</mo></mrow></math>	Math.ceil(3.1)	CEIL(3.1)	4	math.ceil(3.1)	=-INT(-3.1)	⌈3.1⌉
+7!	7!	["7","!"]	7!	<math><mrow><mn>7</mn><mo>!</mo></mrow></math>	7 * 6 * 5 * 4 * 3 * 2 * 1	FACTORIAL(7)	5040	7 * 6 * 5 * 4 * 3 * 2 * 1	=FACT(7)	7!
+!7!	!7!	["7","!","\\not"]	\neg 7!	<math><mrow><mo>¬</mo><mrow><mn>7</mn><mo>!</mo></mrow></mrow></math>	!(7 * 6 * 5 * 4 * 3 * 2 * 1)	NOT FACTORIAL(7)	false	not (7 * 6 * 5 * 4 * 3 * 2 * 1)	=NOT(FACT(7))	¬7!
+Abs(2)	abs(2)	["2","abs"]	\left|2\right|	<math><mrow><mo>|</mo><mn>2</mn><mo>|</mo></mrow></math>	Math.abs(2)	ABS(2)	2	abs(2)	=ABS(2)	|2|
+|-2|	|-2|	["-2","abs"]	\left|-2\right|	<math><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></math>	Math.abs(-2)	ABS(-2)	2	abs(-2)	=ABS(-2)	|-2|
 
 # Mathematical Functions with Multiple Arguments
 max(5,3,8)	max(5,3,8)	["5","3","8","3","max"]	\max\left(5, 3, 8\right)	<math><mrow><mi>max</mi><mo>(</mo><mn>5</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>8</mn><mo>)</mo></mrow></math>	Math.max(5, 3, 8)	GREATEST(5, 3, 8)	8	max(5, 3, 8)	=MAX(5, 3, 8)	max(5, 3, 8)
 min(5,3,8)	min(5,3,8)	["5","3","8","3","min"]	\min\left(5, 3, 8\right)	<math><mrow><mi>min</mi><mo>(</mo><mn>5</mn><mo>,</mo><mn>3</mn><mo>,</mo><mn>8</mn><mo>)</mo></mrow></math>	Math.min(5, 3, 8)	LEAST(5, 3, 8)	3	min(5, 3, 8)	=MIN(5, 3, 8)	min(5, 3, 8)
 max(1.5,2.3,1.1)	max(1.5,2.3,1.1)	["1.5","2.3","1.1","3","max"]	\max\left(1.5, 2.3, 1.1\right)	<math><mrow><mi>max</mi><mo>(</mo><mn>1.5</mn><mo>,</mo><mn>2.3</mn><mo>,</mo><mn>1.1</mn><mo>)</mo></mrow></math>	Math.max(1.5, 2.3, 1.1)	GREATEST(1.5, 2.3, 1.1)	2.3	max(1.5, 2.3, 1.1)	=MAX(1.5, 2.3, 1.1)	max(1.5, 2.3, 1.1)
 min(1.5,2.3,1.1)	min(1.5,2.3,1.1)	["1.5","2.3","1.1","3","min"]	\min\left(1.5, 2.3, 1.1\right)	<math><mrow><mi>min</mi><mo>(</mo><mn>1.5</mn><mo>,</mo><mn>2.3</mn><mo>,</mo><mn>1.1</mn><mo>)</mo></mrow></math>	Math.min(1.5, 2.3, 1.1)	LEAST(1.5, 2.3, 1.1)	1.1	min(1.5, 2.3, 1.1)	=MIN(1.5, 2.3, 1.1)	min(1.5, 2.3, 1.1)
+Sum(1,2,3)	sum(1,2,3)	["1","2","3","3","sum"]	1 + 2 + 3	<math><mrow><mn>1</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn></mrow></math>	1 + 2 + 3	1 + 2 + 3	6	1 + 2 + 3	=1+2+3	1 + 2 + 3
+Prod(1,2,3)	prod(1,2,3)	["1","2","3","3","prod"]	1 \cdot 2 \cdot 3	<math><mrow><mn>1</mn><mo>⋅</mo><mn>2</mn><mo>⋅</mo><mn>3</mn></mrow></math>	1 * 2 * 3	1 * 2 * 3	6	1 * 2 * 3	=1*2*3	1 * 2 * 3
+Gcd(1,2,3)	gcd(1,2,3)	["1","2","3","3","gcd"]	\gcd\left(1, 2, 3\right)	<math><mrow><mi>gcd</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((args)=>{let gcd = function(a,b) { return (!b)?a:gcd(b,a%b); }; return Math.abs(args.reduce(gcd));})([1, 2, 3])	GCD(GCD(1, 2), 3)		math.gcd(1, 2, 3)	=GCD(1, 2, 3)	gcd(1, 2, 3)
+Avg(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3.0)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
+Mean(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3.0)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
 
 # Complex Expressions
 (2+3)*4	(2+3)*4	["2","3","+","4","*"]	\left(2 + 3\right) \cdot 4	<math><mrow><mrow><mo>(</mo><mrow><mn>2</mn><mo>+</mo><mn>3</mn></mrow><mo>)</mo></mrow><mo>⋅</mo><mn>4</mn></mrow></math>	(2 + 3) * 4	(2 + 3) * 4	20	(2 + 3) * 4	=(2+3)*4	(2 + 3) * 4
@@ -114,6 +130,8 @@ sqrt(3^2+4^2)	sqrt(3^{2}+4^{2})	["3","2","^","4","2","^","+","sqrt"]	\sqrt{3^2 +
 -0	-0	["-0"]	-0	<math><mn>-0</mn></math>	-0	-0	-0	-0	=-0	-0
 true	true	["true"]	\mathrm{true}	<math><mi>true</mi></math>	true	TRUE	true	True	=TRUE	true
 false	false	["false"]	\mathrm{false}	<math><mi>false</mi></math>	false	FALSE	false	False	=FALSE	false
+pi	pi	["pi"]	\pi	<math><mi>π</mi></math>	Math.PI	PI()	3.141592653589793	math.pi	=PI()	π
+e	e	["e"]	e	<math><mi>e</mi></math>	Math.E	EXP(1)	2.718281828459045	math.e	=EXP(1)	e
 
 # Division and Modulo Edge Cases
 5/0	5/0	["5","0","/"]	\frac{5}{0}	<math><mfrac><mn>5</mn><mn>0</mn></mfrac></math>	5 / 0	5.0 / 0	Infinity	5 / 0	=5/0	5 / 0
@@ -129,14 +147,15 @@ false	false	["false"]	\mathrm{false}	<math><mi>false</mi></math>	false	FALSE	fal
 -2^2	-2^{2}	["2","2","^","neg"]	-2^2	<math><mrow><mo>−</mo><msup><mn>2</mn><mn>2</mn></msup></mrow></math>	-(Math.pow(2, 2))	-POWER(2, 2)	-4	-(2 ** 2)	=-(2^2)	-2^2
 (-2)^3	(-2)^{3}	["-2","3","^"]	\left(-2\right)^3	<math><msup><mrow><mo>(</mo><mn>-2</mn><mo>)</mo></mrow><mn>3</mn></msup></math>	Math.pow((-2), 3)	POWER(-2, 3)	-8	(-2) ** 3	=(-2)^3	(-2)^3
 2^(-1)	2^(-1)	["2","-1","^"]	2^{-1}	<math><msup><mn>2</mn><mn>-1</mn></msup></math>	Math.pow(2, -1)	POWER(2, -1)	0.5	2 ** -1	=2^(-1)	2^-1
-pi	pi	["pi"]	\pi	<math><mi>π</mi></math>	Math.PI	PI()	3.141592653589793	math.pi	=PI()	π
-e	e	["e"]	e	<math><mi>e</mi></math>	Math.E	EXP(1)	2.718281828459045	math.e	=EXP(1)	e
+(-2)^2	(-2)^{2}	["-2","2","^"]			Math.pow((-2), 2)	POWER(-2, 2)	4	(-2) ** 2	=(-2)^2	(-2)^2
+2^2	2^{2}	["2","2","^"]	2^2	<math><msup><mn>2</mn><mn>2</mn></msup></math>	Math.pow(2, 2)	POWER(2, 2)		2 ** 2	=2^2	2^2
+2^{2}	2^{2}	["2","2","^"]	2^2	<math><msup><mn>2</mn><mn>2</mn></msup></math>	Math.pow(2, 2)	POWER(2, 2)		2 ** 2	=2^2	2^2
 
-# Mixed Type Comparisons
-1==true	1=true	["1","true","="]	1 = \mathrm{true}	<math><mrow><mn>1</mn><mo>=</mo><mi>true</mi></mrow></math>	1 == true	1 = TRUE	true	1 == True	=1=TRUE	1 = true
-0==false	0=false	["0","false","="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 == false	0 = FALSE	true	0 == False	=0=FALSE	0 = false
-"1"==1	"1"=1	["\"1\"","1","="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" == 1	'1' = 1	true	"1" == 1	="1"=1	"1" = 1
-""==0	""=0	["\"\"","0","="]	\text{""} = 0	<math><mrow><mtext>""</mtext><mo>=</mo><mn>0</mn></mrow></math>	"" == 0	'' = 0	true	"" == 0	=""=0	"" = 0
+# Mixed Type Comparisons: only JavaScript's loose == converts a number, text or true/false into another kind, so the other code outputs refuse = between literals of two kinds by name; === between them is false in every language (Nov 2026)
+1==true	1=true	["1","true","="]	1 = \mathrm{true}	<math><mrow><mn>1</mn><mo>=</mo><mi>true</mi></mrow></math>	1 == true	ERROR: No SQL for = between a number and true or false	true	ERROR: No Python for = between a number and true or false	ERROR: No spreadsheet formula for = between a number and true or false	1 = true
+0==false	0=false	["0","false","="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 == false	ERROR: No SQL for = between a number and true or false	true	ERROR: No Python for = between a number and true or false	ERROR: No spreadsheet formula for = between a number and true or false	0 = false
+"1"==1	"1"=1	["\"1\"","1","="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" == 1	ERROR: No SQL for = between text and a number	true	ERROR: No Python for = between text and a number	ERROR: No spreadsheet formula for = between text and a number	"1" = 1
+""==0	""=0	["\"\"","0","="]	\text{""} = 0	<math><mrow><mtext>""</mtext><mo>=</mo><mn>0</mn></mrow></math>	"" == 0	ERROR: No SQL for = between text and a number	true	ERROR: No Python for = between text and a number	ERROR: No spreadsheet formula for = between text and a number	"" = 0
 
 # Parentheses Grouping
 (1+2)	(1+2)	["1","2","+"]	1 + 2	<math><mrow><mn>1</mn><mo>+</mo><mn>2</mn></mrow></math>	1 + 2	1 + 2	3	1 + 2	=1+2	1 + 2
@@ -148,51 +167,27 @@ e	e	["e"]	e	<math><mi>e</mi></math>	Math.E	EXP(1)	2.718281828459045	math.e	=EXP(
 0.1+0.1+0.1	0.1+0.1+0.1	["0.1","0.1","+","0.1","+"]	0.1 + 0.1 + 0.1	<math><mrow><mrow><mn>0.1</mn><mo>+</mo><mn>0.1</mn></mrow><mo>+</mo><mn>0.1</mn></mrow></math>	0.1 + 0.1 + 0.1	0.1 + 0.1 + 0.1	0.30000000000000004	0.1 + 0.1 + 0.1	=0.1+0.1+0.1	0.1 + 0.1 + 0.1
 1.0-0.9	1.0-0.9	["1.0","0.9","-"]	1.0 - 0.9	<math><mrow><mn>1.0</mn><mo>−</mo><mn>0.9</mn></mrow></math>	1.0 - 0.9	1.0 - 0.9	0.09999999999999998	1.0 - 0.9	=1.0-0.9	1.0 - 0.9
 0.3*3	0.3*3	["0.3","3","*"]	0.3 \cdot 3	<math><mrow><mn>0.3</mn><mo>⋅</mo><mn>3</mn></mrow></math>	0.3 * 3	0.3 * 3	0.8999999999999999	0.3 * 3	=0.3*3	0.3 * 3
-2<1?1:0	2<1?(1)?:0	["2","1","<","1","0","?:"]	\begin{cases}1 & \text{if } 2 < 1 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>2</mn><mo>&lt;</mo><mn>1</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(2 < 1 ? 1 : 0)	CASE WHEN 2 < 1 THEN 1 ELSE 0 END	0	(1 if 2 < 1 else 0)	=IF(2<1, 1, 0)	2 < 1 ? 1 : 0
-true?"yes":"no"	true?("yes")?:"no"	["true","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{true} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>true</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(true ? "yes" : "no")	CASE WHEN TRUE THEN 'yes' ELSE 'no' END	yes	("yes" if True else "no")	=IF(TRUE, "yes", "no")	true ? "yes" : "no"
-false?"yes":"no"	false?("yes")?:"no"	["false","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{false} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>false</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(false ? "yes" : "no")	CASE WHEN FALSE THEN 'yes' ELSE 'no' END	no	("yes" if False else "no")	=IF(FALSE, "yes", "no")	false ? "yes" : "no"
-"1"===1	"1"===1	["\"1\"","1","==="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" === 1	'1' = 1	false	"1" == 1	="1"=1	"1" === 1
-0===false	0===false	["0","false","==="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 === false	0 = FALSE	false	0 == False	=0=FALSE	0 === false
-+7+(+8)*+9	+7+(+8)*+9	["7","8","9","*","+"]	7 + 8 \cdot 9	<math><mrow><mn>7</mn><mo>+</mo><mrow><mn>8</mn><mo>⋅</mo><mn>9</mn></mrow></mrow></math>	7 + 8 * 9	7 + 8 * 9	79	7 + 8 * 9	=7+8*9	7 + 8 * 9
-7!	7!	["7","!"]	7!	<math><mrow><mn>7</mn><mo>!</mo></mrow></math>	7 * 6 * 5 * 4 * 3 * 2 * 1	FACTORIAL(7)	5040	7 * 6 * 5 * 4 * 3 * 2 * 1	=FACT(7)	7!
-!7!	!7!	["7","!","\\not"]	\neg 7!	<math><mrow><mo>¬</mo><mrow><mn>7</mn><mo>!</mo></mrow></mrow></math>	!(7 * 6 * 5 * 4 * 3 * 2 * 1)	NOT FACTORIAL(7)	false	not (7 * 6 * 5 * 4 * 3 * 2 * 1)	=NOT(FACT(7))	¬7!
-
-# Conditional Expressions (Ternary)
-5>3?1:0	5>3?(1)?:0	["5","3",">","1","0","?:"]	\begin{cases}1 & \text{if } 5 > 3 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>5</mn><mo>&gt;</mo><mn>3</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(5 > 3 ? 1 : 0)	CASE WHEN 5 > 3 THEN 1 ELSE 0 END	1	(1 if 5 > 3 else 0)	=IF(5>3, 1, 0)	5 > 3 ? 1 : 0
-"true"===true	"true"===true	["\"true\"","true","==="]	\text{"true"} = \mathrm{true}	<math><mrow><mtext>"true"</mtext><mo>=</mo><mi>true</mi></mrow></math>	"true" === true	'true' = TRUE	false	"true" == True	="true"=TRUE	"true" === true
-true===true	true===true	["true","true","==="]	\mathrm{true} = \mathrm{true}	<math><mrow><mi>true</mi><mo>=</mo><mi>true</mi></mrow></math>	true === true	TRUE = TRUE	true	True == True	=TRUE=TRUE	true === true
-Abs(2)	abs(2)	["2","abs"]	\left|2\right|	<math><mrow><mo>|</mo><mn>2</mn><mo>|</mo></mrow></math>	Math.abs(2)	ABS(2)	2	abs(2)	=ABS(2)	|2|
-|-2|	|-2|	["-2","abs"]	\left|-2\right|	<math><mrow><mo>|</mo><mn>-2</mn><mo>|</mo></mrow></math>	Math.abs(-2)	ABS(-2)	2	abs(-2)	=ABS(-2)	|-2|
-2 in {1,2,3}	2∈{1,2,3}	["2","1","2","3","3","{}","∈"]	2 \in \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	[1, 2, 3].includes(2)	2 IN (1, 2, 3)	true	2 in {1, 2, 3}	=OR(2=1, 2=2, 2=3)	2 ∈ {1, 2, 3}
-2 in (1,3)	2∈(1,3)	["2","1","3","2","()","∈"]	2 \in (1, 3)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></mrow></math>	(2 > 1 && 2 < 3)	(2 > 1 AND 2 < 3)	true	(2 > 1 and 2 < 3)	=AND(2>1, 2<3)	2 ∈ (1, 3)
-2 in (1,2]	2∈(1,2]	["2","1","2","2","(]","∈"]	2 \in (1, 2]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow></mrow></math>	(2 > 1 && 2 <= 2)	(2 > 1 AND 2 <= 2)	true	(2 > 1 and 2 <= 2)	=AND(2>1, 2<=2)	2 ∈ (1, 2]
-2 in [3,5]	2∈[3,5]	["2","3","5","2","[]","∈"]	2 \in [3, 5]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></math>	(2 >= 3 && 2 <= 5)	(2 >= 3 AND 2 <= 5)	false	(2 >= 3 and 2 <= 5)	=AND(2>=3, 2<=5)	2 ∈ [3, 5]
-2 in [1,2)	2∈[1,2)	["2","1","2","2","[)","∈"]	2 \in [1, 2)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></mrow></math>	(2 >= 1 && 2 < 2)	(2 >= 1 AND 2 < 2)	false	(2 >= 1 and 2 < 2)	=AND(2>=1, 2<2)	2 ∈ [1, 2)
-2 not in {1,2,3}	2∉{1,2,3}	["2","1","2","3","3","{}","∉"]	2 \notin \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∉</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	![1, 2, 3].includes(2)	2 NOT IN (1, 2, 3)	false	2 not in {1, 2, 3}	=NOT(OR(2=1, 2=2, 2=3))	2 ∉ {1, 2, 3}
-Sum(1,2,3)	sum(1,2,3)	["1","2","3","3","sum"]	1 + 2 + 3	<math><mrow><mn>1</mn><mo>+</mo><mn>2</mn><mo>+</mo><mn>3</mn></mrow></math>	1 + 2 + 3	1 + 2 + 3	6	1 + 2 + 3	=1+2+3	1 + 2 + 3
-Prod(1,2,3)	prod(1,2,3)	["1","2","3","3","prod"]	1 \cdot 2 \cdot 3	<math><mrow><mn>1</mn><mo>⋅</mo><mn>2</mn><mo>⋅</mo><mn>3</mn></mrow></math>	1 * 2 * 3	1 * 2 * 3	6	1 * 2 * 3	=1*2*3	1 * 2 * 3
-Gcd(1,2,3)	gcd(1,2,3)	["1","2","3","3","gcd"]	\gcd\left(1, 2, 3\right)	<math><mrow><mi>gcd</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((args)=>{let gcd = function(a,b) { return (!b)?a:gcd(b,a%b); }; return Math.abs(args.reduce(gcd));})([1, 2, 3])	GCD(1, 2, 3)		math.gcd(1, 2, 3)	=GCD(1, 2, 3)	gcd(1, 2, 3)
-Avg(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3.0)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
-Mean(1,2,3)	mean(1,2,3)	["1","2","3","3","mean"]	\frac{1 + 2 + 3}{3}	<math><mrow><mi>mean</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	((1 + 2 + 3) / 3)	((1 + 2 + 3) / 3.0)	2	((1 + 2 + 3) / 3)	=AVERAGE(1, 2, 3)	mean(1, 2, 3)
-!(3>2||4<5)	!(3>2||4<5)	["3","2",">","4","5","<","|","\\not"]	\neg \left(3 > 2 \lor 4 < 5\right)	<math><mrow><mo>¬</mo><mrow><mo>(</mo><mrow><mrow><mn>3</mn><mo>&gt;</mo><mn>2</mn></mrow><mo>∨</mo><mrow><mn>4</mn><mo>&lt;</mo><mn>5</mn></mrow></mrow><mo>)</mo></mrow></mrow></math>	!(3 > 2 || 4 < 5)	NOT ((3 > 2 OR 4 < 5))	false	not (3 > 2 or 4 < 5)	=NOT(OR(3>2, 4<5))	¬(3 > 2 ∨ 4 < 5)
-(-2)^2	(-2)^{2}	["-2","2","^"]			Math.pow((-2), 2)	POWER(-2, 2)	4	(-2) ** 2	=(-2)^2	(-2)^2
-+7	+7	["7"]			7	7	7	7	=7	7
 
 # String Operations
 "hello"	"hello"	["\"hello\""]			"hello"	'hello'	"hello"	"hello"	="hello"	"hello"
 'world'	'world'	["'world'"]			"world"	'world'	"world"	"world"	="world"	'world'
 "a"+"b"	"a"+"b"	["\"a\"","\"b\"","+"]			"a" + "b"	'a' || 'b'	"ab"	"a" + "b"	="a"&"b"	"a" + "b"
 ""	""	["\"\""]			""	''	""	""	=""	""
+"test123"	"test123"	["\"test123\""]	\text{"test123"}	<math><mtext>"test123"</mtext></math>	"test123"	'test123'	test123	"test123"	="test123"	"test123"
 
 # Variable-like identifiers
 x	x	["x"]			x	x		x	=x	x
 y	y	["y"]			y	y		y	=y	y
 
 # Strict Equality Comparisons
-1===true	1===true	["1","true","==="]			1 === true	1 = TRUE	false	1 == True	=1=TRUE	1 === true
-""===0	""===0	["\"\"","0","==="]			"" === 0	'' = 0	false	"" == 0	=""=0	"" === 0
+1===true	1===true	["1","true","==="]			1 === true	FALSE	false	False	=FALSE	1 === true
+""===0	""===0	["\"\"","0","==="]			"" === 0	FALSE	false	False	=FALSE	"" === 0
 1===1	1===1	["1","1","==="]			1 === 1	1 = 1	true	1 == 1	=1=1	1 === 1
 "abc"==="abc"	"abc"==="abc"	["\"abc\"","\"abc\"","==="]			"abc" === "abc"	'abc' = 'abc'	true	"abc" == "abc"	="abc"="abc"	"abc" === "abc"
+"1"===1	"1"===1	["\"1\"","1","==="]	\text{"1"} = 1	<math><mrow><mtext>"1"</mtext><mo>=</mo><mn>1</mn></mrow></math>	"1" === 1	FALSE	false	False	=FALSE	"1" === 1
+0===false	0===false	["0","false","==="]	0 = \mathrm{false}	<math><mrow><mn>0</mn><mo>=</mo><mi>false</mi></mrow></math>	0 === false	FALSE	false	False	=FALSE	0 === false
+"true"===true	"true"===true	["\"true\"","true","==="]	\text{"true"} = \mathrm{true}	<math><mrow><mtext>"true"</mtext><mo>=</mo><mi>true</mi></mrow></math>	"true" === true	FALSE	false	False	=FALSE	"true" === true
+true===true	true===true	["true","true","==="]	\mathrm{true} = \mathrm{true}	<math><mrow><mi>true</mi><mo>=</mo><mi>true</mi></mrow></math>	true === true	TRUE = TRUE	true	True == True	=TRUE=TRUE	true === true
 
 # String Concatenation
 "Hello "+"World"	"Hello "+"World"	["\"Hello \"","\"World\"","+"]			"Hello " + "World"	'Hello ' || 'World'	"Hello World"	"Hello " + "World"	="Hello "&"World"	"Hello " + "World"
@@ -206,6 +201,10 @@ false?1:0	false?(1)?:0	["false","1","0","?:"]			(false ? 1 : 0)	CASE WHEN FALSE 
 2<1?10:20	2<1?(10)?:20	["2","1","<","10","20","?:"]			(2 < 1 ? 10 : 20)	CASE WHEN 2 < 1 THEN 10 ELSE 20 END	20	(10 if 2 < 1 else 20)	=IF(2<1, 10, 20)	2 < 1 ? 10 : 20
 1===1?"yes":"no"	1===1?("yes")?:"no"	["1","1","===","\"yes\"","\"no\"","?:"]			(1 === 1 ? "yes" : "no")	CASE WHEN 1 = 1 THEN 'yes' ELSE 'no' END	"yes"	("yes" if 1 == 1 else "no")	=IF(1=1, "yes", "no")	1 === 1 ? "yes" : "no"
 1===2?"yes":"no"	1===2?("yes")?:"no"	["1","2","===","\"yes\"","\"no\"","?:"]			(1 === 2 ? "yes" : "no")	CASE WHEN 1 = 2 THEN 'yes' ELSE 'no' END	"no"	("yes" if 1 == 2 else "no")	=IF(1=2, "yes", "no")	1 === 2 ? "yes" : "no"
+2<1?1:0	2<1?(1)?:0	["2","1","<","1","0","?:"]	\begin{cases}1 & \text{if } 2 < 1 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>2</mn><mo>&lt;</mo><mn>1</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(2 < 1 ? 1 : 0)	CASE WHEN 2 < 1 THEN 1 ELSE 0 END	0	(1 if 2 < 1 else 0)	=IF(2<1, 1, 0)	2 < 1 ? 1 : 0
+true?"yes":"no"	true?("yes")?:"no"	["true","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{true} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>true</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(true ? "yes" : "no")	CASE WHEN TRUE THEN 'yes' ELSE 'no' END	yes	("yes" if True else "no")	=IF(TRUE, "yes", "no")	true ? "yes" : "no"
+false?"yes":"no"	false?("yes")?:"no"	["false","\"yes\"","\"no\"","?:"]	\begin{cases}\text{"yes"} & \text{if } \mathrm{false} \\ \text{"no"} & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mtext>"yes"</mtext></mtd><mtd><mrow><mtext>if&#160;</mtext><mi>false</mi></mrow></mtd></mtr><mtr><mtd><mtext>"no"</mtext></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(false ? "yes" : "no")	CASE WHEN FALSE THEN 'yes' ELSE 'no' END	no	("yes" if False else "no")	=IF(FALSE, "yes", "no")	false ? "yes" : "no"
+5>3?1:0	5>3?(1)?:0	["5","3",">","1","0","?:"]	\begin{cases}1 & \text{if } 5 > 3 \\ 0 & \text{otherwise} \end{cases}	<math><mrow><mo>{</mo><mtable columnalign="left left"><mtr><mtd><mn>1</mn></mtd><mtd><mrow><mtext>if&#160;</mtext><mrow><mn>5</mn><mo>&gt;</mo><mn>3</mn></mrow></mrow></mtd></mtr><mtr><mtd><mn>0</mn></mtd><mtd><mtext>otherwise</mtext></mtd></mtr></mtable></mrow></math>	(5 > 3 ? 1 : 0)	CASE WHEN 5 > 3 THEN 1 ELSE 0 END	1	(1 if 5 > 3 else 0)	=IF(5>3, 1, 0)	5 > 3 ? 1 : 0
 
 # Fixed decimals: round, then exactly that many (a text)
 fixed(2.5, 3)	fixed(2.5,3)	["2.5","3","fixed"]	\text{fixed}\left(2.5, 3\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>2.5</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	Number(2.5).toFixed(3)	ROUND(CAST(2.5 AS NUMERIC), 3)	"2.500"	format(math.floor(2.5 * 10 ** 3 + 0.5) / 10 ** 3, ".3f")	=FIXED(2.5, 3)	fixed(2.5, 3)
@@ -213,8 +212,87 @@ fixed(3.14159, 2)	fixed(3.14159,2)	["3.14159","2","fixed"]	\text{fixed}\left(3.1
 fixed(1/3, 4)	fixed(1/3,4)	["1","3","/","4","fixed"]	\text{fixed}\left(\frac{1}{3}, 4\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mfrac><mn>1</mn><mn>3</mn></mfrac><mo>,</mo><mn>4</mn><mo>)</mo></mrow></math>	Number(1 / 3).toFixed(4)	ROUND(CAST(1.0 / 3 AS NUMERIC), 4)	"0.3333"	format((math.floor((1 / 3) * 10 ** 4 + 0.5) if (1 / 3) >= 0 else -math.floor(-(1 / 3) * 10 ** 4 + 0.5)) / 10 ** 4, ".4f")	=FIXED(1/3, 4)	fixed(1 / 3, 4)
 fixed(-2.5, 0)	fixed(-2.5,0)	["-2.5","0","fixed"]	\text{fixed}\left(-2.5, 0\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>-2.5</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Number(-2.5).toFixed(0)	ROUND(CAST(-2.5 AS NUMERIC), 0)	"-3"	format((math.floor((-2.5) + 0.5) if (-2.5) >= 0 else -math.floor(-(-2.5) + 0.5)), ".0f")	=FIXED(-2.5, 0)	fixed(-2.5, 0)
 fixed(2.5)	fixed(2.5)	["2.5","2","fixed"]	\text{fixed}\left(2.5, 2\right)	<math><mrow><mi>fixed</mi><mo>(</mo><mn>2.5</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></math>	Number(2.5).toFixed(2)	ROUND(CAST(2.5 AS NUMERIC), 2)	"2.50"	format(math.floor(2.5 * 10 ** 2 + 0.5) / 10 ** 2, ".2f")	=FIXED(2.5, 2)	fixed(2.5, 2)
-# matrices (Nov 2026): pmatrix, bmatrix, vmatrix keep their brackets; each argument is a row. JavaScript has no det(): a caller supplies one
-\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}		["1","2","2","[]","3","4","2","[]","2","pmatrix"]	\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}		[[1, 2], [3, 4]]	ARRAY[ARRAY[1, 2], ARRAY[3, 4]]		[[1, 2], [3, 4]]	={1,2;3,4}	pmatrix([1, 2], [3, 4])	
-\begin{bmatrix} a & b \\ c & d \end{bmatrix}		["a","b","2","[]","c","d","2","[]","2","bmatrix"]	\begin{bmatrix}a & b \\ c & d\end{bmatrix}		[[a, b], [c, d]]	ARRAY[ARRAY[a, b], ARRAY[c, d]]		[[a, b], [c, d]]	ERROR	bmatrix([a, b], [c, d])	
-\begin{vmatrix} 1 & 2 \\ 3 & 4 \end{vmatrix}		["1","2","2","[]","3","4","2","[]","2","vmatrix"]	\begin{vmatrix}1 & 2 \\ 3 & 4\end{vmatrix}		((m) => { const a = m.map((r) => r.slice()); const n = a.length; let d = 1; for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(a[r][i]) > Math.abs(a[p][i])) p = r; if (a[p][i] === 0) return 0; if (p !== i) { const t = a[p]; a[p] = a[i]; a[i] = t; d = -d; } d *= a[i][i]; for (let r = i + 1; r < n; r++) { const f = a[r][i] / a[i][i]; for (let c = i; c < n; c++) a[r][c] -= f * a[i][c]; } } return d; })([[1, 2], [3, 4]])	ERROR		np.linalg.det([[1, 2], [3, 4]])	=MDETERM({1,2;3,4})	vmatrix([1, 2], [3, 4])	
-bmatrix([1, 2], [3, 4]) * bmatrix(x, y)		["1","2","2","[]","3","4","2","[]","2","bmatrix","x","y","2","bmatrix","*"]	\begin{bmatrix}1 & 2 \\ 3 & 4\end{bmatrix}\begin{bmatrix}x \\ y\end{bmatrix}		[[1, 2], [3, 4]] * [[x], [y]]	ARRAY[ARRAY[1, 2], ARRAY[3, 4]] * ARRAY[ARRAY[x], ARRAY[y]]		[[1, 2], [3, 4]] * [[x], [y]]	ERROR	bmatrix([1, 2], [3, 4]) * bmatrix([x], [y])	
+
+# Named functions in any capitals (Sum, Avg, Log, Abs, Gcd, Round …) and the spellings of their arguments
+Log(2)	log_{e}(2)	["2","ln"]	\ln\left(2\right)	<math><mrow><mi>ln</mi><mo>(</mo><mn>2</mn><mo>)</mo></mrow></math>	Math.log(2)	LN(2)	0.6931471805599453	math.log(2)	=LN(2)	ln(2)
+Log[2](4)	log_[2](4)	["2","4","log"]	\log_{2}\left(4\right)		(Math.log(4) / Math.log(2))	LOG(2, 4)	2	(math.log(4) / math.log(2))	=LOG(4, 2)	log_2(4)
+Sqrt(2)	sqrt(2)	["2","sqrt"]	\sqrt{2}	<math><msqrt><mn>2</mn></msqrt></math>	Math.sqrt(2)	SQRT(2)	1.4142135623730951	math.sqrt(2)	=SQRT(2)	√(2)
+Abs(-2)	abs(-2)	["-2","abs"]			Math.abs(-2)	ABS(-2)	2	abs(-2)	=ABS(-2)	|-2|
+Floor(2.7)	floor(2.7)	["2.7","floor"]			Math.floor(2.7)	FLOOR(2.7)	2	math.floor(2.7)	=INT(2.7)	⌊2.7⌋
+2 mod 3	2 mod 3	["2","3","mod"]			2 % 3	MOD(2, 3)	2	2 % 3	=MOD(2, 3)	2 mod 3
+Mean(2,4,6)	mean(2,4,6)	["2","4","6","3","mean"]			((2 + 4 + 6) / 3)	((2 + 4 + 6) / 3.0)	4	((2 + 4 + 6) / 3)	=AVERAGE(2, 4, 6)	mean(2, 4, 6)
+\log{2}	log_{e}{2}	["2","ln"]	\ln\left(2\right)		Math.log(2)	LN(2)		math.log(2)	=LN(2)	ln(2)
+Ln(2)	log_{e}(2)	["2","ln"]	\ln\left(2\right)		Math.log(2)	LN(2)		math.log(2)	=LN(2)	ln(2)
+Sqrt{2}	sqrt{2}	["2","sqrt"]	\sqrt{2}	<math><msqrt><mn>2</mn></msqrt></math>	Math.sqrt(2)	SQRT(2)		math.sqrt(2)	=SQRT(2)	√(2)
+Max(1,2,3)	max(1,2,3)	["1","2","3","3","max"]	\max\left(1, 2, 3\right)	<math><mrow><mi>max</mi><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></math>	Math.max(1, 2, 3)	GREATEST(1, 2, 3)		max(1, 2, 3)	=MAX(1, 2, 3)	max(1, 2, 3)
+Min(1,2,3)	min(1,2,3)	["1","2","3","3","min"]	\min\left(1, 2, 3\right)		Math.min(1, 2, 3)	LEAST(1, 2, 3)		min(1, 2, 3)	=MIN(1, 2, 3)	min(1, 2, 3)
+Floor(2)	floor(2)	["2","floor"]	\lfloor 2 \rfloor	<math><mrow><mo>⌊</mo><mn>2</mn><mo>⌋</mo></mrow></math>	Math.floor(2)	FLOOR(2)		math.floor(2)	=INT(2)	⌊2⌋
+Ceil(2)	ceil(2)	["2","ceil"]	\lceil 2 \rceil	<math><mrow><mo>⌈</mo><mn>2</mn><mo>⌉</mo></mrow></math>	Math.ceil(2)	CEIL(2)		math.ceil(2)	=-INT(-2)	⌈2⌉
+Round(2)	round(2)	["2","0","round"]	\text{round}\left(2, 0\right)	<math><mrow><mi>round</mi><mo>(</mo><mn>2</mn><mo>,</mo><mn>0</mn><mo>)</mo></mrow></math>	Math.round(2)	ROUND(CAST(2 AS NUMERIC), 0)		math.floor(2 + 0.5)	=ROUND(2, 0)	round(2, 0)
+2 mod 2	2 mod 2	["2","2","mod"]	2 \bmod 2	<math><mrow><mn>2</mn><mo>mod</mo><mn>2</mn></mrow></math>	2 % 2	MOD(2, 2)		2 % 2	=MOD(2, 2)	2 mod 2
+2 % 2	2%2	["2","2","mod"]	2 \bmod 2	<math><mrow><mn>2</mn><mo>mod</mo><mn>2</mn></mrow></math>	2 % 2	MOD(2, 2)		2 % 2	=MOD(2, 2)	2 mod 2
+|2|	|2|	["2","abs"]	\left|2\right|	<math><mrow><mo>|</mo><mn>2</mn><mo>|</mo></mrow></math>	Math.abs(2)	ABS(2)		abs(2)	=ABS(2)	|2|
+Max{1,2,3}	max{1,2,3}		\max\left(1, 2, 3\right)			GREATEST(1, 2, 3)		max(1, 2, 3)	=MAX(1, 2, 3)	max(1, 2, 3)
+\log_2(2)	log_{2}(2)		\log_{2}\left(2\right)			LOG(2, 2)		(math.log(2) / math.log(2))	=LOG(2, 2)	log_2(2)
+max(1,2,3)	max(1,2,3)	["1","2","3","3","max"]	\max\left(1, 2, 3\right)			GREATEST(1, 2, 3)		max(1, 2, 3)	=MAX(1, 2, 3)	max(1, 2, 3)
+
+# Comparisons and logic between numbers (and, or, xor, nand, nor in every spelling)
+2>2	2>2	["2","2",">"]	2 > 2	<math><mrow><mn>2</mn><mo>&gt;</mo><mn>2</mn></mrow></math>	2 > 2	2 > 2		2 > 2	=2>2	2 > 2
+2<2	2<2	["2","2","<"]	2 < 2	<math><mrow><mn>2</mn><mo>&lt;</mo><mn>2</mn></mrow></math>	2 < 2	2 < 2		2 < 2	=2<2	2 < 2
+2=2	2=2	["2","2","="]	2 = 2	<math><mrow><mn>2</mn><mo>=</mo><mn>2</mn></mrow></math>	2 == 2	2 = 2		2 == 2	=2=2	2 = 2
+2 == 2	2=2	["2","2","="]	2 = 2	<math><mrow><mn>2</mn><mo>=</mo><mn>2</mn></mrow></math>	2 == 2	2 = 2		2 == 2	=2=2	2 = 2
+2 != 2	2≠2	["2","2","≠"]	2 \neq 2	<math><mrow><mn>2</mn><mo>≠</mo><mn>2</mn></mrow></math>	2 != 2	2 <> 2		2 != 2	=2<>2	2 ≠ 2
+2 >= 2	2≥2	["2","2","≥"]	2 \geq 2	<math><mrow><mn>2</mn><mo>≥</mo><mn>2</mn></mrow></math>	2 >= 2	2 >= 2		2 >= 2	=2>=2	2 ≥ 2
+2<=2	2≤2	["2","2","≤"]	2 \leq 2	<math><mrow><mn>2</mn><mo>≤</mo><mn>2</mn></mrow></math>	2 <= 2	2 <= 2		2 <= 2	=2<=2	2 ≤ 2
+2 and 2	2&2	["2","2","&"]	2 \land 2	<math><mrow><mn>2</mn><mo>∧</mo><mn>2</mn></mrow></math>	(2 && 2)	(2 AND 2)		(2 and 2)	=AND(2, 2)	2 ∧ 2
+2 && 2	2&2	["2","2","&"]	2 \land 2	<math><mrow><mn>2</mn><mo>∧</mo><mn>2</mn></mrow></math>	(2 && 2)	(2 AND 2)		(2 and 2)	=AND(2, 2)	2 ∧ 2
+2 & 2	2&2	["2","2","&"]	2 \land 2	<math><mrow><mn>2</mn><mo>∧</mo><mn>2</mn></mrow></math>	(2 && 2)	(2 AND 2)		(2 and 2)	=AND(2, 2)	2 ∧ 2
+2 or 2	2∨2	["2","2","|"]	2 \lor 2	<math><mrow><mn>2</mn><mo>∨</mo><mn>2</mn></mrow></math>	(2 || 2)	(2 OR 2)		(2 or 2)	=OR(2, 2)	2 ∨ 2
+2 || 2	2||2	["2","2","|"]	2 \lor 2	<math><mrow><mn>2</mn><mo>∨</mo><mn>2</mn></mrow></math>	(2 || 2)	(2 OR 2)		(2 or 2)	=OR(2, 2)	2 ∨ 2
+2 | 2	2|2	["2","2","|"]	2 \lor 2	<math><mrow><mn>2</mn><mo>∨</mo><mn>2</mn></mrow></math>	(2 || 2)	(2 OR 2)		(2 or 2)	=OR(2, 2)	2 ∨ 2
+2 and not 2	2& \not 2	["2","2","\\not","&"]	2 \land \neg 2	<math><mrow><mn>2</mn><mo>∧</mo><mrow><mo>¬</mo><mn>2</mn></mrow></mrow></math>	(2 && !2)	(2 AND NOT 2)		(2 and not 2)	=AND(2, NOT(2))	2 ∧ ¬2
+Not 2	\not 2	["2","\\not"]	\neg 2	<math><mrow><mo>¬</mo><mn>2</mn></mrow></math>	!2	NOT 2		not 2	=NOT(2)	¬2
+2 xor 2	2 \xor 2	["2","2","\\xor"]	2 \oplus 2	<math><mrow><mn>2</mn><mo>⊕</mo><mn>2</mn></mrow></math>	(!(2) !== !(2))	((2 AND NOT (2)) OR (NOT (2) AND 2))		((not (2)) != (not (2)))	=(NOT(2)<>NOT(2))	2 ⊕ 2
+2 nand 2	2 \nand 2	["2","2","\\nand"]	2 \barwedge 2	<math><mrow><mn>2</mn><mo>↑</mo><mn>2</mn></mrow></math>	!(2 && 2)	NOT (2 AND 2)		not (2 and 2)	=NOT(AND(2, 2))	2 ↑ 2
+2 nor 2	2 \nor 2	["2","2","\\nor"]	2 \downarrow 2	<math><mrow><mn>2</mn><mo>↓</mo><mn>2</mn></mrow></math>	!(2 || 2)	NOT (2 OR 2)		not (2 or 2)	=NOT(OR(2, 2))	2 ↓ 2
+2!=2	2≠2		2 \neq 2			2 <> 2		2 != 2	=2<>2	2 ≠ 2
+2>=2	2≥2		2 \geq 2			2 >= 2		2 >= 2	=2>=2	2 ≥ 2
+
+# Sets, intervals and membership (∈ and ∉ in every spelling)
+2 in {1,2,3}	2∈{1,2,3}	["2","1","2","3","3","{}","∈"]	2 \in \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	[1, 2, 3].includes(2)	2 IN (1, 2, 3)	true	2 in {1, 2, 3}	=OR(2=1, 2=2, 2=3)	2 ∈ {1, 2, 3}
+2 in (1,3)	2∈(1,3)	["2","1","3","2","()","∈"]	2 \in (1, 3)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>3</mn><mo>)</mo></mrow></mrow></math>	(2 > 1 && 2 < 3)	(2 > 1 AND 2 < 3)	true	(2 > 1 and 2 < 3)	=AND(2>1, 2<3)	2 ∈ (1, 3)
+2 in (1,2]	2∈(1,2]	["2","1","2","2","(]","∈"]	2 \in (1, 2]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>(</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>]</mo></mrow></mrow></math>	(2 > 1 && 2 <= 2)	(2 > 1 AND 2 <= 2)	true	(2 > 1 and 2 <= 2)	=AND(2>1, 2<=2)	2 ∈ (1, 2]
+2 in [3,5]	2∈[3,5]	["2","3","5","2","[]","∈"]	2 \in [3, 5]	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>3</mn><mo>,</mo><mn>5</mn><mo>]</mo></mrow></mrow></math>	(2 >= 3 && 2 <= 5)	(2 >= 3 AND 2 <= 5)	false	(2 >= 3 and 2 <= 5)	=AND(2>=3, 2<=5)	2 ∈ [3, 5]
+2 in [1,2)	2∈[1,2)	["2","1","2","2","[)","∈"]	2 \in [1, 2)	<math><mrow><mn>2</mn><mo>∈</mo><mrow><mo>[</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>)</mo></mrow></mrow></math>	(2 >= 1 && 2 < 2)	(2 >= 1 AND 2 < 2)	false	(2 >= 1 and 2 < 2)	=AND(2>=1, 2<2)	2 ∈ [1, 2)
+2 not in {1,2,3}	2∉{1,2,3}	["2","1","2","3","3","{}","∉"]	2 \notin \{1, 2, 3\}	<math><mrow><mn>2</mn><mo>∉</mo><mrow><mo>{</mo><mn>1</mn><mo>,</mo><mn>2</mn><mo>,</mo><mn>3</mn><mo>}</mo></mrow></mrow></math>	![1, 2, 3].includes(2)	2 NOT IN (1, 2, 3)	false	2 not in {1, 2, 3}	=NOT(OR(2=1, 2=2, 2=3))	2 ∉ {1, 2, 3}
+2 in (2,2)	2∈(2,2)	["2","2","2","2","()","∈"]	2 \in (2, 2)		(2 > 2 && 2 < 2)	(2 > 2 AND 2 < 2)		(2 > 2 and 2 < 2)	=AND(2>2, 2<2)	2 ∈ (2, 2)
+2 in (2,2]	2∈(2,2]	["2","2","2","2","(]","∈"]	2 \in (2, 2]		(2 > 2 && 2 <= 2)	(2 > 2 AND 2 <= 2)		(2 > 2 and 2 <= 2)	=AND(2>2, 2<=2)	2 ∈ (2, 2]
+2 in [2,2]	2∈[2,2]	["2","2","2","2","[]","∈"]	2 \in [2, 2]		(2 >= 2 && 2 <= 2)	(2 >= 2 AND 2 <= 2)		(2 >= 2 and 2 <= 2)	=AND(2>=2, 2<=2)	2 ∈ [2, 2]
+2 in [2,2)	2∈[2,2)	["2","2","2","2","[)","∈"]	2 \in [2, 2)		(2 >= 2 && 2 < 2)	(2 >= 2 AND 2 < 2)		(2 >= 2 and 2 < 2)	=AND(2>=2, 2<2)	2 ∈ [2, 2)
+2 in {2}	2∈{2}		2 \in \{2\}		[2].includes(2)	2 IN (2)		2 in {2}	=OR(2=2)	2 ∈ {2}
+x ∉ {1, 2, 3}		["x","1","2","3","3","{}","∉"]	x \notin \{1, 2, 3\}		![1, 2, 3].includes(x)	(x IN (1, 2, 3)) IS NOT TRUE		x not in {1, 2, 3}	=NOT(OR(x=1, x=2, x=3))	x ∉ {1, 2, 3}
+x \notin \{1, 2, 3\}		["x","1","2","3","3","{}","∉"]	x \notin \{1, 2, 3\}		![1, 2, 3].includes(x)	(x IN (1, 2, 3)) IS NOT TRUE		x not in {1, 2, 3}	=NOT(OR(x=1, x=2, x=3))	x ∉ {1, 2, 3}
+x \not\in A		["x","A","∉"]	x \notin A		!A.includes(x)	(x IN (A)) IS NOT TRUE		x not in A	ERROR: No spreadsheet formula for ∈ A	x ∉ A
+x not in {1,2,3}		["x","1","2","3","3","{}","∉"]	x \notin \{1, 2, 3\}		![1, 2, 3].includes(x)	(x IN (1, 2, 3)) IS NOT TRUE		x not in {1, 2, 3}	=NOT(OR(x=1, x=2, x=3))	x ∉ {1, 2, 3}
+x Not In {1,2,3}		["x","1","2","3","3","{}","∉"]	x \notin \{1, 2, 3\}		![1, 2, 3].includes(x)	(x IN (1, 2, 3)) IS NOT TRUE		x not in {1, 2, 3}	=NOT(OR(x=1, x=2, x=3))	x ∉ {1, 2, 3}
+5 not in {1,2,3}		["5","1","2","3","3","{}","∉"]	5 \notin \{1, 2, 3\}		![1, 2, 3].includes(5)	5 NOT IN (1, 2, 3)	true	5 not in {1, 2, 3}	=NOT(OR(5=1, 5=2, 5=3))	5 ∉ {1, 2, 3}
+x \notin [0, 1]		["x","0","1","2","[]","∉"]	x \notin [0, 1]		!(x >= 0 && x <= 1)	NOT (x >= 0 AND x <= 1)		not (x >= 0 and x <= 1)	=NOT(AND(x>=0, x<=1))	x ∉ [0, 1]
+x ∉ (0, 1]		["x","0","1","2","(]","∉"]	x \notin (0, 1]		!(x > 0 && x <= 1)	NOT (x > 0 AND x <= 1)		not (x > 0 and x <= 1)	=NOT(AND(x>0, x<=1))	x ∉ (0, 1]
+0.5 ∉ [0, 1)		["0.5","0","1","2","[)","∉"]	0.5 \notin [0, 1)		!(0.5 >= 0 && 0.5 < 1)	NOT (0.5 >= 0 AND 0.5 < 1)	false	not (0.5 >= 0 and 0.5 < 1)	=NOT(AND(0.5>=0, 0.5<1))	0.5 ∉ [0, 1)
+x ∉ S		["x","S","∉"]	x \notin S		!S.includes(x)	(x IN (S)) IS NOT TRUE		x not in S	ERROR: No spreadsheet formula for ∈ S	x ∉ S
+x \notin \mathbb{R}		["x","ℝ","∉"]	x \notin \mathbb{R}		!(Number.isFinite(x))	NOT (ABS(x) < 'Infinity')		not (math.isfinite(x))	=NOT(ISNUMBER(x))	x ∉ ℝ
+x ∈ {1, 2}		["x","1","2","2","{}","∈"]	x \in \{1, 2\}		[1, 2].includes(x)	(x IN (1, 2)) IS TRUE		x in {1, 2}	=OR(x=1, x=2)	x ∈ {1, 2}
+x in S		["x","S","∈"]	x \in S		S.includes(x)	(x IN (S)) IS TRUE		x in S	ERROR: No spreadsheet formula for ∈ S	x ∈ S
+2 ∈ (2, 3]		["2","2","3","2","(]","∈"]	2 \in (2, 3]		(2 > 2 && 2 <= 3)	(2 > 2 AND 2 <= 3)	false	(2 > 2 and 2 <= 3)	=AND(2>2, 2<=3)	2 ∈ (2, 3]
+x \in \mathbb{R}		["x","ℝ","∈"]	x \in \mathbb{R}		Number.isFinite(x)	(ABS(x) < 'Infinity')		math.isfinite(x)	=ISNUMBER(x)	x ∈ ℝ
+(x+1) ∉ {0}		["x","1","+","0","1","{}","∉"]	x + 1 \notin \{0\}		![0].includes(x + 1)	(x + 1 IN (0)) IS NOT TRUE		x + 1 not in {0}	=NOT(OR(x+1=0))	x + 1 ∉ {0}
+2 ∈ \mathbb{Z}		["2","ℤ","∈"]	2 \in \mathbb{Z}		Number.isInteger(2)	(2 = TRUNC(2))	true	float(2).is_integer()	=2=INT(2)	2 ∈ ℤ
+2.5 \in \mathbb{Z}		["2.5","ℤ","∈"]	2.5 \in \mathbb{Z}		Number.isInteger(2.5)	(2.5 = TRUNC(2.5))	false	float(2.5).is_integer()	=2.5=INT(2.5)	2.5 ∈ ℤ
+\sqrt{2} \notin \mathbb{Q}		["2","sqrt","ℚ","∉"]	\sqrt{2} \notin \mathbb{Q}		ERROR: No JavaScript for ∈ ℚ	ERROR: No SQL for ∈ ℚ		ERROR: No Python for ∈ ℚ	ERROR: No spreadsheet formula for ∈ ℚ	√(2) ∉ ℚ
+
+# Matrices: pmatrix, bmatrix, vmatrix keep their brackets; each argument is a row. JavaScript's determinant and matrix product are inline helpers (js-helpers.js), Python's numpy (np.linalg.det, np.dot); SQL has neither
+\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}		["1","2","2","[]","3","4","2","[]","2","pmatrix"]	\begin{pmatrix}1 & 2 \\ 3 & 4\end{pmatrix}		[[1, 2], [3, 4]]	ARRAY[ARRAY[1, 2], ARRAY[3, 4]]		[[1, 2], [3, 4]]	={1,2;3,4}	pmatrix([1, 2], [3, 4])
+\begin{bmatrix} a & b \\ c & d \end{bmatrix}		["a","b","2","[]","c","d","2","[]","2","bmatrix"]	\begin{bmatrix}a & b \\ c & d\end{bmatrix}		[[a, b], [c, d]]	ARRAY[ARRAY[a, b], ARRAY[c, d]]		[[a, b], [c, d]]	ERROR: No spreadsheet formula for a matrix of anything but numbers	bmatrix([a, b], [c, d])
+\begin{vmatrix} 1 & 2 \\ 3 & 4 \end{vmatrix}		["1","2","2","[]","3","4","2","[]","2","vmatrix"]	\begin{vmatrix}1 & 2 \\ 3 & 4\end{vmatrix}		((m) => { const a = m.map((r) => r.slice()); const n = a.length; let d = 1; for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(a[r][i]) > Math.abs(a[p][i])) p = r; if (a[p][i] === 0) return 0; if (p !== i) { const t = a[p]; a[p] = a[i]; a[i] = t; d = -d; } d *= a[i][i]; for (let r = i + 1; r < n; r++) { const f = a[r][i] / a[i][i]; for (let c = i; c < n; c++) a[r][c] -= f * a[i][c]; } } return d; })([[1, 2], [3, 4]])	ERROR: No SQL for a determinant		np.linalg.det([[1, 2], [3, 4]])	=MDETERM({1,2;3,4})	vmatrix([1, 2], [3, 4])
+bmatrix([1, 2], [3, 4]) * bmatrix(x, y)		["1","2","2","[]","3","4","2","[]","2","bmatrix","x","y","2","bmatrix","*"]	\begin{bmatrix}1 & 2 \\ 3 & 4\end{bmatrix}\begin{bmatrix}x \\ y\end{bmatrix}		((a, b) => { const L = Array.isArray; const m = (v) => L(v) && v.length > 0 && v.every((r) => L(r) && r.length > 0 && r.length === v[0].length && !r.some(L)) && (v.length > 1 || v[0].length > 1); const l = (v) => L(v) && v.length > 0 && !v.some(L); const p = (A, B) => (A[0].length === B.length ? A.map((r) => B[0].map((_, j) => r.reduce((s, x, k) => s + x * B[k][j], 0))) : NaN); const e = (x, y) => (L(x) && L(y) ? (x.length === y.length ? x.map((t, i) => e(t, y[i])) : NaN) : L(x) ? x.map((t) => e(t, y)) : L(y) ? y.map((t) => e(x, t)) : x * y); if (m(a) && m(b)) return p(a, b); if (m(a) && l(b)) { const c = p(a, b.map((y) => [y])); return L(c) ? c.map((r) => r[0]) : c; } if (l(a) && m(b)) { const c = p([a], b); return L(c) ? c[0] : c; } return e(a, b); })([[1, 2], [3, 4]], [[x], [y]])	ERROR: No SQL for a matrix product		np.dot([[1, 2], [3, 4]], [[x], [y]])	ERROR: No spreadsheet formula for a matrix of anything but numbers	bmatrix([1, 2], [3, 4]) * bmatrix([x], [y])
+det([[1, 2], [3, 4]])		["1","2","2","[]","3","4","2","[]","2","[]","det"]	\det\left([[1, 2], [3, 4]]\right)						ERROR: No spreadsheet formula	det([[1, 2], [3, 4]])

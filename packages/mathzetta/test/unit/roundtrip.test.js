@@ -5,6 +5,7 @@
 // new one appears, and if a listed one starts working (then remove it).
 import { readFileSync, readdirSync } from 'node:fs';
 import { suite, test, eq } from '../harness.js';
+import { parseTable } from '../checks.js';
 import { parse, parseTree, evaluate, walk, toLaTeX, toText, toJavaScript, toPython, toSQL, toGLSL, toExcel } from '../../src/all.js';
 
 const FORMATS = {
@@ -24,26 +25,27 @@ const EVERY = Object.keys(FORMATS);
 const BUT = (...not) => EVERY.filter((f) => !not.includes(f));
 /** [inputs, formats, why]: what doesn't come back the same, and why that is all right. */
 const KNOWN = [
-    [['"1"===1', '0===false', '1===true', '""===0'], BUT('javascript', 'text'),
-        "JavaScript's strict equality; every other language writes plain ="],
+    // since 2026-11-22 Python, numpy, SymPy and SQL write a strict comparison of a number with a true or false (or a
+    // text) as its answer, FALSE (GLSL too), and a plain = between them is false in evaluate too; LaTeX still differs
+    [['0===false', '1===true'], ['latex'],
+        "JavaScript's strict equality; these languages write plain ="],
+    [['"1"===1', '""===0'], ['latex'],
+        "the same, with text (SymPy and GLSL refuse text, so they aren't checked)"],
     [['Math.round(x/7,2)+math.round(x/7)+round(13.244,i)'], ['glsl'],
         'a digit count that is a variable: GLSL has no way to round to i places, so it rounds to whole numbers'],
     [['random()', '=RAND()'], EVERY, 'a random number: no one value to compare'],
-    [['A ∩ B', 'a ± b', '[1, 2]'], ['sql'], 'PostgreSQL arrays and set operations (ARRAY[…], INTERSECTION) are written but not read back'],
+    [['a ± b', '[1, 2]'], ['sql'], 'PostgreSQL arrays and set operations (ARRAY[…], INTERSECTION) are written but not read back'],
     [['fixed(2.5, 3)', 'fixed(3.14159, 2)', 'fixed(1/3, 4)', 'fixed(-2.5, 0)', 'fixed(2.5)', 'fixed(x, y)', 'fixed(x, 2)', '=FIXED(x, 1)'], ['python', 'numpy', 'sympy', 'sqlite'],
         "fixed's digit count sits inside a string ('.2f', '%.2f') the reader doesn't open; JavaScript, SQL, Excel and GLSL read back"],
     [['fixed(x, y)'], ['sql', 'glsl'],
         'read back as round(x, y): with a digit count that is not a whole number, fixed takes its whole part and round does not; GLSL (no text) has to ignore a non-literal count'],
-    [['sum(i^2-17,i=0,infinity)!=product(i^2-17,i\\in T)'], ['latex', 'text'], 'an infinite sum and a product over an unknown set T: no value to compare'],
     [['\\sin\\theta', 'r\\cos\\theta', '1 + \\tan^2\\theta = \\sec^2\\theta', '\\theta = \\tan^{-1}\\left(\\frac{y}{x}\\right)',
         '\\theta = \\arctan(y/x)', '\\alpha', 'ε^21', '\\Pi*\\gamma', '\\Delta x', '\\frac{\\Delta y}{\\Delta x}'], ['glsl'],
         'GLSL names have no Greek letters: θ is written theta, Δx delta_x — another variable when read back'],
-    [['\\sqrt{2} \\notin \\mathbb{Q}', 'x in sympy.Rationals', 'x in sympy.Complexes'], ['javascript', 'sql', 'sqlite', 'glsl'],
-        'ℚ has no test in code (a double is always a fraction): it is written as a set known by name'],
-    [['∞', 'Infinity + NaN', '(-\\infty, 0) \\cup (0,\\infty)'], ['sql'], "PostgreSQL's ∞ is the string 'Infinity'"],
-    [['[[1,2],[3,4]]*[[5,6],[7,8]]=[[17,23],[39,53]]'], ['sql'], 'PostgreSQL has no matrix product'],
-    [['\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}', '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}', 'bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['sql', 'glsl'],
-        'a matrix as a PostgreSQL array or a GLSL mat2 is written but not read back'],
+    [['∞', 'Infinity + NaN'], ['sql'], "PostgreSQL's ∞ is the string 'Infinity'"],
+    [['\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}', '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}'], ['sql'],
+        'a matrix as a PostgreSQL array is written but not read back (a GLSL mat2 is read back since 2026-11-22)'],
+    [['bmatrix([1, 2], [3, 4]) * bmatrix(x, y)'], ['glsl'], 'the same, in a product (PostgreSQL refuses a matrix product)'],
     [['[[1, 2], [3, 4]]'], ['sql'], 'a PostgreSQL array of arrays is written but not read back'],
     [['\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}', '\\begin{vmatrix} 1 & 2 \\\\ 3 & 4 \\end{vmatrix}'], ['excel'],
         "a spreadsheet's array constant {1,2;3,4} (and MDETERM) is written but not read back"],
@@ -57,18 +59,30 @@ for (const [inputs, formats] of KNOWN) for (const input of inputs) for (const f 
 const DIR = new URL('../cases/', import.meta.url);
 const inputs = new Set();
 for (const file of readdirSync(DIR).filter((f) => f.endsWith('.tsv'))) {
-    for (const line of readFileSync(new URL(file, DIR), 'utf8').split('\n').slice(1)) {
-        const input = line.split('\t')[0]?.trim();
+    // the tables' own reader: no comment lines, and the header row (the first) is not an input
+    for (const row of parseTable(readFileSync(new URL(file, DIR), 'utf8')).slice(1)) {
+        const input = row[0]?.trim();
         if (input) inputs.add(input);
     }
 }
 
 const VALUES = [0.7, 1.3, 2.1, 0.4, 1.9, 3.2, 0.6, 2.5];
 const CONSTANTS = new Set(['pi', 'e', 'tau', 'true', 'false', 'null', 'undefined']);
+/** One value read two ways: lists entry by entry, a true or false as 1 or 0 (code has no booleans), numbers within 1e-9. */
 const same = (a, b) => {
-    if (typeof a === 'boolean' || typeof b === 'boolean') return Number(a) === Number(b);
-    if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a) === JSON.stringify(b);
-    return (Number.isNaN(a) && Number.isNaN(b)) || a === b || Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a));
+    if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => same(v, b[i]));
+    if (typeof a === 'boolean' || typeof b === 'boolean') {
+        const truth = (v) => (typeof v === 'boolean' ? Number(v) : v === 0 || v === 1 ? v : NaN);
+        return truth(a) === truth(b);
+    }
+    if (typeof a === 'number' && typeof b === 'number') {
+        if (Number.isNaN(a) || Number.isNaN(b)) return Number.isNaN(a) && Number.isNaN(b);
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return a === b;
+        return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a));
+    }
+    // fixed() gives text ("2.50"); SQL and GLSL have no such text and write the rounded number: the same value
+    if (typeof a === 'string' && typeof b === 'number' && /^-?\d+(\.\d+)?$/.test(a)) return same(Number(a), b);
+    return a === b;
 };
 
 // a second pass with negative and whole values: mod, round, trunc and roots differ between languages there
@@ -77,7 +91,8 @@ const SIGNED = [-2, 3, -1.5, 4, -0.5, 2, -3, 1];
 suite('round trip: mathzetta reads what it writes', () => {
     const failures = Object.fromEntries(EVERY.map((f) => [f, []]));
     const counts = Object.fromEntries(EVERY.map((f) => [f, 0]));
-    const unexpectedPasses = new Set();
+    const knownFailed = new Set();    // listed exceptions that failed in some pass: still needed
+    const knownChecked = new Set();   // listed exceptions that were checked at all
     let checked = 0;
     for (const values of [VALUES, SIGNED]) {
         for (const input of inputs) {
@@ -103,14 +118,19 @@ suite('round trip: mathzetta reads what it writes', () => {
                 const expected = known.has(`${format}\t${input}`);
                 const where = values === VALUES ? '' : ' (negative and whole values)';
                 if (!ok && !expected) failures[format].push(`${input}  →  ${code}${where}`);
-                if (ok && expected && values === VALUES) unexpectedPasses.add(`${format}: ${input}`);
+                if (expected) knownChecked.add(`${format}\t${input}`);
+                if (!ok && expected) knownFailed.add(`${format}\t${input}`);
             }
         }
     }
     for (const format of EVERY) {
         test(`${format}: read back with the same value`, () => eq(failures[format], []));
     }
-    test('every listed exception still fails (remove the ones that work now)', () => eq([...unexpectedPasses], []));
+    // in either pass (whole and negative values too); a listed one that is never checked (no value, no code) is dead
+    test('every listed exception still fails (remove the ones that work now)', () => {
+        eq([...known.keys()].filter((k) => knownChecked.has(k) && !knownFailed.has(k)).map((k) => k.replace('\t', ': ')), [], 'pass now');
+        eq([...known.keys()].filter((k) => !knownChecked.has(k)).map((k) => k.replace('\t', ': ')), [], 'never checked');
+    });
     // each format on its own, near what it checks today: a writer that starts throwing (and is skipped) shows here
     test('the sweep covers the cases, in every format', () => {
         // on 2026-11-11: 2068 for most, sympy 1978, sql 2027, glsl 2013, sqlite 1905, excel 1965 (the rest have
@@ -120,51 +140,6 @@ suite('round trip: mathzetta reads what it writes', () => {
         eq(checked > 20000, true, `${checked} checks`);
         eq(EVERY.filter((f) => counts[f] < (FLOOR[f] ?? 2040)).map((f) => `${f}: ${counts[f]}`), []);
     });
-});
-
-suite('code people type', () => {
-    const cases = [
-        ['np.where(x > 0, 1/x, 0)', 'x 0 > 1 x / 0 ?:'],
-        ['1/x if x > 0 else 0', 'x 0 > 1 x / 0 ?:'],
-        ['a if p else b if q else c', 'p a q b c ?: ?:'],
-        ['np.maximum(a, b) + np.sqrt(np.abs(x))', 'a b 2 max x abs sqrt +'],
-        ['np.logical_and(x >= 0, np.logical_not(y))', 'x 0 ≥ y \\not &'],
-        ['np.isin(x, [1, 2])', 'x 1 2 2 {} ∈'],
-        ['[1, 2].includes(x) && !done', 'x 1 2 2 {} ∈ done \\not &'],
-        ['Number.isInteger(n)', 'n ℤ ∈'],
-        ['float(n).is_integer()', 'n ℤ ∈'],
-        ['math.isclose(a, b)', 'a b ≈'],
-        ['math.factorial(n) / math.factorial(n - k)', 'n ! n k - ! /'],
-        ['sum(i ** 2 for i in range(1, n + 1))', 'i 2 ^ i 1 = n 3 \\sumidx'],
-        ['scipy.integrate.quad(lambda t: t ** 2, 0, 1)[0]', 't 2 ^ t 0 1 4 int'],
-        ['True and not False', 'true false \\not &'],
-        ['x % (y + 1)', 'x y 1 + mod'],
-        ['Math.abs(x - 1) < 1e-9', 'x 1 - abs 1 10 -9 ^ * <'],
-        ['CASE WHEN x > 0 THEN 1 WHEN x < 0 THEN -1 ELSE 0 END', 'x 0 > 1 x 0 < -1 0 ?: ?:'],
-        ['POWER(x, 2) + GREATEST(a, b) + LOG(2, y) + PI()', 'x 2 ^ a b 2 max + 2 y log + pi +'],
-        ['x NOT IN (1, 2) AND y <> 3', 'x 1 2 2 {} ∉ y 3 ≠ &'],
-        ['mz_sq(x) + fract(y) + atan(y, x)', 'x 2 ^ y y floor - + y x atan2 +'],
-        ['\\begin{cases} x^2 & \\text{if } x \\ge 0 \\\\ -x & \\text{otherwise} \\end{cases}', 'x 0 ≥ x 2 ^ x neg ?:'],
-        ['\\text{round}\\left(x, 2\\right) + \\operatorname{atan2}(y, x)', 'x 2 round y x atan2 +'],
-        ['sympy.diff(x**3, x)', 'x 3 ^ x der'],
-        ['sympy.integrate(t**2, (t, 0, b))', 't 2 ^ t 0 b 4 int'],
-        ['sympy.integrate(sympy.sin(x), x)', 'x sin x 2 int'],
-        ['sympy.limit(1/x, x, 0, "+")', '1 x / x 0 "+" 4 lim'],
-        ['sympy.summation(i**2, (i, 1, n))', 'i 2 ^ i 1 = n 3 \\sumidx'],
-        ['sympy.Rational(1, 3) * x', '1 3 / x *'],
-        ['sympy.Piecewise((x**2, x > 0), (-x, True))', 'x 0 > x 2 ^ x neg ?:'],
-        ['sympy.Eq(y, sympy.sqrt(x))', 'y x sqrt ='],
-        ['sympy.Contains(x, sympy.Interval.Ropen(0, 1))', 'x 0 1 2 [) ∈'],
-        ['sympy.And(x > 0, sympy.Not(y)) + sympy.exp(x) + sympy.oo', 'x 0 > y \\not & e x ^ + ∞ +'],
-        ['=IF(B2>0, SQRT(B2), 0)', 'B2 0 > B2 sqrt 0 ?:'],
-        ['=SUM($D$2:$D$101) / COUNT(D2:D101)', 'D2:D101 1 sum D2:D101 1 \\:COUNT /'],
-        ['=-x^2 + 2^3^2', 'x neg 2 ^ 2 3 ^ 2 ^ +'],
-        ['=ATAN2(x, y) + LOG(x, 2) + _xlfn.CEILING.MATH(z)', 'y x atan2 2 x log + z ceil +'],
-        ['=AND(x>=0, OR(y<>1, NOT(z)))', 'x 0 ≥ y 1 ≠ z \\not | &'],
-    ];
-    for (const [code, postfix] of cases) {
-        test(code, () => eq(parse(code).join(' '), postfix));
-    }
 });
 
 // Text search ("ab" in name, startswith(name, "ab")) is written as inline helpers in JavaScript, Python and numpy:
@@ -178,7 +153,10 @@ suite('round trip: text search comes back from the code outputs', () => {
             for (const input of TEXT) {
                 const written = FORMATS[format](input);
                 const back = parse(written);
-                for (const scope of SCOPES) eq(Number(evaluate(back, scope)), Number(evaluate(input, scope)), `${input} → ${written} → ${back.join(' ')}`);
+                for (const scope of SCOPES) {
+                    const [got, want] = [evaluate(back, scope), evaluate(input, scope)];
+                    eq(same(got, want), true, `${input} → ${written} → ${back.join(' ')}: ${got}, not ${want}`);
+                }
             }
         });
     }

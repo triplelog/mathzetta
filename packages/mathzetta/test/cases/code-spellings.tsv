@@ -1,0 +1,100 @@
+# code-spellings.tsv — Code as people type it: spreadsheet formulas, SQL, numpy and math, SymPy, GLSL, and what MathZetta's own code outputs write — read back into math.
+# Columns: Input, Clean, Postfix, Latex. A blank cell is not checked; a # line is a note.
+Input	Clean	Postfix	Latex
+
+# Spreadsheet, SQL, numpy/math, SymPy and GLSL spellings that no other row uses
+=AND(a, b)	((a)&(b))	["a","b","&"]	a \land b
+=OR(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
+=NOT(a)	(!(a))	["a","\\not"]	\neg a
+=XOR(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
+=LOG(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
+=LOG(x, 2)	log_{2}(x)	["2","x","log"]	\log_{2}\left(x\right)
+=ATAN2(x, y)	atan2(y,x)	["y","x","atan2"]	\text{atan2}\left(y, x\right)
+=INT(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
+=FLOOR.MATH(x)	floor(x)	["x","floor"]	\lfloor x \rfloor
+=CEILING.MATH(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
+=CEILING(x)	ceil(x)	["x","ceil"]	\lceil x \rceil
+=FACT(5)	((5)!)	["5","!"]	5!
+=COMBIN(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+=PERMUT(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+=AVERAGE(a, b, c)	mean(a,b,c)	["a","b","c","3","mean"]	\frac{a + b + c}{3}
+=SUM(a, b, c)	sum(a,b,c)	["a","b","c","3","sum"]	a + b + c
+=PRODUCT(a, b, c)	prod(a,b,c)	["a","b","c","3","prod"]	a \cdot b \cdot c
+=MAX(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+=MIN(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
+=MEDIAN(a, b, c)	median(a,b,c)	["a","b","c","3","\\:median"]	\operatorname{median}\left(a, b, c\right)
+=STDEV.P(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
+=STDEVP(a, b, c)	stdev(a,b,c)	["a","b","c","3","\\:stdev"]	\operatorname{stdev}\left(a, b, c\right)
+=RAND()	random()	["random"]	\text{random}\left(\right)
+=ISNUMBER(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
+=LOG10(x)	log_{10}(x)	["10","x","log"]	\log_{10}\left(x\right)
+=FIXED(x, 1)	fixed(x,1)	["x","1","fixed"]	\text{fixed}\left(x, 1\right)
+=PI()	π	["pi"]	\pi
+=EXP(x)	e^(x)	["e","x","^"]	e^x
+=SQRT(x)	sqrt(x)	["x","sqrt"]	\sqrt{x}
+=ABS(x)	abs(x)	["x","abs"]	\left|x\right|
+=LN(x)	log_{e}(x)	["x","ln"]	\ln\left(x\right)
+=SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
+=ASIN(x)	arcsin(x)	["x","arcsin"]	\arcsin\left(x\right)
+=IF(x>0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+POWER(x, 2)	pow(x,2)	["x","2","^"]	x^2
+ROUND(x, 2)	round(x,2)	["x","2","round"]	\text{round}\left(x, 2\right)
+SIN(x)	sin(x)	["x","sin"]	\sin\left(x\right)
+SINH(x)	sinh(x)	["x","sinh"]	\sinh\left(x\right)
+COMB(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+TRUNC(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+GREATEST(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+LEAST(a, b)	min(a,b)	["a","b","2","min"]	\min\left(a, b\right)
+MOD(a, b)	((a) mod (b))	["a","b","mod"]	a \bmod b
+CASE WHEN x > 0 THEN 1 ELSE 0 END	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+np.maximum(a, b)	max(a,b)	["a","b","2","max"]	\max\left(a, b\right)
+np.nanmedian(x)	median(x)	["x","1","\\:median"]	\operatorname{median}\left(x\right)
+np.isfinite(x)	((x)∈ℝ)	["x","ℝ","∈"]	x \in \mathbb{R}
+np.logical_xor(a, b)	((a) \xor (b))	["a","b","\\xor"]	a \oplus b
+np.logical_and(a, b)	((a)&(b))	["a","b","&"]	a \land b
+np.logical_or(a, b)	((a)∨(b))	["a","b","|"]	a \lor b
+np.logical_not(a)	(!(a))	["a","\\not"]	\neg a
+np.where(x > 0, 1, 0)	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+np.isin(x, [1, 2])	((x)∈{1,2})	["x","1","2","2","{}","∈"]	x \in \{1, 2\}
+np.isclose(a, b)	((a)≈(b))	["a","b","≈"]	a \approx b
+np.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+Math.trunc(x)	((x)<0?((ceil(x)))?:floor(x))	["x","0","<","x","ceil","x","floor","?:"]	\begin{cases}\lceil x \rceil & \text{if } x < 0 \\ \lfloor x \rfloor & \text{otherwise} \end{cases}
+math.factorial(5)	((5)!)	["5","!"]	5!
+scipy.special.perm(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+scipy.special.comb(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+sympy.factorial(n)	((n)!)	["n","!"]	n!
+sympy.Rational(1, 3)	((1)/(3))	["1","3","/"]	\frac{1}{3}
+sympy.And(a, b)	((a)&(b))	["a","b","&"]	a \land b
+sympy.Nand(a, b)	((a) \nand (b))	["a","b","\\nand"]	a \barwedge b
+sympy.Nor(a, b)	((a) \nor (b))	["a","b","\\nor"]	a \downarrow b
+sympy.Piecewise((1, x > 0), (0, True))	((x>0)?((1))?:(0))	["x","0",">","1","0","?:"]	\begin{cases}1 & \text{if } x > 0 \\ 0 & \text{otherwise} \end{cases}
+sympy.Union(A, B)	((A)∪(B))	["A","B","∪"]	A \cup B
+sympy.summation(i**2, (i, 1, n))	(\sumidx_{i=1}^{n}(i^2))	["i","2","^","i","1","=","n","3","\\sumidx"]	\sum_{i = 1}^{n}{i^2}
+sympy.Interval.open(0, 1)	(0,1)	["0","1","2","()"]	(0, 1)
+sympy.Interval.Lopen(0, 1)	(0,1]	["0","1","2","(]"]	(0, 1]
+sympy.Interval.Ropen(0, 1)	[0,1)	["0","1","2","[)"]	[0, 1)
+sympy.Eq(a, b)	((a)=(b))	["a","b","="]	a = b
+sympy.Ne(a, b)	((a)≠(b))	["a","b","≠"]	a \neq b
+sympy.binomial(5, 2)	comb(5,2)	["5","2","comb"]	\binom{5}{2}
+sympy.ff(5, 2)	perm(5,2)	["5","2","perm"]	{}^{5}\mathrm{P}_{2}
+sympy.limit(sympy.sin(x)/x, x, 0)	lim(sin(x)/x,x,0)	["x","sin","x","/","x","0","3","lim"]	\lim_{x\to 0}{\frac{\sin\left(x\right)}{x}}
+sympy.integrate(x**2, (x, 0, 1))	int(x^2,x,0,1)	["x","2","^","x","0","1","4","int"]	\int_{0}^{1}{x^2}\mathrm{d}x
+x in sympy.Rationals	x∈ℚ	["x","ℚ","∈"]	x \in \mathbb{Q}
+x in sympy.Complexes	x∈ℂ	["x","ℂ","∈"]	x \in \mathbb{C}
+vec2(a, b)	(a,b)	["a","b","2","()"]	(a, b)
+vec3(r, g, b)	(r,g,b)	["r","g","b","3","()"]	(r, g, b)
+inversesqrt(x)	(1/sqrt(x))	["1","x","sqrt","/"]	\frac{1}{\sqrt{x}}
+fract(x)	((x)-floor(x))	["x","x","floor","-"]	x - \lfloor x \rfloor
+mz_sq(x)	((x)^{2})	["x","2","^"]	x^2
+mz_cube(x)	((x)^{3})	["x","3","^"]	x^3
+# The matrix product and = between lists as the code outputs write them, and GLSL logic between numbers
+=MMULT(A, B)		["A","B","*"]
+np.dot(A, B)		["A","B","*"]
+np.matmul(A, B)		["A","B","*"]
+np.multiply(a, b)		["a","b","*"]
+np.array_equal(A, B)		["A","B","="]
+mz_both(a, b)		["a","b","&"]
+mz_either(a, b)		["a","b","|"]
+mat2(1.0, 3.0, 2.0, 4.0)		["1.0","2.0","2","[]","3.0","4.0","2","[]","2","[]"]
+float(x > 0.5)		["x","0.5",">"]

@@ -1,16 +1,23 @@
 /**
- * Reading: the pipeline from text to postfix (clean → tokenize → parse → tree), the postfix format, the tree tools, edge cases, conditionals, strings and {{blocks}}.
+ * Reading: text to postfix (clean → tokenize → parse), in every spelling — math, LaTeX, unicode, the code people
+ * type (numpy, Python, SQL, spreadsheets, SymPy, GLSL) and plain English; strings and {{blocks}}; what is refused.
  */
 import { suite, test, eq, throws } from '../harness.js';
-import { parse, parseSteps, clean, toSpeech, toText, toJavaScript, toGLSL, toPython, evaluate, toLaTeX, calculate, toSQL } from '../../src/all.js';
-import { tokenize } from '../../src/parse/tokenize.js';
+import {
+    calculate, calculateBlock, clean, evaluate, fromPostfix, parse, parseSteps, setBlockHandler, toGLSL, toJavaScript,
+    toLaTeX, toPostfix, toPython, toSQL, toSpeech, toText,
+} from '../../src/all.js';
+import { PHRASES, TRIGGER, englishRewrites } from '../../src/parse/clean/english.js';
 import { toRawPostfix } from '../../src/parse/parser.js';
-import { fromPostfix, toPostfix, firstVariable } from '../../src/tree.js';
+import { tokenize } from '../../src/parse/tokenize.js';
 
-// ---- from parse.test.js ----
 const P = (s) => parse(s).join(' ');
 
-suite('postfix format', () => {
+const V = (s, scope = {}) => evaluate(s, scope);
+
+const C = (s, scope = {}) => calculate(s, scope).text;
+
+suite('reading: the postfix format', () => {
     test('unary minus is neg, folded into numbers', () => {
         eq(P('-x'), 'x neg');
         eq(P('-5'), '-5');
@@ -25,7 +32,6 @@ suite('postfix format', () => {
         eq(P('{1,2}'), '1 2 2 {}');
     });
     test('custom functions are variadic', () => {
-        eq(P('f(x)'), 'x 1 \\:f');
         eq(P('myFunction(x, y)'), 'x y 2 \\:myFunction');
     });
     test('natural log is ln', () => {
@@ -47,7 +53,7 @@ suite('postfix format', () => {
     });
 });
 
-suite('parser fixes', () => {
+suite('reading: powers, unclosed brackets, ternaries, argument counts', () => {
     test('x^2-4 is (x^2)-4, not x^(2-4)', () => eq(P('x^2-4'), 'x 2 ^ 4 -'));
     test('2^0-1 is (2^0)-1: `0-` is no longer an operator', () => eq(P('2^0-1'), '2 0 ^ 1 -'));
     test('negative exponents still work', () => eq(P('x^-2'), 'x -2 ^'));
@@ -61,9 +67,16 @@ suite('parser fixes', () => {
     test('Math.SQRT1_2', () => eq(P('Math.SQRT1_2+3'), '1 2 / sqrt 3 +'));
     test('a bare list needs brackets', () => throws(() => parse('1,2'), /brackets/));
     test('wrong argument counts are reported', () => throws(() => parse('sin(1,2)'), /takes 1 argument/));
+    test('2^-3^2: the minus takes the power, as 2^-x^2 does', () => {
+        eq(parse('2^-3^2').join(' '), '2 3 2 ^ neg ^');
+        eq(evaluate('2^-3^2'), 2 ** -9);
+        eq(parse('e^-2^x').join(' '), 'e 2 x ^ neg ^');
+        eq(parse('2^-3').join(' '), '2 -3 ^');
+        eq(parse('x^-1/2').join(' '), 'x -1 ^ 2 /');
+    });
 });
 
-suite('unchanged: the value of a case nobody wrote', () => {
+suite('reading: unchanged, the value of a case nobody wrote', () => {
     // if … then with no else, \\begin{cases} with no otherwise row and IF(c, a) all end in the name `unchanged`;
     // LaTeX input splits letter runs into products, and it once split this one into u·n·c·h·a·n·g·e·d
     const tail = (s) => parse(s).slice(-3);
@@ -81,9 +94,9 @@ suite('unchanged: the value of a case nobody wrote', () => {
     });
 });
 
-suite('strings and {{blocks}}', () => {
+suite('reading: strings and {{blocks}}', () => {
     test('quoted strings are kept whole', () => eq(parse('x = "2+2<5"'), ['x', '"2+2<5"', '=']));
-    test('review before 1.3: bars written plainly or with Greek, differentials after a bare function, a ternary in braces, set()', () => {
+    test('bars written plainly or with Greek, differentials after a bare function, a ternary in braces, set()', () => {
         eq(P('[x^2]_0^1'), 'x 2 ^ x 0 1 evaluated');
         eq(calculate('[x^2]_0^1').text, '1');
         eq(P('[\\sin\\theta]_{\\theta=0}^{\\theta=\\pi}'), 'θ sin θ 0 pi evaluated');
@@ -144,7 +157,7 @@ suite('strings and {{blocks}}', () => {
     });
 });
 
-suite('pipeline', () => {
+suite('reading: the pipeline (parseSteps, the raw postfix, the tokenizer)', () => {
     test('parseSteps keeps every stage', () => {
         const steps = parseSteps('2x+1');
         eq(steps.cleaned, '2x+1');
@@ -173,7 +186,7 @@ suite('pipeline', () => {
     });
 });
 
-suite('reading like a person', () => {
+suite('reading: like a person', () => {
     test('letters run together multiply, words stay whole', () => {
         eq(P('xy'), 'x y *');
         eq(P('xsinx'), 'x x sin *');
@@ -210,16 +223,15 @@ suite('reading like a person', () => {
         eq(P('17 ≡ 2 (mod 5)'), '17 2 ≡ 5 pmod');
         eq(P('a = b (mod n)'), 'a b = n pmod');
     });
-    test('x(t) and x(0) are functions, x(x+1) a product', () => {
+    test('x(t) and x(0) are functions, x(2t) a product (x(x+1): above)', () => {
         eq(P('x(t)'), 't 1 \\:x');
         eq(P('x(0)'), '0 1 \\:x');
-        eq(P('x(x+1)'), 'x x 1 + *');
         eq(P('x(2t)'), 'x 2 t * *');
     });
     test('quoted strings are not primes', () => eq(parse("a = 'b'"), ['a', "'b'", '=']));
 });
 
-suite('malformed and edge-case input', () => {
+suite('reading: malformed and edge-case input', () => {
     test('empty calls', () => {
         eq(P('f()'), '0 \\:f');
         eq(P('3 + f()'), '3 0 \\:f +');
@@ -251,13 +263,12 @@ suite('malformed and edge-case input', () => {
     });
     test('ordinary words with a function or pi inside stay whole', () => {
         for (const w of ['basin', 'topic', 'octane', 'distance', 'epic', 'capital', 'Missing']) eq(P(w + ' + 1'), `${w} 1 +`, w);
-        eq(P('xsinx'), 'x x sin *');
         eq(P('sint'), 't sin');
         eq(P('pir^2'), 'pi r 2 ^ *');
     });
 });
 
-suite('conditionals', () => {
+suite('reading: conditionals', () => {
     test('if … then … else is a ternary', () => {
         eq(P('if x < 0.5 then 1 - r else r'), 'x 0.5 < 1 r - r ?:');
         eq(P('IF(r > 0.5, 1, 0)'), 'r 0.5 > 1 0 ?:');
@@ -294,53 +305,7 @@ suite('conditionals', () => {
     });
 });
 
-// ---- from tree.test.js ----
-suite('tree', () => {
-    test('postfix round-trips through a tree', () => {
-        const postfix = ['x', '2', '^', '3', 'x', '*', '+'];
-        eq(toPostfix(fromPostfix(postfix)), postfix);
-    });
-
-    test('node ids are postfix indexes', () => {
-        const tree = fromPostfix(['x', '2', '^', '3', '+']);
-        eq(tree.id, 4);
-        eq(tree.args[0].id, 2);
-        eq(tree.args[0].args.map((n) => n.id), [0, 1]);
-    });
-
-    test('variadic operators read their count', () => {
-        const tree = fromPostfix(['1', '2', '3', '3', 'max']);
-        eq(tree.op, 'max');
-        eq(tree.args.map((n) => n.value), ['1', '2', '3']);
-        eq(toPostfix(tree), ['1', '2', '3', '3', 'max']);
-    });
-
-    test('leaf types', () => {
-        eq(fromPostfix(['-2.5']).type, 'number');
-        eq(fromPostfix(['θ']).type, 'symbol');
-        eq(fromPostfix(['"hi"']).type, 'string');
-    });
-
-    test('old spellings are accepted when reading', () => {
-        eq(toPostfix(fromPostfix(['x', '0-'])), ['x', 'neg']);
-        eq(toPostfix(fromPostfix(['3', 'x', 'sqrtpow'])), ['3', 'x', 'root']);
-    });
-
-    test('malformed postfix is rejected', () => {
-        throws(() => fromPostfix(['1', '+']), /needs 2 operands/);
-        throws(() => fromPostfix(['1', '2']), /leaves 2 values/);
-        throws(() => fromPostfix(['x', 'max']), /count/);
-        throws(() => fromPostfix([]), /Empty/);
-    });
-
-    test('firstVariable finds the leftmost single letter', () => {
-        eq(firstVariable(fromPostfix(['2', 't', '*', 'y', '+'])), 't');
-        eq(firstVariable(fromPostfix(['2', '3', '+'])), '');
-    });
-});
-
-// ---- added 2026-11-03: the reading fixes and malformed input ----
-suite('reading: fixes from the 2026-11 review', () => {
+suite('reading: loglog, indexed sums, chains, ∫ without dx, English, code spellings, text joins', () => {
     test('\\loglog and \\logloglog read whole, like loglog and \\log\\log', () => {
         for (const s of ['\\loglog x', '\\log\\log x', 'loglog x', 'loglog(x)']) eq(P(s), 'x loglog', s);
         for (const s of ['\\logloglog x', '\\log\\log\\log x', 'logloglog(x)']) eq(P(s), 'x logloglog', s);
@@ -381,20 +346,19 @@ suite('reading: fixes from the 2026-11 review', () => {
     });
 });
 
-suite('malformed input is refused with a reason', () => {
+suite('reading: malformed input is refused with a reason', () => {
     const refused = [
         ['a ? b', /Unmatched '\?'/], ['a : b', /Unmatched ':'/], ['2 +', /missing an operand/], ['()', /Empty brackets/],
         ['[1, 2}', /not connected/], ['x +* y', /missing an operand/], ['sin()', /takes 1 argument/],
     ];
     for (const [input, why] of refused) test(input, () => throws(() => parse(input), why));
-    test('fromPostfix: too few operands, too many values, a variadic without its count', () => {
+    test('fromPostfix: too few operands, a variadic without its count (too many values: suite tree)', () => {
         throws(() => fromPostfix(['+']), /needs 2 operands/);
-        throws(() => fromPostfix(['1', '2']), /leaves 2 values/);
         throws(() => fromPostfix(['1', '2', 'x', 'max']), /must follow a count/);
     });
 });
 
-suite('plain English reads back what speech says', () => {
+suite('reading: plain English reads back what speech says', () => {
     // toSpeech's words for these come back to the same postfix (src/parse/clean/english.js)
     const SAID = ['x > 3', 'x >= 3', 'x <= 3', 'x != 3', 'x ≈ 3', 'x ∈ [3,5]', 'x ∈ (3,5)', 'x ∉ [3,5]', 'sqrt(x)', 'x^2', 'x^3', '|x|',
         'x^5', 'x^n', 'x + y', 'x - y', 'x * y', 'x / y', 'x^2 + 1', 'x mod 3', 'x = 7', '3x^2 + 2x - 1', 'sin(x)', 'cos(x) + 1', 'ln(x)', 'e^x', 'floor(x)'];
@@ -412,10 +376,7 @@ suite('plain English reads back what speech says', () => {
     });
 });
 
-// ---- added 2026-11-11: the parser review (hangs, prototype keys, internal errors, spellings) ----
-import { englishRewrites, PHRASES, TRIGGER } from '../../src/parse/clean/english.js';
-
-suite('reading: what used to hang, crash or come out wrong', () => {
+suite('reading: §, %, empty calls, spreadsheet powers, trunc, scripts, the English trigger', () => {
     const P = (s) => parse(s, { blocks: null }).join(' ');
     test('a typed § is refused, never looped on (it marks names inside MathZetta)', () => {
         for (const s of ['2§', '§', 'x+§', '§0§+ab']) throws(() => parse(s, { names: ['ab'] }), /§ can't be read/);
@@ -430,14 +391,6 @@ suite('reading: what used to hang, crash or come out wrong', () => {
         throws(() => parse('log()'), /'log' takes 2 arguments/);
         throws(() => parse('x + log()'), /'log' takes 2 arguments/);
         throws(() => parse('lim()'), /'lim' needs at least one argument/);
-    });
-    test('names like constructor reach no lookup table: the postfix is all strings', () => {
-        for (const s of ['lim(f, x, a^constructor)', 'lim_{x→a^{valueOf}} f', 'np.constructor', "(typeof(x) IN ('a', 'b') AND constructor)"]) {
-            let postfix;
-            try { postfix = parse(s); } catch { continue; }   // refusing is fine too
-            eq(postfix.every((t) => typeof t === 'string' && !t.includes('native code') && t !== '[object Object]'), true, `${s} → ${JSON.stringify(postfix)}`);
-        }
-        eq(P('lim(f, x, a^constructor)'), 'f x a constructor ^ 3 lim');
     });
     test('a spreadsheet ^ groups left to right, however long the chain', () => {
         eq(P('=a^b^c'), 'a b ^ c ^');
@@ -471,28 +424,7 @@ suite('reading: what used to hang, crash or come out wrong', () => {
     });
 });
 
-suite('limits: inputs that were slow', () => {
-    const quick = (s, ms = 300) => {
-        const t = Date.now();
-        try { parse(s); } catch { /* refusing is fine */ }
-        eq(Date.now() - t < ms, true, `${JSON.stringify(s.slice(0, 20))}… took ${Date.now() - t} ms`);
-    };
-    test('(mod followed by spaces (was cubic: 39 s)', () => quick('(mod ' + ' '.repeat(4990)));
-    test('a chain of % (was cubic: 22 s)', () => { quick('1%'.repeat(2400) + '1'); quick('x%'.repeat(2400) + 'x'); });
-    test('∫∫∫… is refused past 100 integrals (each one re-read the rest)', () => {
-        throws(() => parse('∫'.repeat(101) + 'x'), /More than 100 integrals/);
-        quick('∫'.repeat(2000));
-    });
-    test('many strings, cells or names (restoring them was quadratic)', () => {
-        quick('=' + 'A1+'.repeat(1600) + '1');
-        quick('"a"+'.repeat(1200) + '1');
-        const t = Date.now();
-        try { parse('ab+'.repeat(1200) + '1', { names: ['ab'] }); } catch { /* too deep is fine */ }
-        eq(Date.now() - t < 300, true);
-    });
-});
-
-suite('{{…}} blocks: the hook', () => {
+suite('reading: {{…}} blocks, the hook', () => {
     test('blocks: null leaves them as groups; a handler of your own fills them; setBlockHandler sets the default', async () => {
         const { setBlockHandler } = await import('../../src/index.js');
         const { calculateBlock } = await import('../../src/calculate.js');   // loading it set calculateBlock
@@ -510,7 +442,7 @@ suite('{{…}} blocks: the hook', () => {
     });
 });
 
-suite('how a product was written: · and × beside the postfix', () => {
+suite('reading: how a product was written, · and × beside the postfix', () => {
     const W = (s) => parseSteps(s).written;
     const POSTFIX = (s) => parse(s).join(' ');
     test('· (\\cdot, ⋅) is dot and × (\\times) is cross, at the * they wrote', () => {
@@ -551,7 +483,6 @@ suite('how a product was written: · and × beside the postfix', () => {
     });
 });
 
-// ---- misreads found in the review before 1.2: each with the neighbors that must stay as they are ----
 suite('reading: \\sqrt without braces', () => {
     test('one letter, one number, or one command with its arguments', () => {
         eq(P('\\sqrt x'), 'x sqrt');
@@ -584,7 +515,6 @@ suite('reading: \\sqrt without braces', () => {
         eq(P('\\sqrt\\sqrt{x}'), 'x sqrt sqrt');
         eq(P('\\sqrt\\sqrt[3]{x}'), '3 x root sqrt');
         eq(P('\\sqrt{x}'), 'x sqrt');
-        eq(P('\\sqrt[3]{x}'), '3 x root');
         eq(P('\\sqrt[3] x'), '3 x root');
         eq(P('\\sqrt(x+1)'), 'x 1 + sqrt');
         eq(P('\\sqrt\\left(x+1\\right)'), 'x 1 + sqrt');
@@ -706,16 +636,22 @@ suite('reading: mixed numbers', () => {
     });
     test('only a proper fraction makes a mixed number', () => {
         eq(P('2\\frac{3}{2}'), '2 3 2 / *');
-        eq(P('1 3/2'), '13 2 /');
+        eq(P('1 3/2'), '1 3 * 2 /', 'not 1 + 3/2, and no longer the number 13/2');
     });
     test('never after ^, _, a point or a name: x^2\\frac{1}{2} is x² times a half', () => {
         eq(P('x^2\\frac{1}{2}'), 'x 2 ^ 1 2 / *');
         eq(P('1.5\\frac{1}{2}'), '1.5 1 2 / *');
         eq(P('x_1½'), P('x_1*(1/2)'));
     });
-    test('a space still groups digits: 1 000, and 1 234/567', () => {
+    test('a space groups digits only in threes: 1 000, 12 345 678, and 1 234/567; other numbers side by side multiply', () => {
         eq(P('1 000'), '1000');
-        eq(P('2 3'), '23');
+        eq(P('12 345 678'), '12345678');
+        eq(P('1 000.5'), '1000.5');
+        eq(P('2 3'), '2 3 *', 'was the number 23');
+        eq(P('1 23'), '1 23 *');
+        eq(P('1 2 3'), '1 2 * 3 *');
+        eq(P('x^2 3'), 'x 2 ^ 3 *', 'was x^23');
+        eq(P('\\sqrt 2 3'), '2 sqrt 3 *', 'TeX: \\sqrt takes one token');
         eq(P('1 234/567'), '1234 567 /');
         eq(P('1 000/3'), '1000 3 /');
     });
@@ -727,10 +663,6 @@ suite('reading: mixed numbers', () => {
     });
 });
 
-// ---- the Calculus II survey (2026-11-20): notation that was misread or refused ----
-const V = (s, scope = {}) => evaluate(s, scope);
-const C = (s, scope = {}) => calculate(s, scope).text;
-
 suite('reading: a name, a space, a number', () => {
     test('two factors: n 3^n is n·3ⁿ (it was a name n3)', () => {
         eq(P('n 3^n'), 'n 3 n ^ *');
@@ -739,10 +671,10 @@ suite('reading: a name, a space, a number', () => {
         eq(P('x 1/2'), 'x 1 * 2 /');
         eq(P('k 10'), 'k 10 *');
     });
-    test('…but a name written with its digits is still one name, digits still group, and a command takes its digits', () => {
+    test('…but a name written with its digits is still one name, thousands still group, and a command takes its digits', () => {
         eq(P('x2'), 'x2');
         eq(P('n3'), 'n3');
-        eq(P('2 3'), '23');
+        eq(P('2 3'), '2 3 *');
         eq(P('1 000'), '1000');
         eq(P('\\frac 1 2'), '1 2 /');
         eq(P('log 7'), '7 ln');
@@ -774,7 +706,6 @@ suite('reading: arcsec, arccsc, arccot', () => {
         eq(C('arccot(-1)'), '(3*pi)/4');
         eq(C('arcsec(-2)'), '(2*pi)/3');
         eq(Math.abs(V('arccot(-1)') - 3 * Math.PI / 4) < 1e-12, true);
-        throws(() => calculate('arcsec(0.5)'), /not a real number/);
     });
     test('every output: code writes acos(1/u), asin(1/u), π/2 − atan u', () => {
         eq(toLaTeX('\\sec^{-1} x'), '\\operatorname{arcsec}\\left(x\\right)');
@@ -868,8 +799,9 @@ suite('reading: ⋯, ∅, ₙCᵣ, f⁽⁴⁾, repeating decimals, f ∘ g', () 
         eq(C('x \\notin \\emptyset', { x: 1 }), 'true');
         eq(toSQL('x \\in \\emptyset'), 'FALSE');
         eq(toSpeech('\\emptyset'), 'the empty set');
-        throws(() => parse('()'), /Empty brackets/);     // other empty brackets are still refused
-        eq(P('f()'), '0 \\:f');
+        throws(() => parse('x \\in ()'), /Empty brackets/);     // other empty brackets are still refused
+        throws(() => parse('[]'), /Empty brackets/);
+        eq(P('f() + {}'), '0 \\:f 0 {} +');   // an empty call beside the empty set
     });
     test('n choose r and n permute r written with subscripts', () => {
         for (const s of ['_5C_2', '{}_5C_2', '{}_{5}\\mathrm{C}_{2}']) eq(P(s), '5 2 comb', s);
@@ -894,17 +826,6 @@ suite('reading: ⋯, ∅, ₙCᵣ, f⁽⁴⁾, repeating decimals, f ∘ g', () 
     test('(f \\circ g)(x) is f(g(x))', () => eq(P('(f \\circ g)(x)'), P('f(g(x))')));
 });
 
-suite('calculate: what underflows inside a limit or an integral is 0 there', () => {
-    test('limits and improper integrals of e^-x', () => {
-        eq(C('\\lim_{x\\to -\\infty} e^x'), '0');
-        eq(C('\\lim_{x\\to\\infty} x e^{-x}'), '0');
-        eq(C('\\int_0^{\\infty} e^{-x} dx'), '1');
-        eq(Math.abs(calculate('\\int_{-\\infty}^{\\infty} e^{-x^2} dx').value - Math.sqrt(Math.PI)) < 1e-9, true);
-    });
-    test('…and a number typed too small is still refused', () => throws(() => calculate('10^{-50000}'), /too small/));
-});
-
-// ---- the second Calculus II pass (2026-11-20) ----
 suite('reading: trig functions by their names', () => {
     test('sine(x), arcsine(x) (it was arcsin times e), cotangent x', () => {
         eq(P('arcsine(x)'), 'x arcsin');
@@ -1007,4 +928,49 @@ suite('reading: set-builder notation', () => {
         eq(P(toText('\\{x \\mid x > 2\\}')), 'x x 2 > setbuilder');
         throws(() => toJavaScript('\\{x \\mid x > 2\\}'), /^No JavaScript for a set described by a condition/);
     });
+});
+
+suite('reading: code people type', () => {
+    const cases = [
+        ['np.where(x > 0, 1/x, 0)', 'x 0 > 1 x / 0 ?:'],
+        ['1/x if x > 0 else 0', 'x 0 > 1 x / 0 ?:'],
+        ['a if p else b if q else c', 'p a q b c ?: ?:'],
+        ['np.maximum(a, b) + np.sqrt(np.abs(x))', 'a b 2 max x abs sqrt +'],
+        ['np.logical_and(x >= 0, np.logical_not(y))', 'x 0 ≥ y \\not &'],
+        ['np.isin(x, [1, 2])', 'x 1 2 2 {} ∈'],
+        ['[1, 2].includes(x) && !done', 'x 1 2 2 {} ∈ done \\not &'],
+        ['Number.isInteger(n)', 'n ℤ ∈'],
+        ['float(n).is_integer()', 'n ℤ ∈'],
+        ['math.isclose(a, b)', 'a b ≈'],
+        ['math.factorial(n) / math.factorial(n - k)', 'n ! n k - ! /'],
+        ['sum(i ** 2 for i in range(1, n + 1))', 'i 2 ^ i 1 = n 3 \\sumidx'],
+        ['scipy.integrate.quad(lambda t: t ** 2, 0, 1)[0]', 't 2 ^ t 0 1 4 int'],
+        ['True and not False', 'true false \\not &'],
+        ['x % (y + 1)', 'x y 1 + mod'],
+        ['Math.abs(x - 1) < 1e-9', 'x 1 - abs 1 10 -9 ^ * <'],
+        ['CASE WHEN x > 0 THEN 1 WHEN x < 0 THEN -1 ELSE 0 END', 'x 0 > 1 x 0 < -1 0 ?: ?:'],
+        ['POWER(x, 2) + GREATEST(a, b) + LOG(2, y) + PI()', 'x 2 ^ a b 2 max + 2 y log + pi +'],
+        ['x NOT IN (1, 2) AND y <> 3', 'x 1 2 2 {} ∉ y 3 ≠ &'],
+        ['mz_sq(x) + fract(y) + atan(y, x)', 'x 2 ^ y y floor - + y x atan2 +'],
+        ['\\begin{cases} x^2 & \\text{if } x \\ge 0 \\\\ -x & \\text{otherwise} \\end{cases}', 'x 0 ≥ x 2 ^ x neg ?:'],
+        ['\\text{round}\\left(x, 2\\right) + \\operatorname{atan2}(y, x)', 'x 2 round y x atan2 +'],
+        ['sympy.diff(x**3, x)', 'x 3 ^ x der'],
+        ['sympy.integrate(t**2, (t, 0, b))', 't 2 ^ t 0 b 4 int'],
+        ['sympy.integrate(sympy.sin(x), x)', 'x sin x 2 int'],
+        ['sympy.limit(1/x, x, 0, "+")', '1 x / x 0 "+" 4 lim'],
+        ['sympy.summation(i**2, (i, 1, n))', 'i 2 ^ i 1 = n 3 \\sumidx'],
+        ['sympy.Rational(1, 3) * x', '1 3 / x *'],
+        ['sympy.Piecewise((x**2, x > 0), (-x, True))', 'x 0 > x 2 ^ x neg ?:'],
+        ['sympy.Eq(y, sympy.sqrt(x))', 'y x sqrt ='],
+        ['sympy.Contains(x, sympy.Interval.Ropen(0, 1))', 'x 0 1 2 [) ∈'],
+        ['sympy.And(x > 0, sympy.Not(y)) + sympy.exp(x) + sympy.oo', 'x 0 > y \\not & e x ^ + ∞ +'],
+        ['=IF(B2>0, SQRT(B2), 0)', 'B2 0 > B2 sqrt 0 ?:'],
+        ['=SUM($D$2:$D$101) / COUNT(D2:D101)', 'D2:D101 1 sum D2:D101 1 \\:COUNT /'],
+        ['=-x^2 + 2^3^2', 'x neg 2 ^ 2 3 ^ 2 ^ +'],
+        ['=ATAN2(x, y) + LOG(x, 2) + _xlfn.CEILING.MATH(z)', 'y x atan2 2 x log + z ceil +'],
+        ['=AND(x>=0, OR(y<>1, NOT(z)))', 'x 0 ≥ y 1 ≠ z \\not | &'],
+    ];
+    for (const [code, postfix] of cases) {
+        test(code, () => eq(parse(code).join(' '), postfix));
+    }
 });

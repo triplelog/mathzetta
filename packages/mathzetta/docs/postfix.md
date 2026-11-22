@@ -75,8 +75,8 @@ Fixed arity — no count token:
 | `setbuilder` | 2 | set-builder notation: the element (a name, or `x ∈ S`) and the condition. Read from `\{x \mid P\}`, `\{x : P\}`, `\left\{ … \middle\| … \right\}`, and `{x : P}` in plain text, which is what text writes. `y ∈ {x \| P}` is P with y for x in every output; the set alone has nothing to list, so code outputs refuse it | `x x 2 > setbuilder` = {x \| x > 2} |
 | `evaluated` | 4 | an evaluation bar: expression, variable, lower, upper — F at x = upper minus F at x = lower. Read from `\left[F\right]_a^b`, `\left.F\right|_a^b`, `F\Big|_a^b` (any size), `_{x=a}^{x=b}`, and `evaluated(F, a, b)` (the variable is F's first) or `evaluated(F, x, a, b)`, which is what text writes. Code outputs write the difference, F with b put in for x minus F with a | `x 3 ^ 3 / x 0 1 evaluated` = [x³/3]₀¹ |
 | `der` | 2 | derivative: expression, variable — or, at a point, expression and `x = a` (an `=` node, as `lim` takes `x → a`): `x 3 ^ x 2 = der` is d/dx x³ at x = 2, drawn with a bar \|ₓ₌₂ and read from `der(f, x = a)` or `\left.\frac{d}{dx} f\right|_{x=a}`. `calculate` works out the point form, and a plain `der(f, x)` only where an enclosing ∫, ∑, lim or d/dx varies x (a value the caller gives x makes it a constant). Drawn and spoken everywhere; worked out by `calculate` (at a point) and SymPy. JavaScript, numeric Python, SQL, GLSL and spreadsheets refuse it by name, as they refuse `int` (without numeric bounds in Python), `lim` and, in SQL and GLSL, indexed sums and products | `x 2 ^ x der` = d/dx x² |
-| `=` `≠` `<` `>` `≤` `≥` | 2 | comparison | |
-| `===` `≠=` | 2 | strict (in)equality, from `===` and `!==` | |
+| `=` `≠` `<` `>` `≤` `≥` | 2 | comparison. `=` and `≠` compare as JavaScript's `==` does a number with true or false (1 and 0): `1 = true` is true in evaluate, calculate and JavaScript; the other code outputs, which have no such conversion, refuse a written number beside a written true or false by name | |
+| `===` `≠=` | 2 | strict (in)equality, from `===` and `!==`: `1 === true` is false | |
 | `∈` `∉` | 2 | membership; the right side is usually a group. With a text on the left and no written-out set on the right it is a text search — `"ab" name ∈`, from `"ab" in name` or `contains(name, "ab")`: is the text somewhere in the value, whatever the case of the letters A to Z. JavaScript, Python, numpy, SQL and a spreadsheet write that test, and evaluate and calculate work it out (as they do `name "ab" 2 \:startswith`, from `startswith(name, "ab")`); no operator was added for either | `x 0 1 2 [] ∈` |
 | `→` | 2 | "tends to", inside limits | `x 0 →` |
 | `≈` | 2 | approximately equal | `x 1.414 ≈` |
@@ -114,6 +114,8 @@ where side `r`/`l` means from the right/left (`x→0^+` becomes `x, 0, r`).
 A matrix written as a list of equally long lists, `[[1, 2], [3, 4]]`, stays `[]` of `[]`
 (`1 2 2 [] 3 4 2 [] 2 []`); `calculate` and `evaluate` treat it as a matrix all the same
 (`*` is the matrix product, `^ n` a power, `^ T` the transpose), and drawings show it as one.
+The code outputs write that product too: JavaScript an inline helper, Python and numpy `np.dot`, SymPy
+`Matrix * Matrix`, spreadsheets `MMULT`, GLSL `mat2 * mat2`; SQL refuses it by name.
 `det` is the determinant (`A det`; `\det A` and `det(A)` read as it). `inv(A)`, `transpose(A)`,
 `trace(A)`, `rank(A)`, `rref(A)`, `identity(n)`, `dot(u, v)`, `cross(u, v)` and `linsolve(A, b)` are
 `\:name` functions the calculator knows; `A^T` (also `A^{\top}`) is the transpose there.

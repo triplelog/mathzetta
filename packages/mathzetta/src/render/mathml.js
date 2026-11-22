@@ -47,6 +47,7 @@ export function render(node) {
     if (node.type === 'string') return el('mtext', node, escape(node.value));
     if (node.type === 'symbol') {
         const v = node.value;
+        if (v === '-∞') return el('mrow', node, mo(MINUS) + mi('∞'));   // a minus and ∞, as -x is written
         return el('mi', node, escape(GREEK[v] ?? (v === '\\+' || v === '\\-' ? v[1] : v)));
     }
     return operation(node);
@@ -221,5 +222,5 @@ function bigOperator(symbol, args) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [SYMBOLS, NAMED, GROUPS]) Object.setPrototypeOf(table, null);

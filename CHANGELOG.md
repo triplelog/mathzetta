@@ -2,6 +2,91 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
+## mathzetta 1.5.0
+
+Not published yet.
+
+- **`away` in filter shaders** (`mathzetta/glsl`'s `filterShader`): how far this pixel is from the selection, in
+  pixels — 0 inside it, and everywhere without one. It is read from a frame-sized picture the caller binds as
+  `mz_img_away` (red = 1 − min(d, 255)/255, green = 1 − min(d, 1020)/1020, so white — a picture not given — is 0),
+  declared only when the expression uses `away`. `FILTER_VALUES` has it, so it is protected like `selected` (and
+  is no longer free as a parameter name). qblur makes the picture from the selection.
+
+- **Numbers with a space are one number only in threes** (`1 000`, `12 345 678`): `2 3` is 2·3 and `1 23` is 1·23
+  (they were the numbers 23 and 123), `x^2 3` is x²·3 (it was x^23), and `1 3/2` is 1·3/2 (it was 13/2). TeX's own
+  `\frac 1 2` still takes its digits; `\sqrt 2 3` is √2·3.
+- `toLaTeX` keeps letters of a product apart with a space where three would run into a word and the LaTeX has no
+  command (`xd x` for x·d·x, `ra te` for r·a·t·e; TeX draws the space as nothing): `xdx` and `rate` read back as one name.
+- docs/how-it-works.md: "When math can be read two ways", checked by test/cases/ambiguity.tsv.
+
+Fixes from a review of the test suite (the tests had hidden them):
+
+Outputs that ran but meant something else, found by checking the table tests' expected values. No change to the postfix.
+
+- **The matrix product in code.** `[[1, 2], [3, 4]] * [[5, 6], [7, 8]]` was written as `*` between two lists: NaN in
+  JavaScript, a TypeError in Python, entry by entry in numpy and spreadsheets, and no SQL at all. Now it is the
+  product `evaluate` and `calculate` give: JavaScript an inline helper (`JS_HELPERS.times`: matrix times matrix, a list
+  as a column or a row, anything else entry by entry), Python and numpy `np.dot` (`np.multiply` between flat lists),
+  SymPy `Matrix * Matrix`, spreadsheets `MMULT`, GLSL `mat2 * mat2` (a list of rows is a matrix there, as `bmatrix` is;
+  a list of lists that isn't one is refused). SQL refuses it: "No SQL for a matrix product". `=` between lists is entry
+  by entry in JavaScript (`JS_HELPERS.same`; `==` only asked if they were the same object) and `np.array_equal` where
+  numpy's answer is an array. The reader reads all of them back (`np.dot`, `np.matmul`, `np.multiply`,
+  `np.array_equal`, `MMULT`, GLSL's `mat2`…`mat4`); `checkGeneratedPython` allows `np.dot`, `np.multiply`, `np.array_equal`.
+- **`===` between literals of two kinds** (`0 === false`, `"1" === 1`) is `false` in every output, as in `evaluate` and
+  `calculate`: Python wrote `0 == False` (True), SQLite `0 = FALSE` (true), PostgreSQL refused it. A loose `=` between
+  them (`1 == true`, `"" == 0`) is refused by name outside JavaScript ("No Python for = between a number and true or
+  false"): only JavaScript's `==` converts, Python's `"1" == 1` is False, PostgreSQL rejects `1 = TRUE`, a spreadsheet's
+  `=1=TRUE` is FALSE.
+- **`x ∈ ℚ` and `x ∈ ℂ`** are refused by name in JavaScript, Python, numpy and SQL (a double is always a fraction, and
+  never complex); they were `ℚ.includes(x)`, `x in ℚ` and `x IN (ℚ)`. SymPy keeps `S.Rationals`.
+- **`gcd` of three or more numbers in PostgreSQL** is `GCD(GCD(a, b), c)` (its GCD takes two), and `gcd(a)` is `ABS(a)`.
+  SQLite still refuses gcd.
+- **GLSL conditions are bools**: a number where a condition goes is "not 0" (`if a then 1` is `(a != 0.0 ? 1.0 : …)`,
+  `not a` is `!(a != 0.0)`); `&&` and `||` with a number keep JavaScript's value through two new helpers, `mz_both` and
+  `mz_either` (`a & b | c` is `mz_either(mz_both(a, b), c)`), a bool beside a number written `float(…)`. They were
+  `(a ? …)` and `(a && b)` on floats, which no GLSL compiler takes.
+- **`Math.log10` and `Math.log2` without a call** are log base 10 and 2 of what follows (`Math.log10 5`); they were read
+  as `ln(10)` and `ln(2)` (and `Math.log10 5` as ln 105). `3Math.log10` alone is refused. `Math.LN10` stays ln 10.
+- **"n is a whole number"** is `n ∈ ℤ ∧ n ≥ 0` (0, 1, 2, …, as US schools use the words), not `n ∈ ℤ`; "is not a whole
+  number" is the opposite. What `toSpeech` says for a set ("is in the integers", "is not in the real numbers") now
+  reads back as ℤ, ℝ, ℕ, ℚ, ℂ.
+- **LaTeX**: the differential of an integral whose variable is guessed is a command for a Greek letter
+  (`\mathrm{d}\alpha`, was `\mathrm{d}α`). **MathML**: `-∞` is a minus and ∞ (`<mrow><mo>−</mo><mi>∞</mi></mrow>`),
+  not `<mi>-∞</mi>`.
+- **Audio speech**: a denominator said with "times" opens a quantity, so 1/(2√x) is "1 over the quantity 2 times the
+  square root of x" (it was the same words as (1/2)·√x). The video wording (`toSpeech`) is unchanged.
+- **`{{≈ 1/3}}` and `{{~ 1/3}}`** are a third as a decimal (0.333333333333): the places touch the sign (`{{≈3 1/3}}`);
+  after a space a number is the question. `calculateBlock('≈ 1/3')` read the 1 as places and threw on `/3`.
+- **A binding's bounds are substituted** (common.js `substitute`): `[\sum_{x=1}^{x} x]_0^2` is 3 in JavaScript and
+  Python too (they wrote `x` for both upper bounds: 0), and `[\int_0^x x\,dx]_0^2` puts 2 and 0 in the upper bound.
+  The body and the bound name keep their own x, as before; lim's point, d/dx at x = a and `{x ∈ S | P}`'s S get the value.
+- **`x \int_0^1 x\,dx`** is x times the integral: the squeeze phase keeps a space between a name and a command, so
+  the text is no longer `xint(…)`, read as ξ·n·t. (`x \cdot y` cleans to `x * y`; same postfix.)
+- **`f^{(10)}(x)` and up** are the tenth derivative and on, as `f^{(4)}`…`f^{(9)}` were: f with n primes (`\:f′′′′′′′′′′`,
+  spoken "f 10 prime of x"), for any whole n up to 100; more is refused. They were the power f¹⁰ times x.
+- **`isNumeric`** (and the tree's number leaves) take only numbers: `'.'`, `'-.'`, `'1.2.3'` are not (`1.`, `.5`,
+  `-3`, `1.333..` are). `fromPostfix(['.'])` is a name, then refused by the code outputs.
+- **Names that are no names are refused in JavaScript and Python** (all four flavors): a custom function or name
+  from a postfix array, `['x', '1', '\\:a);b(']`, was pasted as `a);b((x)`. "No JavaScript for the name …".
+- **`toUnified([])`** has `latex` and `exp` `''`, as `toLaTeX([])` and `toText([])` (they were `'[empty]'`).
+- **SQL membership of a column or expression gives JavaScript's answer for NULL**: `team in {"NYA", "BOS"}` is
+  `("team" IN ('NYA', 'BOS')) IS TRUE` and `∉` `… IS NOT TRUE`, so a missing team is in no set (it was NULL, and
+  `NOT IN` NULL too). A literal on the left keeps the plain `IN`.
+- **`calculate` refuses a polynomial power with too many terms before working it out**: `(a+b+c+d+e+f)^40`
+  (1,221,759 terms) took 3.3 s to reach the 5000-term limit; the count is estimated first (C(n+k−1, k), or each
+  unknown's span of powers). `(x+1)^20`, `(a+b)^10`, `(1+x+…+x⁹)^10` stay exact.
+- **`1 = true` is true in `calculate` too**, as in `evaluate` and JavaScript's `==` (loose `=` takes true and false
+  as 1 and 0 beside a number); `===` keeps them apart. It was false in `calculate` alone.
+- **types**: `convert()`'s format takes `'excel'` and `'sheets'`, as the code does.
+- Tests by subject: the unit tests are one file each for reading, the tree, evaluate, calculate, display, speech, code,
+  GLSL, formulas, security, agreement, round trips and operators (the review and fixes suites split by subject; shared
+  helpers in test/helpers.js); the table tests add code-spellings.tsv and english.tsv (from reading.tsv), take
+  functions-and-sets.tsv into every-output.tsv and the precedence rows into precedence.tsv. The operator sweep checks the
+  names each output calls (it was a second sweep in agreement.test.js). Exact duplicates were dropped.
+- Tests: a formula table's number is compared to the decimals it is written with (it was within 0.01 of anything, so
+  5.932 passed for √35.2 = 5.93296), true / false / null only to themselves (Number() made them 0 and 1), and a row
+  with more cells than its header fails.
+
 ## mathzetta 1.4.0
 
 Text search in formulas over table columns. Not published yet.

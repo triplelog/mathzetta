@@ -27,8 +27,13 @@
  *
  * Formula tables (header starts with `Formula`): a formula over the columns
  * of formula-data.csv, the columns it should use, and its value for each
- * row of that file (compared to 0.01, booleans as 1/0). `ERROR` in the
- * columns cell means the formula must be refused (an unknown name).
+ * row of that file. A number is compared to the decimals it is written with
+ * (5.933 is the value rounded to 3 places; a whole number is the value, to
+ * 1e-9), `true`/`false` only to a boolean, `null` only to null, anything else
+ * to the text. `ERROR` in the columns cell means the formula must be refused
+ * (an unknown name).
+ *
+ * In both kinds a row with more cells than the header (a stray tab) fails.
  *
  * Every check ends up with a status:
  *
@@ -116,7 +121,8 @@ export function matches(column, expected, got) {
         if (/^".*"$/.test(expected)) return JSON.parse(expected) === got;
         const e = Number(expected);
         const a = Number(got);
-        if (expected.trim() !== '' && !Number.isNaN(e) && !Number.isNaN(a)) {
+        // '' and ' ' are 0 to Number(): only a number written as one is compared as one
+        if (expected.trim() !== '' && got.trim() !== '' && !Number.isNaN(e) && !Number.isNaN(a)) {
             return e === a || Math.abs(e - a) <= 1e-9 * Math.max(1, Math.abs(e));
         }
     }
@@ -146,8 +152,16 @@ export function checkTable(file, text, { known = {}, data } = {}) {
     if (!rows.length) return { kind: 'expression', header: [], results: [], empty: [] };
     const header = [...rows[0]];
     const knownFor = known[file] || {};
+    // a cell past the last column is never checked: a stray tab that shifted the row, or a column that was removed
+    const tooLong = rows.slice(1).filter((row) => row.length > header.length).map((row) => {
+        const reason = knownFor[row[0]]?.cells;
+        return {
+            input: row[0], column: 'cells', expected: `at most ${header.length} cells (the header's)`, got: `${row.length} cells`,
+            reason, status: status(false, reason), line: row.line, accept: null,
+        };
+    });
     if (header[0].trim().toLowerCase() === 'formula') {
-        return { kind: 'formula', header, results: checkFormulas(rows, knownFor, data), empty: [] };
+        return { kind: 'formula', header, results: [...checkFormulas(rows, knownFor, data), ...tooLong], empty: [] };
     }
 
     const columns = rows[0].map((h) => COLUMN[h.trim().toLowerCase()]);
@@ -174,7 +188,25 @@ export function checkTable(file, text, { known = {}, data } = {}) {
             });
         });
     }
-    return { kind: 'expression', header, results, empty };
+    return { kind: 'expression', header, results: [...results, ...tooLong], empty };
+}
+
+/**
+ * Does a formula's value match its expected cell? A number to the decimals written (to 1e-9 for a whole
+ * number), true / false / null only to themselves, anything else to the value's text: Number() would take
+ * null, '' and false for 0.
+ */
+export function matchesValue(expected, value) {
+    if (expected === 'true' || expected === 'false') return value === (expected === 'true');
+    if (expected === 'null') return value === null;
+    if (/^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(expected)) {
+        if (typeof value !== 'number') return false;
+        const e = Number(expected);
+        const decimals = /e/i.test(expected) ? 0 : (expected.split('.')[1] ?? '').length;
+        const slack = 1e-9 * Math.max(1, Math.abs(e));
+        return Math.abs(e - value) <= (decimals ? 0.5 * 10 ** -decimals : 0) + slack;
+    }
+    return String(value) === expected;
 }
 
 function checkFormulas(rows, knownFor, data) {
@@ -207,11 +239,8 @@ function checkFormulas(rows, knownFor, data) {
             const values = records.map((record, r) => {
                 const value = evaluate(record);
                 const expected = expectedValues[r];
-                if (expected !== undefined && expected !== '') {
-                    const e = Number(expected);
-                    const a = Number(value);   // booleans become 1 / 0
-                    const ok = !Number.isNaN(e) && !Number.isNaN(a) ? Math.abs(e - a) <= 0.01 : String(value) === expected;
-                    if (!ok) problems.push(`row ${r + 1}: expected ${expected}, got ${value}`);
+                if (expected !== undefined && expected !== '' && !matchesValue(expected, value)) {
+                    problems.push(`row ${r + 1}: expected ${expected}, got ${typeof value === 'string' ? JSON.stringify(value) : value}`);
                 }
                 return typeof value === 'number' ? Math.round(value * 1000) / 1000 : value;
             });

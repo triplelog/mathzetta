@@ -14,12 +14,26 @@ import { isCustomFunction, precedenceOf } from '../operators.js';
  *   tag subexpressions, e.g. `(n, s) => \htmlId{mz-${n.id}}{${s}}`.
  */
 export function toLatex(node, options = {}) {
+    const plain = (n) => (n.type === 'op' ? operation(n, plain) : leaf(n));
     const render = (n) => {
         const latex = n.type === 'op' ? operation(n, render) : leaf(n);
         return options.wrap ? options.wrap(n, latex) : latex;
     };
-    return render(node);
+    // LaTeX with no command in it is read back as plain math, where a run of three letters is one name (xdx, rate):
+    // products of letters are kept apart by a space there (TeX draws it as nothing). With a command, letters multiply.
+    // Which it is is decided once, without the wrap hook, so wrap still sees each node once.
+    lettersApart = true;
+    try {
+        const spaced = plain(node);
+        lettersApart = !spaced.includes('\\');
+        if (lettersApart && !options.wrap) return spaced;
+        return render(node);
+    } finally {
+        lettersApart = false;
+    }
 }
+
+let lettersApart = false;
 
 const paren = (s) => `\\left(${s}\\right)`;
 const PLUS = { op: '+' };    // the parent sum(…) and prod(…) bracket their terms as
@@ -126,7 +140,11 @@ function operation(node, render) {
             if (!isImplicitProduct(a, b, bracketedSides(node))) return `${l} \\cdot ${r}`;
             if (r.startsWith('\\mathrm{d}')) return `${l}\\,${r}`;   // a differential: f'(x)\,\mathrm{d}x
             // \pi followed by a letter would read as one command: \pir
-            return /\\[a-zA-Z]+$/.test(l) && /^[a-zA-Z]/.test(r) ? `${l} ${r}` : l + r;
+            if (/\\[a-zA-Z]+$/.test(l) && /^[a-zA-Z]/.test(r)) return `${l} ${r}`;
+            // letters that would run into a word of three or more (x·d·x as xdx, r·a·t·e as rate) are kept apart by a
+            // space, which TeX draws as nothing: MathZetta reads a long run of letters with no command as one name
+            const run = (/[a-zA-Z]+$/.exec(l)?.[0].length ?? 0) + (/^[a-zA-Z]+/.exec(r)?.[0].length ?? 0);
+            return lettersApart && run >= 3 && /[a-zA-Z]$/.test(l) && /^[a-zA-Z]/.test(r) && !/\\[a-zA-Z]*$/.test(l) ? `${l} ${r}` : l + r;
         }
         case '/':
             return `\\frac{${render(a)}}{${render(b)}}`;
@@ -218,7 +236,7 @@ function integral(args, render) {
     const [f, second, third, fourth] = args;
     const body = `{${render(f)}}`;
     const d = (v) => `\\mathrm{d}${v}`;
-    const guess = () => firstVariable(f) || 'x';
+    const guess = () => render({ type: 'symbol', value: firstVariable(f) || 'x' });   // a Greek letter as its command: \mathrm{d}\alpha
     switch (args.length) {
         case 1: return `\\int${body}${d(guess())}`;
         case 2: return isVariable(second)
@@ -259,5 +277,5 @@ function bigOperator(symbol, args, render) {
 }
 
 // Lookup tables are keyed by what people type: with no prototype, `constructor` or `toString`
-// finds nothing rather than Object's own (tested in test/unit/parse.test.js).
+// finds nothing rather than Object's own (tested in test/unit/security.test.js).
 for (const table of [BLACKBOARD, COMPARISONS, NAMED, GROUPS, GREEK_NAMES, MATH_SPECIAL, TEXT_SPECIAL]) Object.setPrototypeOf(table, null);

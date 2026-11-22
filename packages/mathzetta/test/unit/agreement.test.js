@@ -2,21 +2,25 @@
  * Every output means the same thing: evaluate(), calculate(), the generated JavaScript (run) and SQLite's SQL
  * (run, where node:sqlite is there) agree on a value — with negative numbers and halves, which the tables
  * never had (mod takes the divisor's sign, round takes a half away from zero, trunc goes toward zero, an odd
- * root of a negative number is real). python.test.js runs the Python. Then the brackets and readings the
- * 2026-11 review found wrong in single formats.
+ * root of a negative number is real), text search, roots whose index is a column. python.test.js runs the Python.
  */
-import { suite, test, eq, throws } from '../harness.js';
+import { suite, test, skip, eq, throws } from '../harness.js';
 import {
-    parse, evaluate, calculate, toLaTeX, toMathML, toText, toSpeech, toAudioSpeech, toJavaScript, toPython, toSQL, toExcel,
-    toGLSL, strToFunction, strToSQL, strToExcel, createRowEvaluator,
+    calculate, createRowEvaluator, evaluate, parse, strToFunction, strToSQL, toJavaScript, toSQL,
 } from '../../src/all.js';
+import { DatabaseSync, sqliteTest } from '../helpers.js';
 
-let DatabaseSync = null;
-try { ({ DatabaseSync } = await import('node:sqlite')); } catch { /* Node before 22.5: the SQLite column is not checked */ }
 const db = DatabaseSync ? new DatabaseSync(':memory:') : null;
+/** In a suite that also runs SQLite: say so when it can't. */
+const noSqlite = () => { if (!db) skip('the SQLite checks', 'node:sqlite is missing (Node before 22.5)'); };
 
 const close = (a, b) => (typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a)) : a === b);
+
+/** What SQLite gave, as a JavaScript value: an INTEGER read as a BigInt is a number; NULL stays null (it is not 0). */
+const fromSql = (v) => (typeof v === 'bigint' ? Number(v) : v);
+
 const runJs = (input) => createRowEvaluator(strToFunction([], input).jsFunction)([]);
+
 const runSqlite = (input) => db.prepare(`SELECT ${toSQL(input, { dialect: 'sqlite' })} AS v`).get().v;
 
 /** [input, the value] — the value every output must give. */
@@ -32,17 +36,28 @@ const VALUES = [
 ];
 
 suite('agreement: evaluate, calculate, JavaScript and SQLite give one value', () => {
+    noSqlite();
     for (const [input, want] of VALUES) {
         test(input, () => {
             eq(close(evaluate(input), want), true, `evaluate ${evaluate(input)}`);
-            eq(close(Number(calculate(input).value), want), true, `calculate ${calculate(input).text}`);
+            eq(close(calculate(input).value, want), true, `calculate ${calculate(input).text}`);
             eq(close(runJs(input), want), true, `JavaScript ${toJavaScript(input)} → ${runJs(input)}`);
-            if (db && !/^max\(3\)$/.test(input)) eq(close(Number(runSqlite(input)), want), true, `SQLite ${toSQL(input, { dialect: 'sqlite' })} → ${runSqlite(input)}`);
+            if (db) eq(close(fromSql(runSqlite(input)), want), true, `SQLite ${toSQL(input, { dialect: 'sqlite' })} → ${runSqlite(input)}`);
         });
     }
     test('xor is a true or false in JavaScript, not one of its operands', () => {
         eq(runJs('floor(ln(-1) xor -2)'), evaluate('floor(ln(-1) xor -2)'));
         eq(runJs('0 xor -2'), true);
+    });
+    test('loose = between a number and true or false: 1 = true as JavaScript\'s ==, in evaluate and calculate alike', () => {
+        for (const [input, want] of [['1 = true', true], ['0 = false', true], ['2 = true', false], ['1 ≠ true', false], ['true = 1', true],
+            ['0.5*2 = true', true], ['[1, 0] = [true, false]', true], ['1 === true', false], ['1 ≠= true', true]]) {
+            eq(evaluate(input), want, `evaluate ${input}`);
+            eq(calculate(input).value, want, `calculate ${input}`);
+        }
+        for (const input of ['1 = true', '2 = true', '1 === true']) eq(runJs(input), evaluate(input), `JavaScript ${input}`);
+        eq(evaluate('x = true', { x: 1 }), true);
+        eq(calculate('x = true', { x: 1 }).value, true);
     });
     test('lists are equal entry by entry in evaluate, as in calculate', () => {
         eq(evaluate('[1, 2] = [1, 2]'), true);
@@ -52,26 +67,6 @@ suite('agreement: evaluate, calculate, JavaScript and SQLite give one value', ()
     test('a sum with no index named is summed over its variable by evaluate too', () => {
         eq(evaluate('\\sum_0^3 i^2'), 14);
         eq(calculate('\\sum_0^3 i^2').text, '14');
-    });
-    test('the same in the code that is only written (Excel, GLSL, PostgreSQL)', () => {
-        eq(toExcel('-1*x^2'), '=-(x^2)');                    // Excel's minus binds tighter than ^
-        eq(toExcel('sum(a, b) * c'), '=(a+b)*c');
-        eq(toExcel('2*(a ≈ b)'), '=2*(ABS((a)-(b))<1E-9)');
-        eq(toExcel('c = (a < b)'), '=c=(a<b)');               // spreadsheet comparisons share one precedence
-        eq(toExcel('cbrt(x)'), '=IF(x<0, -POWER(-x, 1/3), POWER(x, 1/3))');
-        eq(toExcel('50% * x'), '=50%*x');
-        eq(toGLSL('round(a + b, 2)'), 'mz_round((a + b) * 100.0) / 100.0');
-        eq(toGLSL('(a+b)^1*c'), '(a + b) * c');
-        eq(toGLSL('a ≈ b - c'), '(abs(a - (b - c)) < 1e-5)');
-        eq(toGLSL('round(x, 25)'), 'mz_round(x * 1.0e25) / 1.0e25');
-        eq(toSQL('x mod 3'), 'MOD(MOD(x, 3) + 3, 3)');
-        eq(toSQL('round(x, 2)'), 'ROUND(CAST(x AS NUMERIC), 2)');   // PostgreSQL's ROUND(x, d) takes NUMERIC only
-        eq(toSQL('cbrt(x)'), 'CBRT(x)');
-        eq(toSQL('1/2'), '1.0 / 2');                                  // not integer division
-        eq(toSQL('name = "Bob"'), "name = 'Bob'");                    // "Bob" would be a column
-        eq(toSQL('tau * x > -∞'), "(2 * PI()) * x > '-Infinity'");
-        eq(toSQL(['user', 'current_user', '+']), '"user" + "current_user"');
-        eq(toSQL('c = (a < b)'), 'c = (a < b)');
     });
 });
 
@@ -84,28 +79,24 @@ const TEXT_SEARCH = [
 ];
 
 suite('agreement: text search gives one answer in evaluate, calculate, JavaScript and SQLite', () => {
+    noSqlite();
     for (const [input, want] of TEXT_SEARCH) {
         test(input, () => {
-            eq(Number(evaluate(input)), Number(want), `evaluate ${evaluate(input)}`);
-            eq(Number(calculate(input).value), Number(want), `calculate ${calculate(input).text}`);
-            eq(Number(runJs(input)), Number(want), `JavaScript ${toJavaScript(input)} → ${runJs(input)}`);
-            if (db) eq(Number(runSqlite(input)), Number(want), `SQLite ${toSQL(input, { dialect: 'sqlite' })} → ${runSqlite(input)}`);
+            eq(evaluate(input), want, 'evaluate');
+            eq(calculate(input).value, want, `calculate ${calculate(input).text}`);
+            eq(runJs(input), want, `JavaScript ${toJavaScript(input)}`);
+            // SQLite has no true or false: a test is the INTEGER 1 or 0 (never NULL)
+            if (db) eq(fromSql(runSqlite(input)), Number(want), `SQLite ${toSQL(input, { dialect: 'sqlite' })}`);
         });
     }
-    test('a list is still searched for a member, in evaluate', () => {
-        eq(evaluate('"a" in L', { L: ['a', 'b'] }), true);
-        eq(evaluate('"A" in L', { L: ['a', 'b'] }), false);
-    });
     test('startswith takes two arguments in evaluate and calculate too', () => {
         throws(() => evaluate('startswith("ab")'), /startswith\(name, "Mc"\)/);
         throws(() => calculate('startswith("ab", "a", 1)'), /startswith\(name, "Mc"\)/);
     });
-    test('a spreadsheet brackets startswith, so it nests', () => {
-        eq(toExcel('2 * startswith(name, "a") + 1'), '=2*(LEFT(LOWER(name), LEN("a"))=LOWER("a"))+1');
-    });
 });
 
 suite('agreement: a root whose index is a column (known only as it runs) is real for an odd index', () => {
+    noSqlite();
     // over a table's columns, as tabview runs a formula: n and x are columns, so the code can't see the index
     const H = ['n', 'x'];
     const rows = [[3, -8, -2], [-3, -8, -0.5], [5, -32, -2], [2, 9, 3], [3, 27, 3], [1, -4, -4]];
@@ -123,24 +114,22 @@ suite('agreement: a root whose index is a column (known only as it runs) is real
         eq(Number.isNaN(evaluate('root(n, x)', { n: 2, x: -4 })), true);
         eq(Number.isNaN(createRowEvaluator(strToFunction(H, 'root(n, x)').jsFunction)([2, -4])), true);
     });
-    test('the spreadsheet and GLSL check the index too', () => {
-        eq(toExcel('root(n, x)'), '=IF(AND(x<0, MOD(n,2)=1), -POWER(-x, 1/n), POWER(x, 1/n))');
-        eq(toGLSL('root(n, x)'), 'mz_root(n, x)');
-        eq(toGLSL('root(5, x)'), 'mz_root(5.0, x)', 'a constant odd index past 3 too: pow is undefined below 0');
-    });
 });
 
 suite('agreement: membership in a column is a text search (a column holds one value, never a list)', () => {
+    noSqlite();
     const H = ['name', 'team'];
     const rows = [['Cab Team', 'ab', true], ['Cab Team', 'AB', true], ['Cab Team', 'zz', false], [null, 'ab', false], ['abc', null, true], [62, 6, true]];
     for (const [name, team, want] of rows) {
         test(`team in name with name ${JSON.stringify(name)}, team ${JSON.stringify(team)}`, () => {
-            for (const f of ['team in name', 'contains(name, team)']) {
-                eq(createRowEvaluator(strToFunction(H, f).jsFunction)([name, team]), want, `JavaScript ${f}`);
-                eq(createRowEvaluator(strToFunction(H, f.replace(' in ', ' not in ')).jsFunction)([name, team]), f.includes(' in ') ? !want : want, `not in`);
+            // each spelling, and its negation: the opposite answer for every row, a missing value included
+            const forms = [['team in name', want], ['contains(name, team)', want], ['team not in name', !want], ['not contains(name, team)', !want]];
+            for (const [f, expected] of forms) {
+                eq(createRowEvaluator(strToFunction(H, f).jsFunction)([name, team]), expected, `JavaScript ${f}`);
                 if (db) {
                     const sql = strToSQL(H, f, new Map(), { dialect: 'sqlite' }).sqlExpression;
-                    eq(Boolean(db.prepare(`SELECT ${sql} AS v FROM (SELECT ? AS name, ? AS team)`).get(...[name, team].map((v) => (Number.isInteger(v) ? BigInt(v) : v))).v), want, `SQLite ${sql}`);   // whole numbers as INTEGER, as a table holds them
+                    const v = db.prepare(`SELECT ${sql} AS v FROM (SELECT ? AS name, ? AS team)`).get(...[name, team].map((v) => (Number.isInteger(v) ? BigInt(v) : v))).v;   // whole numbers as INTEGER, as a table holds them
+                    eq(fromSql(v), Number(expected), `SQLite ${sql} (1 or 0, never NULL)`);
                 }
             }
         });
@@ -151,169 +140,87 @@ suite('agreement: membership in a column is a text search (a column holds one va
         eq(calculate('team in name', { team: '"ab"', name: '"Cab"' }).text, 'true');
         eq(evaluate('"ab" in "CAB"'), true, 'a quoted text on the right is a text too');
     });
-    test('the spreadsheet searches as well', () => {
-        eq(strToExcel(H, 'team in name').excelFormula((i) => 'AB'[i] + '2'), '=ISNUMBER(FIND(LOWER(B2), LOWER(A2)))');
-    });
-    test('outside a table a name may be a list: toJavaScript keeps membership', () => {
-        eq(toJavaScript('team in name'), 'name.includes(team)');
-    });
 });
 
-suite('agreement: brackets every format keeps', () => {
-    test('-1·(a + b) is -(a + b) everywhere', () => {
-        const pf = ['-1', 'a', 'b', '+', '*'];
-        eq(toLaTeX(pf), '-\\left(a + b\\right)');
-        eq(toText(pf), '-(a + b)');
-        eq(toJavaScript(pf), '-(a + b)');
-        eq(toPython(pf), '-(a + b)');
-        eq(toSQL(pf), '-(a + b)');
-        eq(toExcel(pf), '=-(a+b)');
-        eq(toGLSL(pf), '-(a + b)');
-        eq(toMathML(pf).includes('<mo>(</mo>'), true);
-        eq(toLaTeX(['c', '-1', 'a', 'b', '+', '*', '+']), 'c - \\left(a + b\\right)');
-        eq(toLaTeX(['-1', 'x', '*', '!']), '\\left(-x\\right)!');
-    });
-    test("LaTeX's wrap hook keeps its own backslashes (a - (-1·x) was sliced)", () => {
-        eq(toLaTeX('a - (-1*x)', { wrap: (n, s) => `\\htmlId{mz-${n.id}}{${s}}` }), '\\htmlId{mz-4}{\\htmlId{mz-0}{a} + \\htmlId{mz-2}{x}}');
-    });
-    test('prod(a + b, c) and sum terms are bracketed in the drawn formats', () => {
-        const pf = ['a', 'b', '+', 'c', '2', 'prod'];
-        eq(toLaTeX(pf), '\\left(a + b\\right) \\cdot c');
-        eq(toText(pf), '(a + b) * c');
-    });
-    test('Python: max of one number, not with its looser binding, ≈ with an absolute tolerance', () => {
-        eq(toPython('max(x)'), 'x');
-        eq(toPython('!a + 1'), '(not a) + 1');
-        eq(toPython('!a = b'), '(not a) == b');
-        eq(toSQL('!a + 1'), '(NOT a) + 1');
-        eq(toPython('x ≈ 0'), 'abs((x) - (0)) < 1e-9');
-        eq(toJavaScript('mean(c, c = -1, x)'), '((c + (c == -1) + x) / 3)');
-    });
-    test('a derivative by a compound variable is drawn once, not for ever', () => {
-        for (const write of [toLaTeX, toText, toSpeech, toMathML]) eq(typeof write('der(x^2, x+1)'), 'string', write.name);
-    });
-    test('text writes limits, definite integrals and sums as calls that read back', () => {
-        for (const input of ['\\lim_{x\\to 3}(2x+1)', '\\lim_{x\\to 0^+} f', '\\int_0^1 x^2 dx', 'int(t^5,t,0)<=0']) {
-            eq(parse(toText(input)), parse(input), `${input} → ${toText(input)}`);
-        }
-        eq(evaluate(parse(toText('\\sum_0^3 i^2'))), 14);   // written with its index: sum(i^2, i = 0, 3)
-        eq(toText('\\lim_{x\\to 3}(2x+1)'), 'lim(2 * x + 1, x → 3)');
-    });
-});
-
-suite('agreement: speech alone keeps apart what the drawing keeps apart', () => {
-    const PAIRS = [
-        ['-x^2', '(-x)^2'], ['e^{-x^2}', 'e^{(-x)^2}'], ['\\frac{a}{bc}', '\\frac{a}{b}c'], ['a/(b/c)', 'a/b/c'],
-        ['2^{x}y', '2^{xy}'], ['-3!', '(-3)!'], ['2x!', '(2x)!'], ['x_1^2', 'x_{1^2}'], ['\\max(1,2)+3', '\\max(1,2+3)'],
-        ['\\lim_{x\\to 0} \\frac{\\sin x}{x}', '\\frac{\\lim_{x\\to 0} \\sin x}{x}'], ['x>0 ? 1 : -1+2', '(x>0 ? 1 : -1)+2'],
-        [['-1', 'a', 'b', '+', '*'], ['-1', 'a', '*', 'b', '+']],
+// Run the generated SQL in SQLite and compare with evaluate().
+suite('agreement: SQLite gives what evaluate() gives, row by row', () => {
+    if (!DatabaseSync) {
+        sqliteTest('every formula', () => {});
+        return;
+    }
+    const db = new DatabaseSync(':memory:');
+    db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, x REAL, y REAL, s TEXT)');
+    const rows = [
+        { a: 7, b: 2, x: 2.5, y: 0.5, s: "O'Neil" },
+        { a: -7, b: 3, x: 0.25, y: 1.5, s: 'Alpha' },
+        { a: 10, b: 5, x: 1, y: 0.75, s: 'Beta' },
+        { a: 3, b: 4, x: 0.9, y: 2, s: 'Alpha' },
     ];
-    for (const [a, b] of PAIRS) test(`${a} and ${b}`, () => eq(toAudioSpeech(a) === toAudioSpeech(b), false, `both read "${toAudioSpeech(a)}"`));
-    test('"to the the quantity": an exponent that opens a quantity takes "to the power of"', () => {
-        eq(toSpeech('2^{(-2)^2}'), '2 to the power of the quantity negative 2, squared');
-    });
-});
+    const insert = db.prepare('INSERT INTO t (a, b, x, y, s) VALUES (?, ?, ?, ?, ?)');
+    for (const r of rows) insert.run(r.a, r.b, r.x, r.y, r.s);
 
-suite('agreement: calculate — exact answers that were wrong', () => {
-    const text = (s) => calculate(s).text;
-    test('exact values are compared to every digit: e^-30 is not 0', () => {
-        eq(text('e^(-30) > 0'), 'true');
-        eq(text('10^(-13)*pi = 0'), 'false');
-        eq(text('sqrt(2)/10^13 > 0'), 'true');
-        eq(text('0.1+0.2 = 0.3'), 'true');
-        eq(text('sin(1)^2+cos(1)^2 = 1'), 'true');
-    });
-    test('congruence and membership are exact', () => {
-        eq(text('2^100 ≡ 1 (mod 3)'), 'true');
-        eq(text('10^20 ≡ 1 (mod 3)'), 'true');
-        eq(text('10^20+1 ∈ {10^20}'), 'false');
-        eq(text('0.1+0.2 ∈ {0.3}'), 'true');
-        eq(text('pi ∈ ℚ'), 'false');
-        eq(text('-2 ∈ ℤ'), 'true');
-    });
-    test('series: terms that do not shrink diverge; a slow one gets no verdict', () => {
-        throws(() => calculate('\\sum_{n=1}^{\\infty} (-1)^n'), /diverges/);
-        throws(() => calculate('\\sum_{n=1}^{\\infty} sin(n)'), /diverges/);
-        throws(() => calculate('\\sum_{n=1}^{\\infty} 1/n^1.01'), /too slowly to tell/);
-        eq(text('\\sum_{n=1}^{\\infty} 1/n^2'), 'pi^2/6');
-    });
-    test('a limit that oscillates has none (two sequences of points must agree)', () => {
-        for (const f of ['sin(x)', 'cos(x)', 'x sin(x)', '(-1)^{floor(x)}']) throws(() => calculate(`\\lim_{x\\to\\infty} ${f}`), /limit/);
-        eq(text('\\lim_{x\\to\\infty} sin(x)/x'), '0');
-        eq(text('\\lim_{x\\to 0^+} sqrt(x)'), '0');
-        eq(text('\\lim_{x\\to 0^+} x^(1/3)'), '0');
-    });
-    test('integrals over a kink or many waves, and tiny ones', () => {
-        eq(text('\\int_{-1}^{1} abs(x) dx'), '1');
-        eq(Math.abs(calculate('\\int_0^{1000} cos(x) dx').value - Math.sin(1000)) < 1e-6, true);
-        eq(Math.abs(calculate('\\int_0^{0.00001} x dx').value - 5e-11) < 1e-15, true);
-    });
-    test('tiny and huge exact answers are written as what they are', () => {
-        eq(text('10^(-400)'), '1*10^(-400)');
-        eq(text('10^400/7'), '1.42857142857*10^(399)');
-        throws(() => calculate('10^(-50000)'), /too small/);
-        eq(text('round(pi, 400)'), '3.14159265359');
-        eq(text('fixed(pi, 120)').length, 124);
-        eq(text('1 = "a"'), 'false');
-    });
-});
-
-suite('agreement: KaTeX reads the LaTeX', () => {
-    test('a root index holding ] is braced, so it does not end the index', () => {
-        eq(toLaTeX(['x', '0', '5', '2', '(]', '∈', '3', '2', '?:', 'y', 'root']).startsWith('\\sqrt[{'), true);
-        eq(toLaTeX('root(3, x)'), '\\sqrt[3]{x}');
-    });
-});
-
-// ---- added 2026-11-11: no output calls a function its language doesn't have ----
-import { operator, operatorNames, VARIADIC } from '../../src/operators.js';
-import { op, sym, num } from '../../src/tree.js';
-import { checkGeneratedJs, toPythonFunction } from '../../src/all.js';
-import { GLSL_HELPERS } from '../../src/render/glsl.js';
-
-suite('agreement: every output either writes what its language has, or refuses by name', () => {
-    // a node for every operator; the calculus ones with a variable and bounds, a sum with its index
-    const sample = (name) => {
-        if (['pmatrix', 'bmatrix', 'vmatrix'].includes(name)) return op(name, [op('[]', [num('1'), num('2')]), op('[]', [num('3'), num('4')])]);
-        if (name === 'det') return op(name, [op('[]', [op('[]', [num('1'), num('2')]), op('[]', [num('3'), num('4')])])]);
-        if (name === 'der') return op(name, [op('^', [sym('a'), num('2')]), sym('a')]);
-        if (name === 'int') return op(name, [op('^', [sym('a'), num('2')]), sym('a'), num('0'), num('1')]);
-        if (name === 'lim') return op(name, [op('^', [sym('a'), num('2')]), sym('a'), num('1')]);
-        if (name === '\\sumidx' || name === '\\prodidx') return op(name, [op('^', [sym('i'), num('2')]), op('=', [sym('i'), num('1')]), sym('n')]);
-        const { arity } = operator(name);
-        return op(name, ['a', 'b', 'c'].slice(0, arity === VARIADIC ? 3 : arity).map(sym));
-    };
-    const REFUSAL = /^No (JavaScript|Python|numpy|SymPy|SQL|SQLite SQL|GLSL|spreadsheet formula) for /;
-    /** The output, or null when it refuses by name; anything else thrown is a failure. */
-    const written = (write) => {
-        try { return write(); } catch (e) {
-            if (REFUSAL.test(e.message.replace(/^f(\(.*?\))?: /, ''))) return null;
-            throw e;
+    const same = (got, want) => {
+        if (typeof want === 'boolean') want = Number(want);
+        if (Number.isNaN(want)) return got === null;   // SQLite has no NaN: it gives NULL
+        if (typeof want === 'number' && typeof got === 'number') {
+            if (!Number.isFinite(want)) return got === want;
+            return Math.abs(got - want) <= 1e-9 * Math.max(1, Math.abs(want));
         }
+        return got === want;
     };
-    const PG = new Set(['POWER', 'SQRT', 'CBRT', 'ABS', 'FLOOR', 'CEIL', 'LN', 'LOG', 'EXP', 'SIN', 'COS', 'TAN', 'COT', 'ASIN', 'ACOS',
-        'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH', 'ATANH', 'ROUND', 'TRUNC', 'MOD', 'GREATEST', 'LEAST', 'GCD', 'FACTORIAL',
-        'RANDOM', 'PI', 'CAST', 'ARRAY', 'NOT', 'IN', 'OR', 'AND']);
-    const GLSL = new Set(['radians', 'degrees', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
-        'pow', 'exp', 'log', 'exp2', 'log2', 'sqrt', 'inversesqrt', 'abs', 'sign', 'floor', 'ceil', 'trunc', 'round', 'fract', 'mod', 'min', 'max',
-        'clamp', 'mix', 'step', 'smoothstep', 'length', 'distance', 'dot', 'cross', 'normalize', 'determinant', 'inverse', 'transpose',
-        'float', 'int', 'bool', 'vec2', 'vec3', 'vec4', 'mat2', 'mat3', 'mat4', ...[...GLSL_HELPERS.matchAll(/\b(mz_\w+)\s*\(/g)].map((m) => m[1])]);
-    const called = (code, lowercase) => [...code.matchAll(/(?<![\w.])([A-Za-z_]\w*)\s*\(/g)].map((m) => m[1]).filter((n) => !lowercase || n === n.toUpperCase());
-    for (const name of operatorNames()) {
-        test(name, () => {
-            const t = sample(name);
-            const js = written(() => toJavaScript(t));
-            // a sum's loop: checkGeneratedJs refuses loops by design, so it is run instead (∑ i² to 3 is 14, ∏ is 36)
-            if (js !== null && /^\\(sum|prod)idx$/.test(name)) eq(new Function('n', `return ${js};`)(3), name === '\\sumidx' ? 14 : 36);
-            // a name JavaScript lacks is refused here (x_1 is a variable)
-            else if (js !== null) checkGeneratedJs(js, { variables: /^(?:[a-z](?:_\w+)?|sum|prod|loopCount)$/ });
-            for (const flavour of [{}, { numpy: true }, { sympy: true }]) {
-                if (written(() => toPython(t, flavour)) !== null) written(() => toPythonFunction(t, flavour));   // its whitelist: every name exists
-            }
-            const sql = written(() => toSQL(t));
-            if (sql !== null) eq(called(sql, true).filter((n) => !PG.has(n)), [], sql);
-            const glsl = written(() => toGLSL(t));
-            if (glsl !== null) eq(called(glsl, false).filter((n) => !GLSL.has(n)), [], glsl);
+    const check = (label, sql, expected) => {
+        const got = db.prepare(`SELECT ${sql} AS v FROM t ORDER BY id`).all().map((r) => r.v);
+        got.forEach((g, i) => {
+            if (!same(g, expected[i])) throw new Error(`row ${i}: SQLite ${g}, evaluate ${expected[i]} (${sql})`);
+        });
+    };
+
+    const formulas = [
+        // arithmetic, with the integer-division traps
+        'a / b', 'a / b / 2', '(a + b) / (a - b)', '1 / b', '-a / b', 'a / (b / 3)', '7 / 2', 'a / b * b',
+        'mean(a, b)', 'mean(a, b, 4)', 'sum(a, b, x)', 'prod(a, b)', 'a - b - 1', '2a + 3b', 'a / b > 3',
+        // powers, roots, logs
+        'a^2 / b', 'b^(-1)', '2^b', 'x^y', 'sqrt(x)', 'root(3, x)', 'cbrt(a)', '\\sqrt{b}^3',
+        'ln(x)', 'log_2(b)', 'log10(b)', 'e^x', 'exp(y)', 'expm1(y)',
+        // trig and hyperbolic
+        'sin(x) + cos(y)', 'tan(x)', 'csc(x)', 'sec(x)', 'cot(x)', 'arcsin(y / 2)', 'arccos(y / 2)', 'arctan(x)',
+        'sinh(x)', 'cosh(x)', 'tanh(x)', 'arcsinh(x)', 'arccosh(b + 1)', 'arctanh(x / 3)', 'atan2(a, b)', 'x°',
+        'pi x^2', 'tau', 'x < ∞', '-∞ < a',
+        // min/max, rounding, mod
+        'max(a, b, x)', 'min(a, y)', 'max(a, b) / min(b, 3)', 'abs(a)', 'floor(x a)', 'ceil(x a)', 'round(x / 3, 2)',
+        'round(a / b)', 'a mod b', '(a + 1) mod 3', 'a ≡ b (mod 3)',
+        // comparisons and logic
+        'a > b', 'a = 10', 'a ≠ 3', 'a ≤ b', 'x ≥ y', 'x ≈ 0.25', 'a > 0 and b < 4', 'a > 5 or x < 0.5',
+        'not (a > 0)', 'a > 0 xor b > 3', 'a > 0 nand b > 3', 'a > 0 nor b > 3', 'true & a > 0',
+        'if a > 0 then a / b else x', 'a > 5 ? 1 : 0',
+        // membership
+        'a ∈ [3, 7]', 'a ∈ (3, 7]', 'a ∈ [3, 7)', 'a ∉ {7, 10}', 'b ∈ {2, 3}', 'a ∈ ℤ', 'x ∈ ℤ', 'a ∈ ℕ', 'x ∈ ℝ',
+        's = "Alpha"', 's = "O\'Neil"', 's ∈ {"Alpha", "Beta"}',
+    ];
+    for (const formula of formulas) {
+        test(formula, () => {
+            const postfix = parse(formula);
+            // evaluate() has no value for the degree sign, so give it one.
+            const expected = rows.map((r) => evaluate(postfix, { ...r, '°': Math.PI / 180 }));
+            check(formula, toSQL(postfix, { dialect: 'sqlite', quoteIdentifiers: true }), expected);
         });
     }
+
+    test('strToSQL over baseball columns', () => {
+        db.exec('CREATE TABLE bat (id INTEGER PRIMARY KEY, H INTEGER, AB INTEGER, HR INTEGER)');
+        const stats = [[150, 500, 30], [98, 410, 4], [0, 12, 0]];
+        const add = db.prepare('INSERT INTO bat (H, AB, HR) VALUES (?, ?, ?)');
+        for (const s of stats) add.run(...s);
+        const header = ['H', 'AB', 'HR'];
+        for (const formula of ['H / AB', 'h/ab > 0.25', 'HR / AB * 100', 'max(H, HR * 5)', 'round(H / AB, 3)',
+            'HR ∈ [1, 30)', '(H - HR) / (AB - HR)', 'mean(H, AB, HR)']) {
+            const sql = strToSQL(header, formula, new Map(), { dialect: 'sqlite' });
+            const fn = strToFunction(header, formula);
+            const expected = stats.map(([h, ab, hr]) => evaluate(fn.postfixArray, { c0: h, c1: ab, c2: hr }));
+            const got = db.prepare(`SELECT ${sql.sqlExpression} AS v FROM bat ORDER BY id`).all().map((r) => r.v);
+            got.forEach((g, i) => {
+                if (!same(g, expected[i])) throw new Error(`${formula} row ${i}: SQLite ${g}, evaluate ${expected[i]} (${sql.sqlExpression})`);
+            });
+        }
+    });
 });

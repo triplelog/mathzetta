@@ -1,0 +1,109 @@
+# ambiguity.tsv — input that can be read two ways, and the reading MathZetta takes (docs/how-it-works.md, "When math can be read two ways"; the home page shows some).
+# Columns: Input, Postfix, Text. A blank cell is not checked; ERROR (or ERROR: text) expects a refusal; a # line is a note.
+Input	Postfix	Text
+
+# Letters: words or products
+xy	["x","y","*"]	x * y
+speed	["speed"]	speed
+cos t	["t","cos"]	cos(t)
+cost	["cost"]	cost
+sinx	["x","sin"]	sin(x)
+xsinx	["x","x","sin","*"]	x * sin(x)
+\frac{rate}{time}	["r","a","*","t","*","e","*","t","i","*","m","*","e","*","/"]	r * a * t * e / (t * i * m * e)
+\frac{\text{rate}}{\text{time}}	["rate","time","/"]	rate / time
+rate/time	["rate","time","/"]	rate / time
+lg 100	["l","g","*","100","*"]	l * g * 100
+
+# Brackets: a call or a product
+f(x+1)	["x","1","+","1","\\:f"]	f(x + 1)
+x(t)	["t","1","\\:x"]	x(t)
+y(0)	["0","1","\\:y"]	y(0)
+x(x+1)	["x","x","1","+","*"]	x * (x + 1)
+x(x)	["x","x","*"]	x * x
+e(x+1)	["e","x","1","+","*"]	e * (x + 1)
+ab(c)	["a","c","1","\\:b","*"]	a * b(c)
+x * (t)	["x","t","*"]	x * t
+
+# Side by side: implicit products and division
+1/2x	["1","2","/","x","*"]	1 / 2 * x
+1/(2x)	["1","2","x","*","/"]	1 / (2 * x)
+a/bc	["a","b","/","c","*"]	a / b * c
+a/(bc)	["a","b","c","*","/"]	a / (b * c)
+e^2x	["e","2","^","x","*"]	e^2 * x
+e^{2x}	["e","2","x","*","^"]	e^(2 * x)
+2^x+1	["2","x","^","1","+"]	2^x + 1
+
+# How far a bare function reaches
+sin 2x	["2","x","*","sin"]	sin(2 * x)
+sin x^2	["x","2","^","sin"]	sin(x^2)
+sin x cos x	["x","sin","x","cos","*"]	sin(x) * cos(x)
+sin x/x	["x","sin","x","/"]	sin(x) / x
+sin^2 x	["x","sin","2","^"]	sin(x)^2
+
+# Powers of -1: reciprocal, inverse trig, inverse function
+x^-1	["x","-1","^"]	x^-1
+sin^-1 x	["x","arcsin"]	arcsin(x)
+\sin^{-1} x	["x","arcsin"]	arcsin(x)
+(\sin x)^{-1}	["x","sin","-1","^"]	sin(x)^-1
+f^{-1}(x)	["x","1","\\:f⁻¹"]	f⁻¹(x)
+
+# log
+log x	["x","ln"]	ln(x)
+\log x	["x","ln"]	ln(x)
+log_10(x)	["10","x","log"]	log_10(x)
+log10(100)	["10","100","log"]	log_10(100)
+log(8, 2)	["2","8","log"]	log_2(8)
+
+# mod, % and percent
+2 + 3 mod 4	["2","3","+","4","mod"]	(2 + 3) mod 4
+2 + 3 % 4	["2","3","4","mod","+"]	2 + (3 mod 4)
+50% * 8	["50%","8","*"]	50% * 8
+10%3	["10","3","mod"]	10 mod 3
+a ≡ b (mod n)	["a","b","≡","n","pmod"]	a ≡ b (mod n)
+
+# Minus signs and powers; spreadsheet rules after =
+-2^2	["2","2","^","neg"]	-2^2
+2^3^2	["2","3","2","^","^"]	2^3^2
+2^-3^2	["2","3","2","^","neg","^"]	2^(-3^2)
+=-2^2	["-2","2","^"]	(-2)^2
+=2^3^2	["2","3","^","2","^"]	(2^3)^2
+
+# One symbol, several jobs
+|a||b|	["a","abs","b","abs","*"]	|a| * |b|
+a | b	["a","b","|"]	a ∨ b
+\{x | x > 0\}	["x","x","0",">","setbuilder"]	{x : x > 0}
+{x : x > 0}	["x","x","0",">","setbuilder"]	{x : x > 0}
+{x | x > 0}	["x","x","0",">","|"]	x ∨ x > 0
+n!	["n","!"]	n!
+!n	["n","\\not"]	¬n
+!7!	["7","!","\\not"]	¬7!
+f'(x)	["x","1","\\:f′"]	f′(x)
+'hello'	["'hello'"]	'hello'
+(0, 1)	["0","1","2","()"]	(0, 1)
+x \in (0, 1)	["x","0","1","2","()","∈"]	x ∈ (0, 1)
+f(0, 1)	["0","1","2","\\:f"]	f(0, 1)
+x = 1, y = 2	["x","1","=","y","2","=","&"]	x = 1 ∧ y = 2
+3 < x < 7	["3","x","<","7","<"]	3 < x < 7
+
+# How far calculus reaches
+d/dx x^2 + 1	["x","2","^","1","+","x","der"]	d/dx(x^2 + 1)
+\frac{d}{dx} x^2 + 1	["x","2","^","1","+","x","der"]	d/dx(x^2 + 1)
+\int x^2 + 1 dx	["x","2","^","1","+","x","2","int"]	∫ x^2 + 1 dx
+\lim_{x\to 0} x + 1	["x","x","0","→","2","lim","1","+"]	lim(x, x → 0) + 1
+\lim_{x\to 0} (x + 1)	["x","1","+","x","0","→","2","lim"]	lim(x + 1, x → 0)
+\sum_{i=1}^n i + 1	["i","i","1","=","n","3","\\sumidx","1","+"]	sum(i, i = 1, n) + 1
+x dx	["x","d","*","x","*"]	x * d * x
+\int x\,dx	["x","x","2","int"]	∫ x dx
+
+# Numbers with spaces: thousands, mixed numbers, products
+1 000	["1000"]	1000
+12 345 678	["12345678"]	12345678
+2 3	["2","3","*"]	2 * 3
+1 1/2	["1","1","2","/","+"]	1 + 1 / 2
+2 3/4	["2","3","4","/","+"]	2 + 3 / 4
+1 3/2	["1","3","*","2","/"]	1 * 3 / 2
+1\frac{1}{2}	["1","1","2","/","+"]	1 + 1 / 2
+3\frac{x}{2}	["3","x","2","/","*"]	3 * (x / 2)
+2x 3	["2","x","*","3","*"]	2 * x * 3
+1, 2	ERROR: A list of values needs brackets around i	
+1,000	ERROR: A list of values needs brackets around i	
