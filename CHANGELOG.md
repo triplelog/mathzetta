@@ -2,9 +2,22 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
-## mathzetta 1.5.0
+## mathzetta 1.5.0, @mathzetta/inlinemath 0.4.1, @mathzetta/cas 0.3.1
 
-Not published yet.
+### @mathzetta/cas 0.3.1
+
+- Steps: d/dx x = 1 is never a step of its own. Where the chain rule leaves a dx/dx factor (sin x → cos x · dx/dx),
+  it is folded into that step, which goes straight to cos x and says the derivative of x is 1.
+- README: limits, inequalities and improper integrals; x^x is differentiated by the CAS's `diff`.
+
+### @mathzetta/inlinemath 0.4.1
+
+- Brackets around one line sit from the baseline, as typed brackets do (0.25em below it to 0.75em above), whatever the
+  font's line box; around taller content they still fill it.
+- README: CDN pins at `@0.4` (a 0.x range never reaches the next minor version), measured bundle sizes, `limit(…)`
+  blocks, and evaluation bars no longer listed as missing.
+
+### mathzetta 1.5.0
 
 - **`away` in filter shaders** (`mathzetta/glsl`'s `filterShader`): how far this pixel is from the selection, in
   pixels — 0 inside it, and everywhere without one. It is read from a frame-sized picture the caller binds as

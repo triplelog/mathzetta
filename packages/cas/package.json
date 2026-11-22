@@ -1,6 +1,6 @@
 {
   "name": "@mathzetta/cas",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MathZetta CAS: exact computer algebra with explained steps — simplify, expand, factor, solve, differentiate, integrate, any-precision decimals, complex numbers — on a rule engine whose rules are readable YAML over MathZetta postfix.",
   "type": "module",
   "main": "src/cas/index.js",

@@ -1,6 +1,6 @@
 {
   "name": "@mathzetta/inlinemath",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Draw calculus-level math as HTML and CSS from anything MathZetta reads, with every part addressable.",
   "type": "module",
   "main": "src/index.js",
