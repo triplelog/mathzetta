@@ -512,6 +512,13 @@ class Layout {
         };
         const l = side(open, 'l');
         const rr = side(close, 'r');
+        // Around one line, the brackets sit where typed ones do, from the baseline (0.25em below it to 0.75em
+        // above: .mv-fence-line), whatever the font's line box; around taller content they fill the box.
+        if (!tall) {
+            const b = box(this.el('fence fence-line', l.html + inner.html + rr.html), Math.max(inner.h, LH), Math.max(inner.d, LD));
+            b.fenced = true;
+            return b;
+        }
         const style = `padding:${em(pad)} ${em(rr.w)} ${em(pad)} ${em(l.w)}`;
         const b = box(this.el('fence', l.html + inner.html + rr.html, style), Math.max(inner.h, LH) + pad, Math.max(inner.d, LD) + pad);
         b.fenced = true;

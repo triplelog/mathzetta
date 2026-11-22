@@ -41,8 +41,34 @@ export function stepOptions(option) {
 }
 
 /** The raw steps → the ones asked for. */
+/**
+ * d/dx x = 1 is never a step of its own: where a step leaves a dx/dx factor (the chain rule's inner
+ * derivative when the inside is just x: sin x → cos x · dx/dx), the "Derivative of the variable" step that
+ * follows is folded into it, so it goes straight to cos x and says why.
+ */
+function foldVariableDerivatives(raw) {
+  const out = [];
+  for (const step of raw) {
+    const prev = out[out.length - 1];
+    const leftover = step.id === 'd-variable' && prev && /^(\S+) \1 der$/.test(step.before ?? '') && ` ${prev.after ?? ''} `.includes(` ${step.before} `);
+    if (!leftover) { out.push(step); continue; }
+    const folded = { ...prev, to: step.to };
+    // what the earlier step wrote, with dx/dx as 1 and the ·1 gone: cos x · dx/dx → cos x, 3 · dx/dx → 3
+    if (prev.after) folded.after = ` ${prev.after} `.replace(` ${step.before} `, ' 1 ').replace(/ 1 \*(?= )/g, '').trim();
+    if (prev.explanation) {
+      const v = step.before.split(' ')[0];
+      folded.explanation = prev.explanation.endsWith(`the derivative of ${v}.`)
+        ? `${prev.explanation.slice(0, -1)}, which is 1.`
+        : `${prev.explanation} The derivative of ${v} is 1.`;
+    }
+    out[out.length - 1] = folded;
+  }
+  return out;
+}
+
 export function selectSteps(raw, options) {
   if (!options) return [];
+  raw = foldVariableDerivatives(raw);
   const out = [];
   let pending = null;   // hidden steps not yet folded into a shown one
   for (const step of raw) {

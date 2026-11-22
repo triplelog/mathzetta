@@ -90,6 +90,15 @@ span.mv-delim { width: 0.16em; border: 0 solid currentColor; box-sizing: border-
 .mv-delim.mv-rfloor { border-width: 0 0.06em 0.06em 0; }
 .mv-delim.mv-lceil { border-width: 0.06em 0 0 0.06em; }
 .mv-delim.mv-rceil { border-width: 0.06em 0.06em 0 0; }
+/* around one line: inline, placed from the baseline like a typed bracket (0.25em below it, 0.75em above),
+   not stretched over the line box, which sits higher or lower in every font; the margins keep the widths */
+.mv-fence-line > .mv-delim { position: static; display: inline-block; vertical-align: -0.25em; height: 1em; }
+.mv-fence-line > svg.mv-delim-l { margin: 0 0.07em 0 0.03em; }
+.mv-fence-line > svg.mv-delim-r { margin: 0 0.03em 0 0.07em; }
+.mv-fence-line > span.mv-delim-l { margin: 0 0.08em 0 0.06em; }
+.mv-fence-line > span.mv-delim-r { margin: 0 0.06em 0 0.08em; }
+.mv-fence-line > .mv-delim.mv-vert.mv-delim-l { margin: 0 0.11em 0 0.07em; }
+.mv-fence-line > .mv-delim.mv-vert.mv-delim-r { margin: 0 0.07em 0 0.11em; }
 
 /* ---- shapes ----------------------------------------------------------------- */
 .mv svg { overflow: visible; }

@@ -190,6 +190,11 @@ test('the radical\'s hook is drawn inside the radicand and sized by CSS, so its 
     }
 });
 
+test('brackets around one line sit from the baseline like typed ones; around taller content they fill it', () => {
+    for (const input of ['f(x)', '[0, 1)', '|x|', '\\{1, 2\\}', '\\lfloor x \\rfloor']) assert.ok(has(toHTML(input), 'fence-line'), input);
+    for (const input of ['\\left(\\frac{1}{x}\\right)', '\\left|\\frac{x-1}{x+1}\\right|']) assert.ok(!has(toHTML(input), 'fence-line'), input);
+});
+
 test('every delimiter kind draws', () => {
     for (const input of ['(x+1)^2', '[0, 1)', '\\{1, 2\\}', '|x|', '\\lfloor x \\rfloor', '\\lceil x \\rceil', '\\binom{n}{k}']) {
         assert.ok(has(toHTML(input), 'fence'), input);

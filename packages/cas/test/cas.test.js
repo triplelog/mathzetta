@@ -169,6 +169,15 @@ suite('cas: systems, substitution, equivalence', () => {
     equal(cas.solveSystem(['x + y = 1', '2x + 2y = 2'], ['x', 'y']).status, 'many');
   });
   test('substitute', () => equal(cas.substitute('x^2 + y', { x: 3, y: 'z + 1' }).text, 'z + 10'));
+  test('d/dx x = 1 is folded into the step that left it: sin x goes straight to cos x', () => {
+    const names = (f) => cas.diff(f, 'x', { steps: true }).steps.map((s) => s.name);
+    equal(names('sin(x)').join(', '), 'Derivative of sine');
+    equal(cas.diff('sin(x)', 'x', { steps: true }).steps[0].to, 'x cos');
+    equal(cas.diff('sin(x)', 'x', { steps: true }).steps[0].explanation, 'Sine differentiates to cosine, times the derivative of x, which is 1.');
+    equal(names('sin(3x)').join(', '), 'Derivative of sine, Constant multiple rule');
+    for (const f of ['e^x', 'ln(x)', 'x^2 sin(x)', 'cos(x)^2']) assert(!names(f).includes('Derivative of the variable'), f);
+    equal(names('x').join(', '), 'Derivative of the variable', 'd/dx x alone is still its own step');
+  });
   test('a derivative at a point, der(f, x = a), is worked out wherever it is read', () => {
     equal(cas.simplify('der(x^3, x = 2)', { steps: false }).text, '12');
     equal(cas.simplify('der(x^3, x = a, 2) + 1', { steps: false }).text, '6a + 1');   // the second derivative at a
