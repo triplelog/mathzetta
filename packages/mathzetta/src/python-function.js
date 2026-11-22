@@ -36,9 +36,10 @@
 import { treeOf } from './input.js';
 import { toCode, pythonName, boundVariables } from './render/code.js';
 import { isCustomFunction } from './operators.js';
-import { customName } from './common.js';
+import { customName, substringTest, isStartsWith } from './common.js';
 import { walk } from './tree.js';
 import { UnsafeCodeError } from './safe.js';
+import { PY_HELPERS, NP_HELPERS } from './js-helpers.js';
 import { toLatex } from './render/latex.js';
 import { replaceColumnNames, columnIndexOf } from './columns.js';
 
@@ -72,6 +73,11 @@ const IMPORTS = {
     math: 'import math', random: 'import random', np: 'import numpy as np', sympy: 'import sympy',
     'scipy.integrate': 'import scipy.integrate', 'scipy.special': 'import scipy.special',
 };
+/** [exact text, name, module]: the inline helpers, longest first. */
+const HELPER_TEXTS = [
+    ...Object.entries(NP_HELPERS).map(([name, source]) => [source, `np.${name}`, 'np']),
+    ...Object.entries(PY_HELPERS).map(([name, source]) => [source, name, null]),
+].sort((a, b) => b[0].length - a[0].length);
 /** Built-ins the renderer calls. */
 const CALLS = new Set(['abs', 'max', 'min', 'round', 'sum', 'range', 'float', 'format', 'str', 'sorted', 'set']);   // format, str: what fixed() writes; sorted(set(a) | set(b)): ∪
 const KEYWORDS = new Set(['for', 'in', 'if', 'else', 'and', 'or', 'not', 'lambda', 'True', 'False', 'None']);
@@ -101,6 +107,14 @@ function scanPython(code, variables, functions) {
         const match = (re) => re.exec(rest)?.[0];
         let text;
         if ((text = match(/^[ \t]+/))) { i += text.length; continue; }
+        // the text-search helpers render/code.js writes, matched as exact text (as checkGeneratedJs matches
+        // JavaScript's): their insides (a lambda, .join, .startswith) are allowed nowhere else
+        const helper = HELPER_TEXTS.find(([source]) => rest.startsWith(source));
+        if (helper) {
+            tokens.push({ type: 'id', value: helper[1], helper: true, module: helper[2] });
+            i += helper[0].length;
+            continue;
+        }
         if ((text = match(/^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/))) tokens.push({ type: 'num', value: text });
         else if ((text = match(NAME))) tokens.push({ type: 'id', value: text.normalize('NFKC') });
         else if (rest[0] === '"') {
@@ -167,6 +181,11 @@ function scanPython(code, variables, functions) {
             next.owner = prev?.owner && MEMBERS[`${prev.owner}.${after}`] ? `${prev.owner}.${after}` : null;
             next.member = true;
             if (IMPORTS[next.owner]) modules.add(next.owner);
+            return;
+        }
+        if (t.helper) {
+            if (!isP(next, '(')) fail(`the helper ${t.value} without a call`);
+            if (t.module) modules.add(t.module);
             return;
         }
         if (t.type !== 'id' || t.member) return;
@@ -244,6 +263,17 @@ function freeOutsideBinding(tree, v) {
     return found;
 }
 
+/** The names a text search reads ("ab" in name, startswith(name, prefix)): numpy must not make them floats. */
+function textNames(tree) {
+    const names = new Set();
+    walk(tree, (n) => {
+        const search = substringTest(n);
+        const args = search ? [search.within, search.text] : n.type === 'op' && isStartsWith(n.op) ? n.args : [];
+        for (const a of args) if (a.type === 'symbol') names.add(pythonName(a.value));
+    });
+    return names;
+}
+
 /** In numpy labels, sum(HR) of one column is Σ HR, not HR (as a sum of one value would be written). */
 const AGGREGATE_LATEX = { sum: '\\sum ', prod: '\\prod ', mean: '\\mathrm{mean}' };
 function aggregateLatex(node, latex) {
@@ -273,7 +303,7 @@ function columnVariable(column, taken) {
  *
  * @param {{ name: string, source: string }[]} columns variable ← `data["HR"]`
  */
-function bodyLines(expr, { numpy, sympy, bound = [], errors, params, columns, signature }) {
+function bodyLines(expr, { numpy, sympy, bound = [], errors, params, columns, signature, texts = new Set() }) {
     const I = '    ';
     if (sympy) {
         // The variables calculus binds are symbols here; one that is also a parameter is differentiated
@@ -291,7 +321,9 @@ function bodyLines(expr, { numpy, sympy, bound = [], errors, params, columns, si
         if (errors === 'raise') return [...lines, `return ${expr}`];
         return [...lines, 'try:', `${I}return ${expr}`, 'except (ArithmeticError, ValueError):', `${I}return math.nan`];
     }
-    const lines = params.map((p) => `${p} = np.asarray(${p}, dtype=float)`);
+    // a value that is searched as text is taken as it comes (whole numbers and booleans as floats, as a column is)
+    const lines = params.flatMap((p) => (texts.has(p) ? [`${p} = np.asarray(${p})`, `${p} = ${p}.astype(float) if ${p}.dtype.kind in "iub" else ${p}`]
+        : [`${p} = np.asarray(${p}, dtype=float)`]));
     for (const { name, source } of columns) {
         lines.push(`${name} = np.asarray(${source})`, `${name} = ${name}.astype(float) if ${name}.dtype.kind in "iub" else ${name}`);
     }
@@ -452,6 +484,7 @@ export function toPythonFunction(input, options = {}) {
 
     const lines = bodyLines(body, {
         numpy, sympy, bound, errors, params: params.filter((p) => p !== table), columns: [...columns.values()], signature: signature(),
+        texts: numpy ? textNames(tree) : undefined,
     });
     if (numpy) scanned.modules.add('np');
     if (sympy) scanned.modules.add('sympy');

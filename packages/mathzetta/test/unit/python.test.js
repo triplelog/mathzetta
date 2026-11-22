@@ -436,3 +436,54 @@ suite('python: a comparison inside a comparison', () => {
     if (hasPython) test('Python gives what evaluate() gives', run({}, (code) => code));
     if (hasNumpy) test('numpy gives what evaluate() gives', run({ numpy: true }, (code) => `np.asarray(${code}).item()`));
 });
+
+// "ab" in name, startswith(name, "ab"): the inline helpers, which the gate knows as exact text only
+suite('python: text search', () => {
+    const CASES = [
+        ['"ab" in "CAB"', true], ['"ab" ∉ "CAB"', false], ['startswith("Abc", "ab")', true], ['startswith("Abc", "bc")', false],
+        ['"é" in "É"', false], ['"%" in "a_b"', false], ['"6" in 62', true], ['2 * startswith("ab", "A") + 1', 3], ['2 * ("x" ∉ "ab") + 1', 3],
+    ];
+    test('toPythonFunction takes what toPython writes, plain and numpy', () => {
+        for (const f of ['"ab" in name', '"ab" ∉ name', 'startswith(name, "ab")', 'not startswith(name, p) and x > 1']) {
+            for (const numpy of [false, true]) {
+                const fn = toPythonFunction(f, { numpy });
+                eq(fn.params.includes('name'), true, f);
+                eq(checkGeneratedPython(toPython(f, { numpy }), { variables: fn.params }), toPython(f, { numpy }));
+            }
+        }
+        // numpy keeps a searched value as it comes (text), not as floats
+        eq(toPythonFunction('startswith(name, "a") or x > 1', { numpy: true }).code.includes('name = np.asarray(name)\n'), true);
+        eq(toPythonFunction('startswith(name, "a") or x > 1', { numpy: true }).code.includes('x = np.asarray(x, dtype=float)\n'), true);
+    });
+    test('the gate opens for the exact helpers only, not for what is inside them', () => {
+        for (const code of ['str(name).lower()', '"ab".startswith("a")', '(lambda s: s.lower())(name)',
+            '"".join(name)', 'name.__class__', toPython('"ab" in name').replace('f(t) in f(s)', 'f(t) in f(s) or open(s)'),
+            toPython('"ab" in name').replace('(name, "ab")', '')]) {
+            let error = null;
+            try { checkGeneratedPython(code, { variables: ['name', 's', 't'] }); } catch (e) { error = e; }
+            eq(error instanceof UnsafeCodeError, true, code);
+        }
+    });
+    if (hasPython) test('Python gives what evaluate() gives; None and NaN are empty text, 62.0 is 62', () => {
+        const lines = CASES.map(([f]) => `print(int(${toPython(f)}))`);
+        const fn = toPythonFunction('"aa" in name');
+        const sw = toPythonFunction('startswith(name, "6")', { name: 'g' });
+        const out = runPython([fn.code, sw.code, ...lines,
+            'print([int(f(v)) for v in ["AAron", "aÀa", None, float("nan"), 62.0]])',
+            'print([int(g(v)) for v in [62.0, 6.5, None, True, "6x"]])'].join('\n')).trim().split('\n');
+        eq(out.slice(0, CASES.length).map(Number), CASES.map(([f, want]) => Number(want)));
+        eq(out.slice(0, CASES.length).map(Number), CASES.map(([f]) => Number(evaluate(f))));
+        eq(out[CASES.length], '[1, 0, 0, 0, 0]');
+        eq(out[CASES.length + 1], '[1, 1, 0, 0, 1]');
+    });
+    if (hasNumpy) test('numpy searches element by element', () => {
+        const fn = toPythonFunction('"aa" in name', { numpy: true });
+        const sw = toPythonFunction('not startswith(name, "ted")', { numpy: true, name: 'g' });
+        const out = runPython(['import numpy as np', fn.code, sw.code,
+            'v = np.array(["Aaron Judge", "Ted Williams", None, float("nan"), 62.0], dtype=object)',
+            'print(f(v).tolist(), g(v).tolist(), f(np.array(["xaAx", "b"])).tolist(), f(np.array([], dtype=str)).tolist(), bool(f("AAa")))',
+            ...CASES.map(([f]) => `print(int(np.asarray(${toPython(f, { numpy: true })}).item()))`)].join('\n')).trim().split('\n');
+        eq(out[0], '[True, False, False, False, False] [True, False, True, True, True] [True, False] [] True');
+        eq(out.slice(1).map(Number), CASES.map(([, want]) => Number(want)));
+    });
+});

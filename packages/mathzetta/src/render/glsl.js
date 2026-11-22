@@ -201,6 +201,7 @@ function operation(node, render, es3, filter = false) {
             const n = integerExponent(a);
             if (n === 2) return `sqrt(${render(b)})`;
             if (n === 3) return `mz_cbrt(${render(b)})`;
+            if (n === null || n % 2 !== 0) return `mz_root(${render(a)}, ${render(b)})`;   // real for an odd index (pow is undefined below 0)
             return `pow(${render(b)}, 1.0 / ${side(a, 'right', '/')})`;
         }
         case 'log': {
@@ -375,6 +376,7 @@ export const GLSL_HELPERS = [
         `${t} mz_sq(${t} x) { return x * x; }`,
         `${t} mz_cube(${t} x) { return x * x * x; }`,
         `${t} mz_cbrt(${t} x) { return sign(x) * pow(abs(x), ${t}(1.0 / 3.0)); }`,
+        `${t} mz_root(float n, ${t} x) { return mod(n, 2.0) == 1.0 ? sign(x) * pow(abs(x), ${t}(1.0 / n)) : pow(x, ${t}(1.0 / n)); }`,   // real for an odd n
         `${t} mz_round(${t} x) { return sign(x) * floor(abs(x) + 0.5); }`,   // halves away from zero; GLSL's round() may go either way
         `${t} mz_sinh(${t} x) { return (exp(x) - exp(-x)) / 2.0; }`,
         `${t} mz_cosh(${t} x) { return (exp(x) + exp(-x)) / 2.0; }`,

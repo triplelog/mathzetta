@@ -8,7 +8,7 @@
 import { suite, test, eq, throws } from '../harness.js';
 import {
     parse, evaluate, calculate, toLaTeX, toMathML, toText, toSpeech, toAudioSpeech, toJavaScript, toPython, toSQL, toExcel,
-    toGLSL, strToFunction, createRowEvaluator,
+    toGLSL, strToFunction, strToSQL, strToExcel, createRowEvaluator,
 } from '../../src/all.js';
 
 let DatabaseSync = null;
@@ -72,6 +72,90 @@ suite('agreement: evaluate, calculate, JavaScript and SQLite give one value', ()
         eq(toSQL('tau * x > -∞'), "(2 * PI()) * x > '-Infinity'");
         eq(toSQL(['user', 'current_user', '+']), '"user" + "current_user"');
         eq(toSQL('c = (a < b)'), 'c = (a < b)');
+    });
+});
+
+/** Text search: one answer everywhere — A to Z fold, nothing else does, nothing is a pattern, a number is its digits. */
+const TEXT_SEARCH = [
+    ['"ab" in "CAB"', true], ['"ab" ∉ "CAB"', false], ['contains("CAB", "AB")', true], ['"ba" in "CAB"', false],
+    ['startswith("Abc", "ab")', true], ['startswith("Abc", "bc")', false], ['not startswith("Abc", "AB")', false],
+    ['"é" in "É"', false], ['"%" in "a_b"', false], ['"_" in "a_b"', true], ['"6" in 62', true], ['startswith(62, "6")', true],
+    ['2 * startswith("ab", "A") + 1', 3], ['2 * ("x" ∉ "ab") + 1', 3], ['"" in "ab"', true],
+];
+
+suite('agreement: text search gives one answer in evaluate, calculate, JavaScript and SQLite', () => {
+    for (const [input, want] of TEXT_SEARCH) {
+        test(input, () => {
+            eq(Number(evaluate(input)), Number(want), `evaluate ${evaluate(input)}`);
+            eq(Number(calculate(input).value), Number(want), `calculate ${calculate(input).text}`);
+            eq(Number(runJs(input)), Number(want), `JavaScript ${toJavaScript(input)} → ${runJs(input)}`);
+            if (db) eq(Number(runSqlite(input)), Number(want), `SQLite ${toSQL(input, { dialect: 'sqlite' })} → ${runSqlite(input)}`);
+        });
+    }
+    test('a list is still searched for a member, in evaluate', () => {
+        eq(evaluate('"a" in L', { L: ['a', 'b'] }), true);
+        eq(evaluate('"A" in L', { L: ['a', 'b'] }), false);
+    });
+    test('startswith takes two arguments in evaluate and calculate too', () => {
+        throws(() => evaluate('startswith("ab")'), /startswith\(name, "Mc"\)/);
+        throws(() => calculate('startswith("ab", "a", 1)'), /startswith\(name, "Mc"\)/);
+    });
+    test('a spreadsheet brackets startswith, so it nests', () => {
+        eq(toExcel('2 * startswith(name, "a") + 1'), '=2*(LEFT(LOWER(name), LEN("a"))=LOWER("a"))+1');
+    });
+});
+
+suite('agreement: a root whose index is a column (known only as it runs) is real for an odd index', () => {
+    // over a table's columns, as tabview runs a formula: n and x are columns, so the code can't see the index
+    const H = ['n', 'x'];
+    const rows = [[3, -8, -2], [-3, -8, -0.5], [5, -32, -2], [2, 9, 3], [3, 27, 3], [1, -4, -4]];
+    for (const [n, x, want] of rows) {
+        test(`root(${n}, ${x}) = ${want}`, () => {
+            eq(close(evaluate('root(n, x)', { n, x }), want), true, `evaluate ${evaluate('root(n, x)', { n, x })}`);
+            eq(close(createRowEvaluator(strToFunction(H, 'root(n, x)').jsFunction)([n, x]), want), true, 'JavaScript');
+            if (db) {
+                const sql = strToSQL(H, 'root(n, x)', new Map(), { dialect: 'sqlite' }).sqlExpression;
+                eq(close(db.prepare(`SELECT ${sql} AS v FROM (SELECT ? AS n, ? AS x)`).get(n, x).v, want), true, `SQLite ${sql}`);
+            }
+        });
+    }
+    test('an even index of a negative number has no real value everywhere', () => {
+        eq(Number.isNaN(evaluate('root(n, x)', { n: 2, x: -4 })), true);
+        eq(Number.isNaN(createRowEvaluator(strToFunction(H, 'root(n, x)').jsFunction)([2, -4])), true);
+    });
+    test('the spreadsheet and GLSL check the index too', () => {
+        eq(toExcel('root(n, x)'), '=IF(AND(x<0, MOD(n,2)=1), -POWER(-x, 1/n), POWER(x, 1/n))');
+        eq(toGLSL('root(n, x)'), 'mz_root(n, x)');
+        eq(toGLSL('root(5, x)'), 'mz_root(5.0, x)', 'a constant odd index past 3 too: pow is undefined below 0');
+    });
+});
+
+suite('agreement: membership in a column is a text search (a column holds one value, never a list)', () => {
+    const H = ['name', 'team'];
+    const rows = [['Cab Team', 'ab', true], ['Cab Team', 'AB', true], ['Cab Team', 'zz', false], [null, 'ab', false], ['abc', null, true], [62, 6, true]];
+    for (const [name, team, want] of rows) {
+        test(`team in name with name ${JSON.stringify(name)}, team ${JSON.stringify(team)}`, () => {
+            for (const f of ['team in name', 'contains(name, team)']) {
+                eq(createRowEvaluator(strToFunction(H, f).jsFunction)([name, team]), want, `JavaScript ${f}`);
+                eq(createRowEvaluator(strToFunction(H, f.replace(' in ', ' not in ')).jsFunction)([name, team]), f.includes(' in ') ? !want : want, `not in`);
+                if (db) {
+                    const sql = strToSQL(H, f, new Map(), { dialect: 'sqlite' }).sqlExpression;
+                    eq(Boolean(db.prepare(`SELECT ${sql} AS v FROM (SELECT ? AS name, ? AS team)`).get(...[name, team].map((v) => (Number.isInteger(v) ? BigInt(v) : v))).v), want, `SQLite ${sql}`);   // whole numbers as INTEGER, as a table holds them
+                }
+            }
+        });
+    }
+    test('evaluate and calculate: a text in the scope is searched, a list is still a list', () => {
+        eq(evaluate('team in name', { team: 'ab', name: 'CAB' }), true);
+        eq(evaluate('x in L', { x: 2, L: [1, 2] }), true);
+        eq(calculate('team in name', { team: '"ab"', name: '"Cab"' }).text, 'true');
+        eq(evaluate('"ab" in "CAB"'), true, 'a quoted text on the right is a text too');
+    });
+    test('the spreadsheet searches as well', () => {
+        eq(strToExcel(H, 'team in name').excelFormula((i) => 'AB'[i] + '2'), '=ISNUMBER(FIND(LOWER(B2), LOWER(A2)))');
+    });
+    test('outside a table a name may be a list: toJavaScript keeps membership', () => {
+        eq(toJavaScript('team in name'), 'name.includes(team)');
     });
 });
 

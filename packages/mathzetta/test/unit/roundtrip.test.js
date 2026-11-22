@@ -166,3 +166,20 @@ suite('code people type', () => {
         test(code, () => eq(parse(code).join(' '), postfix));
     }
 });
+
+// Text search ("ab" in name, startswith(name, "ab")) is written as inline helpers in JavaScript, Python and numpy:
+// the reader takes them back (matched as exact text, so they hold no string literal: strings are placeholders by then)
+suite('round trip: text search comes back from the code outputs', () => {
+    const TEXT = ['"aa" in name', '"aa" ∉ name', 'contains(name, "AA")', 'startswith(name, "ted")', 'not startswith(name, "T")',
+        '2 * startswith(name, "A") + ("x" ∉ name)', 'startswith(name, "a") and "ron" in name or h > 60'];
+    const SCOPES = [{ name: 'Aaron', h: 62 }, { name: 'Ted Williams', h: 43 }, { name: 'Xavier', h: 70 }];
+    for (const format of ['javascript', 'python', 'numpy', 'text', 'latex']) {
+        test(format, () => {
+            for (const input of TEXT) {
+                const written = FORMATS[format](input);
+                const back = parse(written);
+                for (const scope of SCOPES) eq(Number(evaluate(back, scope)), Number(evaluate(input, scope)), `${input} → ${written} → ${back.join(' ')}`);
+            }
+        });
+    }
+});

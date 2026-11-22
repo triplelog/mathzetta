@@ -34,7 +34,7 @@
  */
 
 import { asTree, firstVariable, walk } from './tree.js';
-import { expandChain, percentDecimal, setCondition } from './common.js';
+import { expandChain, percentDecimal, setCondition, isStartsWith } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 import { evaluate as floatEvaluate } from './evaluate.js';
 import { parseTree, setBlockHandler } from './parse/index.js';
@@ -1067,6 +1067,7 @@ function calc(node, env) {
         const name = op.slice(2);
         const f = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;   // valueOf(1): the scope's own only
         if (typeof f !== 'function' && Object.prototype.hasOwnProperty.call(MATRIX_FUNCTIONS, name)) return MATRIX_FUNCTIONS[name](...args.map(v));
+        if (typeof f !== 'function' && isStartsWith(op)) return delegate(node, env);   // text: as evaluate() reads it
         if (typeof f !== 'function') throw new UnknownError(`no function ${op.slice(2)}`);
         return fromJS(f(...args.map((a) => toJS(v(a)))));
     }

@@ -60,8 +60,8 @@ import '@mathzetta/inlinemath/fonts/fonts.css';    // optional: Latin Modern, th
 
 ```html
 <!-- or from the CDN -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/inlinemath.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/fonts/fonts.css">  <!-- optional -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/fonts/fonts.css">  <!-- optional -->
 ```
 
 ### Lite: drawing only
@@ -146,8 +146,8 @@ npm run build        # dist/ (a few seconds)
 
 - **`dist/`** — Inline Math with everything inside, no import map or `node_modules` needed:
   - `inlinemath.js`, `markdown.js`, `cas.js` — ES modules (shared code in `dist/chunks/`);
-  - `inlinemath.global.min.js` (183 KB, 62 KB gzipped) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
-  - `inlinemath-cas.global.min.js` (323 KB, 104 KB gzipped) — the same plus the CAS (`InlineMath.mathCAS`, `casBlocks`, `stepsHTML`);
+  - `inlinemath.global.min.js` (207 KB, 71 KB gzipped) — a classic `<script>`: `window.InlineMath`, with Inline Math and the Markdown;
+  - `inlinemath-cas.global.min.js` (385 KB, 123 KB gzipped) — the same plus the CAS (`InlineMath.mathCAS`, `casBlocks`, `stepsHTML`);
   - `inlinemath.css` and `fonts/` — put both on the page.
 
 ```html
@@ -169,23 +169,23 @@ Every npm release's `dist/` is on jsDelivr (and unpkg); the bundles carry MathZe
 page needs nothing else:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/fonts/fonts.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/fonts/fonts.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/inlinemath.css">
 
 <!-- a script tag: window.InlineMath -->
-<script src="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/inlinemath.global.min.js"></script>
 <script>document.getElementById('out').innerHTML = InlineMath.toHTML('\\frac{d}{dx} x^2');</script>
 
 <!-- or modules: inlinemath.js, markdown.js, cas.js (the CAS one holds MathZetta CAS too) -->
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.js';
-  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/markdown.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/inlinemath.js';
+  import { markdownToHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/markdown.js';
 </script>
 ```
 
-`@0.2` follows the latest 0.2.x; `@0.2.0` pins a release.
+`@0.4` follows the latest 0.4.x (a 0.x range never reaches the next minor version); `@0.4.0` pins a release.
 
-**The stylesheet is required** — the drawing is HTML laid out by `inlinemath.css` (10.4 KB, 3.2 KB
+**The stylesheet is required** — the drawing is HTML laid out by `inlinemath.css` (10.5 KB, 3.2 KB
 gzipped): without it fractions, radicals and brackets don't line up. The classic builds
 (`*.global.min.js`) carry it and add it to the page themselves (`<style id="inlinemath-css">`; a
 `<link>` to `dist/inlinemath.css` is still fine, it is only added when absent); the ES modules
@@ -196,17 +196,17 @@ its Greek letters, which Latin Modern lacks, from New Computer Modern in the sam
 Greek never fetches those two; without the link the math is drawn in the system serif.
 
 Every build comes **with MathZetta inside, or without it** (`*.external.*`), with or without the
-CAS (MathZetta CAS). Sizes, gzipped:
+CAS (MathZetta CAS). Sizes, gzipped (a module with the shared chunks it imports):
 
 | | ES module | classic `<script>` (`window.InlineMath`) |
 |---|---|---|
-| Lite (drawing only), MathZetta inside | `lite.js` 35 KB | `inlinemath-lite.global.min.js` 38 KB |
-| Lite with the calculator (`{{…}}` worked out) | `lite-calc.js` 48 KB | `inlinemath-lite-calc.global.min.js` 52 KB |
-| Lite without MathZetta | `lite.external.js` 8 KB | `inlinemath-lite.external.global.min.js` 11 KB |
-| Inline Math (+ Markdown in the classic build), MathZetta inside | `inlinemath.js` 51 KB, `markdown.js` 55 KB | `inlinemath.global.min.js` 62 KB |
-| …without MathZetta | `inlinemath.external.js` **12 KB**, `markdown.external.js` 15 KB | `inlinemath.external.global.min.js` 21 KB |
-| with the CAS, MathZetta inside | `cas.js` 90 KB | `inlinemath-cas.global.min.js` 104 KB |
-| with the CAS, without MathZetta | `cas.external.js` 50 KB | `inlinemath-cas.external.global.min.js` 63 KB |
+| Lite (drawing only), MathZetta inside | `lite.js` 42 KB | `inlinemath-lite.global.min.js` 43 KB |
+| Lite with the calculator (`{{…}}` worked out) | `lite-calc.js` 58 KB | `inlinemath-lite-calc.global.min.js` 60 KB |
+| Lite without MathZetta | `lite.external.js` 9 KB | `inlinemath-lite.external.global.min.js` 12 KB |
+| Inline Math (+ Markdown in the classic build), MathZetta inside | `inlinemath.js` 62 KB, `markdown.js` 66 KB | `inlinemath.global.min.js` 71 KB |
+| …without MathZetta | `inlinemath.external.js` **13 KB**, `markdown.external.js` 17 KB | `inlinemath.external.global.min.js` 21 KB |
+| with the CAS, MathZetta inside | `cas.js` 113 KB | `inlinemath-cas.global.min.js` 123 KB |
+| with the CAS, without MathZetta | `cas.external.js` 62 KB | `inlinemath-cas.external.global.min.js` 74 KB |
 
 Without MathZetta, the page loads it once itself: a classic page puts a MathZetta `<script>` first —
 `mathzetta.min.js`, or the `maths-display` flavor, since speech, text and calculate are used (for
@@ -221,7 +221,7 @@ map (every name can point at the one MathZetta bundle). The fonts are 94 KB more
                "mathzetta/calculate": "https://cdn.jsdelivr.net/npm/mathzetta@1/build/mathzetta.esm.min.js" } }
 </script>
 <script type="module">
-  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.2/dist/inlinemath.external.js';
+  import { toHTML } from 'https://cdn.jsdelivr.net/npm/@mathzetta/inlinemath@0.4/dist/inlinemath.external.js';
 </script>
 ```
 
@@ -297,7 +297,8 @@ el.innerHTML = stepsHTML(mathCAS().solve('sqrt(x + 1) = x - 1', 'x', { steps: 'b
 ```
 
 Block functions: `simplify`, `expand`, `factor`, `cancel`, `diff(f, x[, n])`,
-`integrate(f, x[, a, b])`, `solve(eq, x)`, `approx(x[, digits])`; `d/dx …` and
+`integrate(f, x[, a, b])`, `solve(eq, x)`, `limit(f, x, a[, right|left])` (or `limit(f, x -> a^+)`),
+`approx(x[, digits])`; `d/dx …`, `\lim_{x \to a} …` and
 `∫ … dx` go to the CAS too; every other block is the calculator, as before.
 `stepsHTML` draws each step with the rewritten part highlighted and its
 explanation. `mathCAS({ rules, names })` uses rule files of your own;
@@ -309,7 +310,6 @@ playground: any input, any operation, detail level, and a live rule editor).
 ## What still needs doing
 
 **Notation MathZetta doesn't read yet** (Inline Math can only draw what parses):
-- **Evaluation bars:** `[F(x)]_0^1` reads as a power of a subscript, and `\left. F \right|_0^1` is rejected.
 - **Partial derivatives:** `\partial f / \partial x` becomes products.
 - **Derivative orders:** `f^{(4)}` becomes a power.
 - **Lists of answers:** `x = 2, x = -3` is rejected.

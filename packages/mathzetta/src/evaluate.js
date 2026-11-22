@@ -9,7 +9,7 @@
 
 import { treeOf } from './input.js';
 import { firstVariable } from './tree.js';
-import { expandChain, percentDecimal, repeatingDecimal, setCondition } from './common.js';
+import { expandChain, percentDecimal, repeatingDecimal, setCondition, substringTest, isStartsWith, startsWithArgs, foldText } from './common.js';
 import { matrixArithmetic, isMatrixValue, isVectorValue } from './matrix.js';
 
 // ---- matrices (lists of equally long lists): the matrix product, powers, determinants -----------
@@ -197,7 +197,23 @@ function value(node, scope) {
     if (op === '?:') return value(args[0], scope) ? value(args[1], scope) : value(args[2], scope);
     if (op === 'setbuilder') throw new Error('A set described by a condition has no list of values (test membership in it: y ∈ {x | P})');
     if ((op === '∈' || op === '∉') && setCondition(node)) return value(setCondition(node), scope);
-    if (op === '∈' || op === '∉') return membership(node, scope);
+    if (op === '∈' || op === '∉') {
+        // "ab" ∈ name: is the text in the value, whatever the case of A to Z (as every code output); a list is still a list
+        const search = substringTest(node);
+        if (search) {
+            const within = value(search.within, scope);
+            if (!Array.isArray(within)) return foldText(within).includes(foldText(value(search.text, scope))) === (op === '∈');
+        } else if (args[1].type === 'symbol' && scope && Object.prototype.hasOwnProperty.call(scope, args[1].value)) {
+            // team ∈ name, with name a text in the scope: a text search too (a list is still a list)
+            const within = value(args[1], scope);
+            if (typeof within === 'string') return foldText(within).includes(foldText(value(args[0], scope))) === (op === '∈');
+        }
+        return membership(node, scope);
+    }
+    if (isStartsWith(op)) {
+        const [text, start] = startsWithArgs(node).map((a) => value(a, scope));
+        return foldText(text).startsWith(foldText(start));
+    }
     if (op === 'random') return Math.random();
     if (op === 'evaluated') {   // [F]_a^b: F with x = b, minus F with x = a
         const [body, variable, lo, hi] = args;

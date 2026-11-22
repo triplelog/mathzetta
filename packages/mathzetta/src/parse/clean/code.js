@@ -22,7 +22,7 @@
  * `CASE WHEN`), on text whose strings are already placeholders.
  */
 
-import { JS_HELPERS } from '../../js-helpers.js';
+import { JS_HELPERS, PY_HELPERS, NP_HELPERS } from '../../js-helpers.js';
 
 const OPEN = '([{';
 const CLOSE = ')]}';
@@ -83,8 +83,10 @@ const setOf = (list) => (/^\[.*\]$/s.test(list.trim()) ? `{${list.trim().slice(1
 
 // ---- JavaScript's inline helpers (js-helpers.js) and loops ----------------------
 
+const HELPERS = [...Object.entries(JS_HELPERS), ...Object.entries(NP_HELPERS), ...Object.entries(PY_HELPERS)];   // numpy's hold Python's: first
+
 function jsHelpers(text) {
-    for (const [name, source] of Object.entries(JS_HELPERS)) {
+    for (const [name, source] of HELPERS) {
         for (let at = text.lastIndexOf(source); at >= 0; at = at > 0 ? text.lastIndexOf(source, at - 1) : -1) {
             const open = at + source.length;
             const close = text[open] === '(' ? closing(text, open) : -1;

@@ -20,7 +20,7 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -141,6 +141,10 @@ function operation(node, render, opts) {
     if (FUNCTIONS[op]) return `${FUNCTIONS[op]}(${list()})`;
     if (RECIPROCALS[op]) return `1/${RECIPROCALS[op]}(${render(a)})`;
     if (COMPARE[op]) return `${side(a, 'left')}${COMPARE[op]}${side(b, 'right')}`;
+    if (isStartsWith(op)) {   // LEFT, not SEARCH: SEARCH reads * and ? as wildcards
+        const [value, text] = startsWithArgs(node).map(render);
+        return `(LEFT(LOWER(${value}), LEN(${text}))=LOWER(${text}))`;   // bracketed: = is the loosest operator
+    }
     if (isCustomFunction(op)) {
         // only the functions the caller lists: a spreadsheet name could be WEBSERVICE or IMPORTXML
         const name = customName(op);
@@ -183,7 +187,13 @@ function operation(node, render, opts) {
                 return `IF(${v}<0, -POWER(-${v}, 1/${n}), POWER(${v}, 1/${n}))`;
             }
             const index = render(a);
-            return `POWER(${render(b)}, 1/${isAtom(a, index) ? index : `(${index})`})`;
+            const k = isAtom(a, index) ? index : `(${index})`;
+            if (a.type !== 'number' || /^-\d*[13579]$/.test(a.value)) {   // an index known only as it runs: real when odd (MOD takes the divisor's sign)
+                const x = render(b);
+                const v = isAtom(b, x) ? x : `(${x})`;
+                return `IF(AND(${v}<0, MOD(${k},2)=1), -POWER(-${v}, 1/${k}), POWER(${v}, 1/${k}))`;
+            }
+            return `POWER(${render(b)}, 1/${k})`;
         }
         case 'mod':
             return `MOD(${render(a)}, ${render(b)})`;
@@ -228,7 +238,8 @@ function operation(node, render, opts) {
                 ? `MOD((${render(a.args[0])})-(${render(a.args[1])}), ${render(b)})=0`
                 : `MOD(${render(a)}, ${render(b)})`;
         case '∈': case '∉': {
-            const test = membership(a, b, render);
+            const search = substringTest(node);   // "ab" ∈ name: FIND (no wildcards) on both in small letters
+            const test = search ? `ISNUMBER(FIND(LOWER(${render(search.text)}), LOWER(${render(search.within)})))` : membership(a, b, render);
             return op === '∈' ? test : `NOT(${test})`;
         }
         case '_':

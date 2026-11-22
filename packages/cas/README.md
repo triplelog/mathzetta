@@ -1,7 +1,8 @@
 # MathZetta CAS
 
 Exact computer algebra with steps you can read: simplify, expand, factor, cancel, differentiate,
-integrate, solve, approximate to any number of digits, and complex numbers if you ask for them. What
+integrate (improper integrals too), solve equations and inequalities, take limits (one-sided too),
+approximate to any number of digits, and complex numbers if you ask for them. What
 it knows about functions is YAML rules you can read, change, add to or replace; the engine under it
 applies any rules you give it.
 
@@ -153,8 +154,9 @@ never evaluates it, the rules rewrite it away. So d/dx of x² is `x 2 ^ x der`.
 
 The rules cover constants, sums, products, quotients, powers (`x^n`, `a^x`,
 `e^u`, roots), the trig, inverse trig and hyperbolic families, `ln`,
-`log_a`, `|u|`, and the chain rule through all of them; `x^x` is left as it
-is (it needs logarithmic differentiation).
+`log_a`, `|u|`, and the chain rule through all of them; these rules leave
+`x^x` as it is (it needs logarithmic differentiation). The CAS does that:
+`cas.diff('x x ^', 'x')` is x^x·(ln(x) + 1).
 
 Each differentiation step replaces one derivative with smaller ones. The
 product rule is the clearest case: one derivative becomes two, each wrapping
@@ -188,7 +190,7 @@ picks the one that reads better:
 | `x sin x cos * x der` | `_ _ * _ der` | product rule | both sides depend on `x` |
 | `x 2 ^ x der` | `_ _ ^ _ der` | power rule | base *is* the variable |
 | `2 x ^ x der` | `_ _ ^ _ der` | constant to a power | base is free of `x` |
-| `x x ^ x der` | `_ _ ^ _ der` | nothing | needs logarithmic differentiation |
+| `x x ^ x der` | `_ _ ^ _ der` | nothing | needs logarithmic differentiation (the CAS's `diff` has it) |
 | `2 3 ^ x der` | `_ _ der` | constant | priority 10 beats the deeper power rule |
 
 Differentiation always terminates: every rule strictly shrinks what sits under

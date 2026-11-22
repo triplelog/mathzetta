@@ -77,7 +77,7 @@ Fixed arity — no count token:
 | `der` | 2 | derivative: expression, variable — or, at a point, expression and `x = a` (an `=` node, as `lim` takes `x → a`): `x 3 ^ x 2 = der` is d/dx x³ at x = 2, drawn with a bar \|ₓ₌₂ and read from `der(f, x = a)` or `\left.\frac{d}{dx} f\right|_{x=a}`. `calculate` works out the point form, and a plain `der(f, x)` only where an enclosing ∫, ∑, lim or d/dx varies x (a value the caller gives x makes it a constant). Drawn and spoken everywhere; worked out by `calculate` (at a point) and SymPy. JavaScript, numeric Python, SQL, GLSL and spreadsheets refuse it by name, as they refuse `int` (without numeric bounds in Python), `lim` and, in SQL and GLSL, indexed sums and products | `x 2 ^ x der` = d/dx x² |
 | `=` `≠` `<` `>` `≤` `≥` | 2 | comparison | |
 | `===` `≠=` | 2 | strict (in)equality, from `===` and `!==` | |
-| `∈` `∉` | 2 | membership; the right side is usually a group | `x 0 1 2 [] ∈` |
+| `∈` `∉` | 2 | membership; the right side is usually a group. With a text on the left and no written-out set on the right it is a text search — `"ab" name ∈`, from `"ab" in name` or `contains(name, "ab")`: is the text somewhere in the value, whatever the case of the letters A to Z. JavaScript, Python, numpy, SQL and a spreadsheet write that test, and evaluate and calculate work it out (as they do `name "ab" 2 \:startswith`, from `startswith(name, "ab")`); no operator was added for either | `x 0 1 2 [] ∈` |
 | `→` | 2 | "tends to", inside limits | `x 0 →` |
 | `≈` | 2 | approximately equal | `x 1.414 ≈` |
 | `∪` `∩` | 2 | union, intersection | `-∞ 0 2 () 0 ∞ 2 () ∪` |

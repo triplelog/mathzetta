@@ -274,6 +274,38 @@ export function smallWhole(node, limit) {
 /** The name of a custom function: `\:myFunc` → `myFunc`. */
 export const customName = (op) => op.slice(2);
 
+// ---- text search ----
+// Two tests on text, written without operators of their own. `"ab" in name` (or contains(name, "ab")) is
+// membership with a text on the left and no written-out set on the right: is the text somewhere in the
+// value? `startswith(name, "ab")` is a function by that name. Both ignore the case of the letters A to Z
+// (only those: the same answer in JavaScript, SQLite and a column store that folds bytes) and read a
+// number by its digits. The outputs that can run them (JavaScript, Python, SQL, a spreadsheet) write
+// them out; the rest show them as they were written.
+const WRITTEN_SETS = new Set(['{}', '()', '[]', '(]', '[)', 'setbuilder', '∪', '∩']);
+
+/** For `x ∈ y` / `x ∉ y` that is a text search: { text, within }; else null. */
+export function substringTest(node) {
+    if (node.type !== 'op' || (node.op !== '∈' && node.op !== '∉') || node.args.length !== 2) return null;
+    const [text, within] = node.args;
+    // a text is never a list, and a table's column holds one value (the formula functions mark those: textSearch)
+    if (within.type === 'string' || node.textSearch) return { text, within };
+    if (text.type !== 'string') return null;
+    if (within.type === 'op' ? WRITTEN_SETS.has(within.op) : within.type === 'symbol' && /^[ℝℤℕℚℂ∅]$/u.test(within.value)) return null;
+    return { text, within };
+}
+
+/** Is this token the function startswith(value, text)? (Any capitals: startsWith, STARTSWITH.) */
+export const isStartsWith = (op) => typeof op === 'string' && op.startsWith('\\:') && op.slice(2).toLowerCase() === 'startswith';
+
+/** A value as the text searches read it: A to Z in small letters (only those), a missing value empty, a number its digits. */
+export const foldText = (x) => (x == null ? '' : String(x)).replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32));
+
+/** startswith's two arguments, or an error that says how it is written. */
+export function startsWithArgs(node) {
+    if (node.args.length !== 2) throw new Error('startswith takes a value and the text it starts with: startswith(name, "Mc")');
+    return node.args;
+}
+
 /**
  * d/dx applied n times: { n, body, by } for der(der(f, x), x) etc., `at` for a derivative at a point
  * (der(f, x = a): the point's value, else null), and whether the body is a plain variable, written dy/dx.

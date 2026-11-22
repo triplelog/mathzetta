@@ -24,6 +24,7 @@ import {
     calculate,
     fromPostfix,
 } from '../../src/all.js';
+import { PY_HELPERS, NP_HELPERS } from '../../src/js-helpers.js';
 
 // ---- from evaluate-formulas.test.js ----
 const E = (s, scope) => evaluate(parse(s), scope);
@@ -318,6 +319,107 @@ suite('sql: sqlite results match evaluate()', () => {
             got.forEach((g, i) => {
                 if (!same(g, expected[i])) throw new Error(`${formula} row ${i}: SQLite ${g}, evaluate ${expected[i]} (${sql.sqlExpression})`);
             });
+        }
+    });
+});
+
+// ---- text search: "ab" in name, contains(name, "ab"), startswith(name, "ab") ----
+suite('formulas: text search', () => {
+    const header = ['team', 'name', 'HR'];
+    const rows = [['NYA', 'Aaron Judge', 62], ['bos', 'Ted Williams', 43], ['', "Mc'Gee 50%_x*?", 0], [null, 'ÉMILE émile', 6]];
+    const js = (f) => {
+        const r = strToFunction(header, f);
+        if (!r.success) throw new Error(`${f}: ${r.error}`);
+        eq(r.unknownStrings, [], `${f}: no unknown names`);
+        const fn = createRowEvaluator(r.jsFunction);
+        return rows.map((row) => Number(Boolean(fn(row)))).join('');
+    };
+    test('a text in a value, whatever the case of A to Z; contains() is the same test', () => {
+        eq(js('"aa" in name'), '1000');
+        eq(js('contains(name, "AA")'), '1000');
+        eq(js('"ILLIAMS" ∈ name'), '0100');
+        eq(js('"aa" ∉ name'), '0111');
+        eq(js('not contains(name, "aa")'), '0111');
+        eq(parse('contains(name, "aa")'), parse('"aa" in name'));
+    });
+    test('startswith, in any capitals', () => {
+        eq(js('startswith(name, "ted")'), '0100');
+        eq(js('StartsWith(name, "Mc\'")'), '0010');
+        eq(js('startswith(name, "a") and HR > 50'), '1000');
+        eq(js('not startswith(name, "a")'), '0111');
+    });
+    test('only A to Z fold: É and é are different letters', () => {
+        eq(js('"émile" in name'), '0001');
+        eq(js('startswith(name, "émile")'), '0000');
+        eq(js('startswith(name, "Émile")'), '0001');
+    });
+    test('nothing in the text is a pattern; a number is read by its digits; a missing value is empty text', () => {
+        eq(js('"%_" in name'), '0010');
+        eq(js('"*?" in name'), '0010');
+        eq(js('"." in name'), '0000');
+        eq(js('"6" in HR'), '1001');
+        eq(js('startswith(HR, "4")'), '0100');
+        eq(js('"" in team'), '1111');
+        eq(js('"n" ∉ team'), '0111');
+    });
+    test('membership in a written set is still membership', () => {
+        eq(js('team in {"NYA", "BOS"}'), '1000');
+        eq(js('"NYA" in {"NYA", team}'), '1111');
+        eq(strToSQL(header, 'team in {"NYA", "BOS"}').sqlExpression, `"team" IN ('NYA', 'BOS')`);
+    });
+    test('startswith takes two arguments; other functions are still unknown', () => {
+        eq(strToFunction(header, 'startswith(name)').success, false);
+        eq(/startswith\(name, "Mc"\)/.test(strToSQL(header, 'startswith(name, "a", 1)').error), true);
+        eq(strToFunction(header, 'endswith(name, "x")').unknownStrings, ['endswith']);
+        eq(/unknown name endswith/.test(strToSQL(header, 'endswith(name, "x")').error), true);
+    });
+    test('the generated JavaScript passes the gate, and text in it stays text', () => {
+        for (const f of ['"aa" in name', 'startswith(name, "x\\" ); alert(1); (\\"")', '"${HR}" in name', "startswith(name, 'a') or \"`\" in name"]) {
+            const r = strToFunction(header, f);
+            eq(r.success && isSafeGeneratedJs(r.jsFunction, { variables: /^c\d+$/, keywords: false }), true, f);
+            eq(typeof createRowEvaluator(r.jsFunction)(rows[0]), 'boolean', f);
+        }
+    });
+    test('SQL, a spreadsheet and Python', () => {
+        eq(strToSQL(header, '"aa" in name', new Map(), { dialect: 'sqlite' }).sqlExpression, `(INSTR(LOWER(COALESCE("name", '')), LOWER(COALESCE('aa', ''))) > 0)`);
+        eq(strToSQL(header, '"aa" ∉ name', new Map(), { dialect: 'sqlite' }).sqlExpression, `(INSTR(LOWER(COALESCE("name", '')), LOWER(COALESCE('aa', ''))) = 0)`);
+        eq(strToSQL(header, "startswith(name, \"O'N\")", new Map(), { dialect: 'sqlite' }).sqlExpression, `(INSTR(LOWER(COALESCE("name", '')), LOWER(COALESCE('O''N', ''))) = 1)`);
+        eq(strToSQL(header, '"aa" in name').sqlExpression, `(STRPOS(LOWER(COALESCE(CAST("name" AS TEXT), '')), LOWER(COALESCE(CAST('aa' AS TEXT), ''))) > 0)`);
+        eq(toExcel('"aa" in name'), '=ISNUMBER(FIND(LOWER("aa"), LOWER(name)))');
+        eq(toExcel('"aa" ∉ name'), '=NOT(ISNUMBER(FIND(LOWER("aa"), LOWER(name))))');
+        eq(toExcel('startswith(name, "Mc")'), '=(LEFT(LOWER(name), LEN("Mc"))=LOWER("Mc"))');
+        eq(toPython('"aa" in name'), `${PY_HELPERS.contains}(name, "aa")`);
+        eq(toPython('"aa" ∉ name'), `(not ${PY_HELPERS.contains}(name, "aa"))`);
+        eq(toPython('startswith(name, "Mc")'), `${PY_HELPERS.startswith}(name, "Mc")`);
+        eq(toPython('"aa" in name', { numpy: true }), `${NP_HELPERS.contains}(name, "aa")`);
+        eq(toPython('"aa" ∉ name', { numpy: true }), `np.logical_not(${NP_HELPERS.contains}(name, "aa"))`);
+    });
+    test('SQLite gives the JavaScript answers', () => {
+        if (!DatabaseSync) return;
+        const db = new DatabaseSync(':memory:');
+        db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, team TEXT, name TEXT, HR INTEGER)');
+        const add = db.prepare('INSERT INTO t (team, name, HR) VALUES (?, ?, ?)');
+        for (const r of rows) add.run(...r);
+        for (const f of ['"aa" in name', 'contains(name, "AA")', '"aa" ∉ name', 'not contains(name, "aa")', 'startswith(name, "ted")', 'StartsWith(name, "Mc\'")',
+            '"émile" in name', '"É" in name', 'startswith(name, "Émile")', '"%_" in name', '"*?" in name', '"6" in HR', 'startswith(HR, "4")', '"" in team', '"n" ∉ team',
+            'not startswith(team, "n")', 'startswith(name, "a") and HR > 50', '"x" in team or "e w" in name', 'team in {"NYA", "BOS"}']) {
+            const sql = strToSQL(header, f, new Map(), { dialect: 'sqlite' });
+            if (!sql.success) throw new Error(`${f}: ${sql.error}`);
+            const got = db.prepare(`SELECT ${sql.sqlExpression} AS v FROM t ORDER BY id`).all().map((r) => Number(Boolean(r.v))).join('');
+            eq(got, js(f), `${f} (${sql.sqlExpression})`);
+        }
+    });
+    test('a missing text is empty text in SQLite too: the answer is never NULL', () => {
+        if (!DatabaseSync) return;
+        const db = new DatabaseSync(':memory:');
+        db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, prefix TEXT)');
+        db.prepare('INSERT INTO t (name, prefix) VALUES (?, ?), (?, ?), (?, ?)').run('Ted', null, null, null, 'Ted', 'x');
+        const h = ['name', 'prefix'];
+        for (const f of ['startswith(name, prefix)', 'not startswith(name, prefix)', 'startswith(prefix, name)']) {
+            const sql = strToSQL(h, f, new Map(), { dialect: 'sqlite' });
+            const got = db.prepare(`SELECT ${sql.sqlExpression} AS v FROM t ORDER BY id`).all().map((r) => String(r.v)).join(' ');
+            const fn = createRowEvaluator(strToFunction(h, f).jsFunction);
+            eq(got, [['Ted', null], [null, null], ['Ted', 'x']].map((row) => String(Number(fn(row)))).join(' '), `${f} (${sql.sqlExpression})`);
         }
     });
 });

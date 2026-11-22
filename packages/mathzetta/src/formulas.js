@@ -12,7 +12,7 @@ import { parse } from './parse/index.js';
 import { isOperator, isCustomFunction } from './operators.js';
 import { isNumber } from './parse/vocabulary.js';
 import { fromPostfix } from './tree.js';
-import { percentDecimal } from './common.js';
+import { percentDecimal, isStartsWith } from './common.js';
 import { checkGeneratedJs } from './safe.js';
 
 export { checkGeneratedJs, isSafeGeneratedJs, UnsafeCodeError } from './safe.js';
@@ -42,7 +42,7 @@ export function strToFunction(header, formula, unknownStringSelections = new Map
     let jsFunction;
     try {   // what JavaScript has no way to write (a limit, a derivative) is an answer, not an exception
         mathml = toMathml(namedTree(compiled));
-        jsFunction = toCode(fromPostfix(columnsAsIndexes));
+        jsFunction = toCode(textSearches(fromPostfix(columnsAsIndexes), compiled.types));
     } catch (error) {
         return { success: false, error: error.message, unknownStrings: compiled.unknownStrings };
     }
@@ -75,7 +75,7 @@ export function strToSQL(header, formula, unknownStringSelections = new Map(), o
     const columns = compiled.columnsAsNames.filter((_, i) => compiled.types[i] === 'column');
     let sqlExpression;
     try {
-        sqlExpression = toSqlCode(namedTree(compiled),
+        sqlExpression = toSqlCode(textSearches(namedTree(compiled), compiled.types),
             { dialect: options.dialect, quoteIdentifiers: true, stringQuote: "'", columns, functions: options.functions });
     } catch (error) {
         return { success: false, error: error.message, unknownStrings: compiled.unknownStrings };
@@ -107,7 +107,7 @@ export function strToExcel(header, formula, unknownStringSelections = new Map(),
     // A name that is no column is written as a name (a spreadsheet reads it as a named range, or #NAME?): unlike
     // SQL, where it would reach the database, nothing is refused — it is in unknownStrings for the caller to decide
     // (tabview writes values only; the Sheets sidebar asks). f(…) is written only for the functions listed.
-    const tree = fromPostfix(compiled.columnsAsIndexes);
+    const tree = textSearches(fromPostfix(compiled.columnsAsIndexes), compiled.types);
     const COLUMN = '\u0000column:';   // a name no formula can type
     (function visit(node) {
         if (node.type === 'op') node.args.forEach(visit);
@@ -137,7 +137,7 @@ const CONSTANTS = new Set(['pi', 'π', 'e', 'tau', 'τ', '°', '∞', '-∞']); 
 function unknownNames(compiled, options) {
     const listed = (name) => (typeof options.functions === 'function' ? options.functions(name) : (options.functions ?? []).includes(name));
     const unknown = compiled.columnsAsIndexes.filter((t, i) => (compiled.types[i] === 'unknown' && !CONSTANTS.has(t))
-        || (isCustomFunction(t) && !listed(t.slice(2))));
+        || (isCustomFunction(t) && !isStartsWith(t) && !listed(t.slice(2))));
     return unknown.length ? `unknown name ${unknown.map((t) => (isCustomFunction(t) ? t.slice(2) + '(…)' : t.replace(/^_(?=c\d+$)/, ''))).join(', ')}` : null;
 }
 
@@ -176,6 +176,19 @@ export function createRowEvaluator(jsCode) {
  * `max`, `sum`) and would be read as one if the names went back through
  * fromPostfix.
  */
+/**
+ * x ∈ column: a column holds one value (a text or a number), never a list, so membership in it is a text search,
+ * as "ab" ∈ name is: team ∈ name is "is the team's text in the name?" in every output (JavaScript, SQL, Excel).
+ */
+function textSearches(tree, types) {
+    (function visit(node) {
+        if (node.type !== 'op') return;
+        node.args.forEach(visit);
+        if ((node.op === '∈' || node.op === '∉') && node.args.length === 2 && node.args[1].type === 'symbol' && types[node.args[1].id] === 'column') node.textSearch = true;
+    })(tree);
+    return tree;
+}
+
 function namedTree({ columnsAsIndexes, columnsAsNames, types }) {
     const tree = fromPostfix(columnsAsIndexes);
     (function visit(node) {
@@ -216,7 +229,7 @@ function compile(header, formula, selections) {
         columnsAsNames.push(type === 'column' ? header[value] : value);
     });
     // f(x), alert(x): a function that isn't MathZetta's is reported like an unknown name
-    for (const token of postfix) if (isCustomFunction(token)) unknownStrings.push(token.slice(2));
+    for (const token of postfix) if (isCustomFunction(token) && !isStartsWith(token)) unknownStrings.push(token.slice(2));   // startswith is ours
     return { success: true, columnsAsIndexes, columnsAsNames, types, unknownStrings };
 }
 

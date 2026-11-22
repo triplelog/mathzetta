@@ -7,7 +7,7 @@
 
 import { firstVariable } from '../tree.js';
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, unaryNeedsBrackets, isMinusOneTimes, customName, substringTest, isStartsWith, startsWithArgs, expandChain, isText, guardLength, MATRICES, matrixRows, percentDecimal, withIndex , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 
 /**
  * @param {object} node expression tree
@@ -146,6 +146,7 @@ function operation(node, render, options) {
     if (op === 'vmatrix' || op === 'det') throw new Error('No SQL for a determinant');
     if (MATRICES[op]) return `ARRAY[${matrixRows(node).map((r) => `ARRAY[${r.map(render).join(', ')}]`).join(', ')}]`;
     if (GROUPS[op]) return GROUPS[op][0] + list() + GROUPS[op][1];
+    if (isStartsWith(op)) return textAt(...startsWithArgs(node).map(render), '= 1', options.sqlite);
     if (isCustomFunction(op)) {
         // f(x) names no SQL function of ours, and a name in SQL could be anything the database has
         // (a subquery's words, load_extension): only the functions the caller lists are written
@@ -178,6 +179,12 @@ function operation(node, render, options) {
                 if (n === 3 && !options.sqlite) return `CBRT(${x})`;
                 const v = /^[\w."]+$/.test(x) ? x : `(${x})`;
                 return `(CASE WHEN ${v} < 0 THEN -POWER(-${v}, 1.0 / ${n}) ELSE POWER(${v}, 1.0 / ${n}) END)`;
+            }
+            if (a.type !== 'number' || /^-\d*[13579]$/.test(a.value)) {   // an index known only as it runs: real when odd
+                const [x, k] = [render(b), render(a)];
+                const v = /^[\w."]+$/.test(x) ? x : `(${x})`;
+                const m = /^[\w."]+$/.test(k) ? k : `(${k})`;
+                return `(CASE WHEN ${v} < 0 AND ABS(${m}) - 2 * FLOOR(ABS(${m}) / 2.0) = 1 THEN -POWER(-${v}, 1.0 / ${m}) ELSE POWER(${v}, 1.0 / ${m}) END)`;
             }
             return `POWER(${render(b)}, 1.0 / (${render(a)}))`;
         }
@@ -234,8 +241,11 @@ function operation(node, render, options) {
             return args.map((x, i) => sideOf('*', x, i ? 'right' : 'left')).join(' * ');
         case 'mean':   // written out as a sum, so bracket like +
             return `((${args.map((x, i) => sideOf('+', x, i ? 'right' : 'left')).join(' + ')}) / ${args.length}.0)`;   // .0: whole numbers divide as whole numbers
-        case '∈': case '∉':
+        case '∈': case '∉': {
+            const search = substringTest(node);   // "ab" ∈ name: is the text in the value?
+            if (search) return textAt(render(search.within), render(search.text), node.op === '∈' ? '> 0' : '= 0', options.sqlite);
             return membership(node, render);
+        }
         case '±':
             return `ARRAY[${render(a)} + ${side(b, 'right')}, ${render(a)} - ${side(b, 'right')}]`;
         case '→':
@@ -272,7 +282,7 @@ function sqliteOperation(node, render, side, list, sideOf) {
         case 'fixed':   // text with exactly that many decimals
             return b.type === 'number' && /^\d+$/.test(b.value) ? `printf('%.${b.value}f', ${render(a)})` : `printf('%.' || (${render(b)}) || 'f', ${render(a)})`;
         case '∈': case '∉':
-            return sqliteNumberSet(node, render);
+            return substringTest(node) ? undefined : sqliteNumberSet(node, render);
     }
     return undefined;
 }
@@ -327,6 +337,16 @@ const POSTGRES_NUMBER_SETS = {
     'ℤ': (v) => `(${v} = TRUNC(${v}))`,
     'ℕ': (v) => `(${v} = TRUNC(${v}) AND ${v} > 0)`,
 };
+
+/**
+ * Where a text sits in a value, compared: `> 0` somewhere, `= 1` at the start, `= 0` nowhere. Letters fold
+ * with LOWER — A to Z in SQLite; PostgreSQL folds what its locale says. A number is read by its digits.
+ */
+function textAt(value, text, test, sqlite) {
+    // a missing value or text is empty text (as in JavaScript), so "not in" keeps its row and the answer is never NULL
+    return sqlite ? `(INSTR(LOWER(COALESCE(${value}, '')), LOWER(COALESCE(${text}, ''))) ${test})`
+        : `(STRPOS(LOWER(COALESCE(CAST(${value} AS TEXT), '')), LOWER(COALESCE(CAST(${text} AS TEXT), ''))) ${test})`;
+}
 
 function membership(node, render) {
     const [x, set] = node.args;

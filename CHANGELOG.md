@@ -2,6 +2,44 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
+## mathzetta 1.4.0
+
+Text search in formulas over table columns. Not published yet.
+
+- **`"ab" in name`** (or `"ab" ∈ name`, `contains(name, "ab")`): is the text somewhere in the value?
+  **`startswith(name, "ab")`**: does the value start with it? Both ignore the case of the letters A to Z, and
+  only those, so JavaScript and SQLite give the same answer for every text; nothing in the text is a pattern
+  (`%`, `_`, `*`, `?` are themselves); a number is read by its digits and a missing value is empty text. `∉` and
+  `not` give the opposite. `=` and membership in a written set (`team in {"NYA", "BOS"}`) are exact, as before.
+- Written by `strToFunction` / `toJavaScript` (two inline helpers, which `checkGeneratedJs` knows and the parser
+  reads back), `strToSQL` / `toSQL` (`INSTR(LOWER(…), LOWER(…))` in SQLite, `STRPOS` in PostgreSQL, whose
+  `LOWER` folds what its locale says), `toExcel` (`FIND` and `LEFT` over `LOWER`: no wildcards) and `toPython`
+  (inline helpers, below). SymPy and GLSL refuse text, as before; the other outputs show them as written.
+- **Membership in a column is a text search.** In the formula functions (`strToFunction`, `strToSQL`, `strToExcel`)
+  a column holds one value, never a list, so `team in name` and `contains(name, team)` with both columns search the
+  text, as `"ab" in name` does (it was `name.includes(team)`, case-sensitive, and `team IN (name)`, exact: the
+  table's backends disagreed). A quoted text on the right (`team in "NYA BOS"`) is a text search everywhere, and
+  `evaluate` searches a name whose value in the scope is a text. Outside the formula functions a name may be a
+  list, so `toJavaScript('team in name')` still tests membership.
+- **A root whose index is only known as it runs** (`root(n, x)`, n a column or a variable, or a negative odd number)
+  is real for an odd index in every output, as `evaluate` takes it: `root(n, x)` with n = 3, x = −8 is −2 in
+  JavaScript (the `root` helper checks the index), Python and numpy, SQL, spreadsheets and GLSL (a new `mz_root`
+  helper, also used for constant odd indexes past 3, where `pow` is undefined below 0). It was `x^(1/n)`: NaN.
+- No new operator and no change to the postfix: `"ab" name ∈` and `name "ab" 2 \:startswith` are what these
+  inputs already parsed to (docs/postfix.md). `startswith` is no longer reported among a formula's unknown names.
+- `evaluate` and `calculate` give the same answers as the code (`"ab" in "CAB"` is true, `startswith("Abc", "ab")`
+  too; a list in the scope is still searched for a member); test/unit/agreement.test.js holds all of them to one answer.
+- Python and numpy write two inline helpers (in `js-helpers.js`, beside JavaScript's) that fold A to Z only, as
+  JavaScript and SQLite do, read `None` and NaN as empty text and a whole float by its digits (62.0 is "62");
+  numpy's work element by element (`np.vectorize`), and a numpy function keeps a searched parameter as text.
+  `checkGeneratedPython` (so `toPythonFunction`) knows them as exact text, as `checkGeneratedJs` knows JavaScript's;
+  nothing inside them (`.lower`, `.join`, a lambda's default) is allowed anywhere else. The parser reads the
+  JavaScript, Python and numpy helpers back (they hold no string literal: JavaScript's empty text is `String()`).
+- SQL: a missing searched text (a NULL column in `startswith(name, prefix)`) is empty text too, so the answer is
+  never NULL. A spreadsheet's `startswith` is bracketed, so it nests in a larger formula.
+- **Behavior change:** `"ab" in name` used to compile to JavaScript's `name.includes("ab")` (which told the
+  case of letters apart) and to SQL's `'ab' IN ("name")` (equality).
+
 ## mathzetta 1.3.0, @mathzetta/inlinemath 0.4.0, @mathzetta/cas 0.3.0
 
 Calculus II notation that was misread or refused (a survey of precalculus through Calculus II inputs).

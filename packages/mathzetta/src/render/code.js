@@ -11,9 +11,9 @@
  */
 
 import { needsParens, isCustomFunction, operator } from '../operators.js';
-import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
+import { bracketOp, isMinusOneTimes, isVariable, smallWhole, customName, substringTest, isStartsWith, startsWithArgs, expandChain, guardLength, MATRICES, matrixRows, percentDecimal, conditionNeedsBrackets , repeatingDecimal, inverseReciprocal, evaluationDifference, setCondition } from '../common.js';
 import { firstVariable } from '../tree.js';
-import { JS_HELPERS } from '../js-helpers.js';
+import { JS_HELPERS, PY_HELPERS, NP_HELPERS } from '../js-helpers.js';
 
 const JS = {
     name: 'javascript', title: 'JavaScript',
@@ -25,11 +25,14 @@ const JS = {
     both: (a, b) => `(${a} && ${b})`, either: (a, b) => `(${a} || ${b})`, not: (x) => `!${x}`,
     xor: (a, b) => `(!(${a}) !== !(${b}))`,
     oddRoot: (x, n) => (n === 3 ? `Math.cbrt(${x})` : atom(x) ? `(${x} < 0 ? -Math.pow(-${x}, 1 / ${n}) : Math.pow(${x}, 1 / ${n}))` : `${JS_HELPERS.root}(${n}, ${x})`),
+    realRoot: (n, x) => `${JS_HELPERS.root}(${n}, ${x})`,
     close: (a, b) => `Math.abs((${a}) - (${b})) < 1e-9`,
     eq: { '=': '==', '===': '===', '≠': '!=', '≠=': '!==' },
     ternary: (c, t, f) => `(${c} ? ${t} : ${f})`,
     list: { '()': ['[', ']'], '[]': ['[', ']'], '{}': ['[', ']'], '(]': ['[', ']'], '[)': ['[', ']'] },
     contains: (list, x, negate) => `${negate ? '!' : ''}${list}.includes(${x})`,
+    substring: (within, text, negate) => `${negate ? '!' : ''}${JS_HELPERS.contains}(${within}, ${text})`,
+    startsWith: (value, text) => `${JS_HELPERS.startswith}(${value}, ${text})`,
     factorial: (x) => `${JS_HELPERS.factorial}(${x})`,
     perm: (n, k) => `${JS_HELPERS.perm}(${n}, ${k})`,
     comb: (n, k) => `${JS_HELPERS.comb}(${n}, ${k})`,
@@ -64,12 +67,17 @@ const PY = {
     both: (a, b) => `(${a} and ${b})`, either: (a, b) => `(${a} or ${b})`, not: (x) => `not ${x}`,
     xor: (a, b) => `((not (${a})) != (not (${b})))`,
     oddRoot: (x, n) => (n === 3 ? `math.cbrt(${x})` : once(x, (v) => `(-(-${v}) ** (1 / ${n}) if ${v} < 0 else ${v} ** (1 / ${n}))`)),   // math.cbrt: Python 3.11
+    // an index known only as it runs: real when it is odd (Python's % takes the divisor's sign: -3 % 2 is 1)
+    realRoot: (n, x) => once(x, (v) => `(-(-${v}) ** (1 / ${bracketed(n)}) if ${v} < 0 and ${bracketed(n)} % 2 == 1 else ${v} ** (1 / ${bracketed(n)}))`),
     close: (a, b) => `abs((${a}) - (${b})) < 1e-9`,   // as JavaScript and SQL: math.isclose has no absolute tolerance, so x ≈ 0 never held
     eq: { '=': '==', '===': '==', '≠': '!=', '≠=': '!=' },
     ternary: (c, t, f) => `(${t} if ${c} else ${f})`,
     list: { '()': ['(', ')'], '[]': ['[', ']'], '{}': ['{', '}'], '(]': ['(', ')'], '[)': ['(', ')'] },
     emptySet: 'set()',
     contains: (list, x, negate) => `${x} ${negate ? 'not in' : 'in'} ${list}`,
+    // inline helpers (js-helpers.js): A to Z fold as in JavaScript and SQLite, None is empty text
+    substring: (within, text, negate) => (negate ? `(not ${PY_HELPERS.contains}(${within}, ${text}))` : `${PY_HELPERS.contains}(${within}, ${text})`),
+    startsWith: (value, text) => `${PY_HELPERS.startswith}(${value}, ${text})`,
     factorial: (x) => `math.factorial(${x})`,
     perm: (n, k) => `math.perm(${n}, ${k})`,
     comb: (n, k) => `math.comb(${n}, ${k})`,
@@ -134,6 +142,9 @@ const NP = {
     close: (a, b) => `np.isclose(${a}, ${b})`,
     ternary: (c, t, f) => `np.where(${c}, ${t}, ${f})`,
     contains: (list, x, negate) => (negate ? `np.logical_not(np.isin(${x}, ${list}))` : `np.isin(${x}, ${list})`),
+    // element by element over arrays (np.vectorize of Python's helpers)
+    substring: (within, text, negate) => (negate ? `np.logical_not(${NP_HELPERS.contains}(${within}, ${text}))` : `${NP_HELPERS.contains}(${within}, ${text})`),
+    startsWith: (value, text) => `${NP_HELPERS.startswith}(${value}, ${text})`,
     factorial: (x) => `scipy.special.factorial(${x})`,
     perm: (n, k) => `scipy.special.perm(${n}, ${k})`,
     comb: (n, k) => `scipy.special.comb(${n}, ${k})`,
@@ -145,6 +156,7 @@ const NP = {
         return atom(v) && atom(d) ? body(simple(v) ? v : `(${v})`, p) : `(lambda _v, _p: ${body('_v', '_p')})(${v}, ${p})`;
     },
     oddRoot: (x, n) => (n === 3 ? `np.cbrt(${x})` : once(x, (v) => `np.where(${v} < 0, -np.power(-${v}, 1 / ${n}), np.power(${v}, 1 / ${n}))`)),
+    realRoot: (n, x) => once(x, (v) => `np.where((${v} < 0) & (np.mod(${n}, 2) == 1), -np.power(-${v}, 1 / ${bracketed(n)}), np.power(${v}, 1 / ${bracketed(n)}))`),
     fixed: (v, d, literal) => (literal === null ? `np.char.mod("%." + str(${d}) + "f", ${NP.round(v, d)})` : `np.char.mod("%.${literal}f", ${NP.round(v, literal)})`),   // strings, element-wise
     /**
      * Operators written differently from Python's: (args rendered, node, render) → code, or null for Python's.
@@ -530,6 +542,7 @@ function operation(node, render, lang) {
     if (op === '{}' && !node.args.length && lang.emptySet && lang.list['{}'][0] === '{') return lang.emptySet;
     if (lang.list[op]) return lang.list[op][0] + list() + lang.list[op][1];
     if (lang.eq[op]) return binary(lang.eq[op]);
+    if (isStartsWith(op) && lang.startsWith) return lang.startsWith(...startsWithArgs(node).map(render));
     if (isCustomFunction(op)) return `${identifier(customName(op), lang)}(${list()})`;
 
     switch (op) {
@@ -596,6 +609,8 @@ function operation(node, render, lang) {
                 const x = render(b);
                 return lang.oddRoot(simple(x) ? x : `(${x})`, n);
             }
+            // an index known only as it runs (or a negative odd one): real when it is odd, as evaluate() takes it
+            if (lang.realRoot && (a.type !== 'number' || /^-\d*[13579]$/.test(a.value))) return lang.realRoot(render(a), render(b));
             return `${lang.math('pow')}(${render(b)}, 1 / (${render(a)}))`;
         }
         case 'log':
@@ -689,6 +704,8 @@ const NUMBER_SETS = {
 
 function membership(node, render, lang) {
     const [x, set] = node.args;
+    const search = lang.substring && substringTest(node);   // "ab" ∈ name: is the text in the value?
+    if (search) return lang.substring(render(search.within), render(search.text), node.op === '∉');
     const v = render(x);
     const numbers = set.type === 'symbol' && NUMBER_SETS[set.value];
     if (numbers) {
