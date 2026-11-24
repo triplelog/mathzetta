@@ -80,7 +80,7 @@ el.innerHTML = toHTML('\\frac{d}{dx} x^2 = 2x', { colors: { '2x': 'crimson' } })
 ## Try it
 
 ```bash
-npm test          # 253 checks; every input in mathzetta/test/cases/calculus.tsv
+npm test          # 290 checks; every input in mathzetta/test/cases/calculus.tsv
 ```
 
 [inlinemath.com](https://inlinemath.com) has the live editor, steps and the gallery; its
