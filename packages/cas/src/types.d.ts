@@ -302,6 +302,12 @@ export interface CASOptions {
     /** How a string input is read (default: postfix). */
     read?: (text: string) => string[] | Expr;
 }
+export type IntegrateOptions = CallOptions & {
+    from?: string | number;
+    to?: string | number;
+    /** true: + C (c or K when the integrand has a C); a string: that name. */
+    constant?: boolean | string;
+};
 export interface CAS {
     /** A string (postfix, or what `read` reads), tokens or a node → a node. */
     node(input: ExprInput): Expr;
@@ -316,8 +322,9 @@ export interface CAS {
     cancel(input: ExprInput, options?: CallOptions): CASResult;
     /** d/dv, `order` times. */
     diff(input: ExprInput, v?: string, options?: CallOptions & { order?: number }): CASResult;
-    /** ∫ input dv; { from, to } for a definite integral, { constant: 'C' } to add + C. */
-    integrate(input: ExprInput, v?: string, options?: CallOptions & { from?: string | number; to?: string | number; constant?: string }): CASResult;
+    /** ∫ input dv; { from, to } for a definite integral, { constant: true } (or a name, 'k') to add + C. The options may come second. */
+    integrate(input: ExprInput, v?: string, options?: IntegrateOptions): CASResult;
+    integrate(input: ExprInput, options?: IntegrateOptions): CASResult;
     /** Solve an equation (or expression = 0) for v. */
     solve(input: ExprInput, v?: string, options?: CallOptions): CASResult & {
         solutions: Expr[];

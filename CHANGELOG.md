@@ -2,6 +2,31 @@
 
 Each package keeps its own version: `mathzetta`, `@mathzetta/inlinemath`, `@mathzetta/cas`.
 
+## @mathzetta/cas 0.3.2
+
+Fixes, most of them found by a consumer drawing the steps on a board:
+
+- **A linear substitution keeps its 1/a in the steps.** ∫ e^(2x) dx went to ∫ e^u du, and the ½ only came back with
+  x; now it is (∫ e^u du)/2 → e^u/2 → e^(2x)/2. Its explanation says `du = dx` and `du = -dx` for a = ±1.
+- **The steps of an integral are a chain.** A strategy's steps (a substitution, by parts, partial fractions …) were
+  written for the one integral they worked on; now every `from`/`to` is the whole line, each `from` is the `to`
+  before it, and the last `to` is the answer. Such a step's `path` is `null`. A definite integral ends with a
+  "work out" step from F(b) − F(a) to the value.
+- **`integrate(…, { constant: true })` adds `+ C`** (it added a symbol named `true`); c, then K, when the integrand
+  has a C. `integrate(f, { constant: true })`, options second, works (it was read as the variable).
+- **Solving:** `x/(x + 1) = 2` (the unknown above and below: multiply by what is below), `x(x − 2) = 3` (multiply
+  out; new step `solve.expand`), and the unknown to the first power in several terms with letters or π beside it —
+  `a·x + b·x = c`, `2x + πx = 1`, `x·y + x = y` for y (new step `solve.collect`) — all came back unsolved. An answer
+  in letters is one canceled fraction (`b·c/(a − c)`).
+- **Factoring takes the sign out of what is left:** `x(2x + 3) − x²` is `x(x + 3)` (it was `−x(−x − 3)`, which
+  simplify and cancel then showed as `−x²(−2x − 3)`-style answers).
+- **One fraction reaches fractions inside:** `cancel` and `simplify` give (x + 1)/(x − 1) for (1 + 1/x)/(1 − 1/x), and
+  a top with brackets among its terms is multiplied out when that is shorter ((2x + 3)² − 2x² − 6x over (2x + 3)²).
+- **`diff` cancels or multiplies out its answer when that is shorter:** d/dx (2x + 3)/x² is −2(x + 3)/x³ (it was
+  (2x² − 2x(2x + 3))/x⁴), d/dx x²(2x + 3) is 6x² + 6x. It does not factor a sum.
+- **Integrals:** fractions inside a fraction are canceled first (new step `integrate.cancel`), and a top of at least
+  the bottom's degree is divided before anything is multiplied out: ∫ (x + 1)/(x − 1) dx is two lines shorter.
+
 ## mathzetta 1.5.0, @mathzetta/inlinemath 0.4.1, @mathzetta/cas 0.3.1
 
 ### @mathzetta/cas 0.3.1

@@ -726,3 +726,86 @@ suite('cas: trig identities hold', () => {
     assert(ids.includes('simplify.trig'), ids.join(', '));
   });
 });
+
+// Found by calcvidnew (its README's "worked around" list) and by a sweep of ordinary course problems.
+suite('cas: steps are a chain, and the answers a board can show', () => {
+  const chain = (steps) => steps.every((s, i) => i === 0 || s.from === steps[i - 1].to);
+  const shown = (s) => cas.format(parse(s));
+
+  test('a linear substitution keeps its 1/a: ∫ e^(2x) dx = ½ ∫ e^u du', () => {
+    const r = cas.integrate('e^(2x)', 'x');
+    const sub = r.steps.find((s) => s.id === 'integrate.substitute');
+    equal(shown(sub.to), '(∫ e^u du)/2');
+    equal(sub.explanation, 'Let u = 2x, so du = 2 dx.');
+    equal(shown(r.steps[r.steps.length - 1].from), 'e^u/2');
+    equal(r.text, 'e^(2x)/2');
+    equal(cas.integrate('1/(x - 3)', 'x').steps[0].explanation, 'Let u = x - 3, so du = dx.');
+  });
+
+  test('every integration step starts where the one before ended, and the last ends at the answer', () => {
+    for (const f of ['e^(2x)', '3cos(3x + 1) + x', 'x sqrt(x + 1)', 'sin(x)^2 + cos(x)^2 + e^(-x)', 'x e^(x^2)', 'sin(x)^3', '1/(x^2 - 1)', 'x^2/(x^2 + 1)',
+      '\\int_0^1 (2x + 1)^2 dx', '\\int_0^1 e^(2x) dx', '(1 + 1/x)/(1 - 1/x)']) {
+      const r = cas.integrate(f);
+      assert(chain(r.steps), `${f}: ${r.steps.map((s) => `${shown(s.from)} → ${shown(s.to)}`).join(' | ')}`);
+      equal(r.steps[r.steps.length - 1].to, r.result.s, f);
+    }
+  });
+
+  test('{ constant: true } adds + C, a name adds that name, and the options may come second', () => {
+    equal(cas.integrate('e^(2x)', 'x', { constant: true }).text, 'e^(2x)/2 + C');
+    equal(cas.integrate('e^(2x)', { constant: true }).text, 'e^(2x)/2 + C');
+    equal(cas.integrate('x', 'x', { constant: 'k' }).text, 'x^2/2 + k');
+    equal(cas.integrate('C x', 'x', { constant: true }).text, 'C·x^2/2 + c');
+    equal(cas.integrate('x', { from: 0, to: 2 }).text, '2');
+  });
+
+  test('factoring takes the sign out of what is left: x(2x + 3) - x² is x(x + 3)', () => {
+    equal(cas.factor('x(2x + 3) - x^2').text, 'x·(x + 3)');
+    equal(cas.factor('x(2x + 3) - x^2').steps[0].explanation, 'Take out the common factor x.');
+    equal(cas.simplify('(x(2x + 3) - x^2)/(2x + 3)^2').text, 'x·(x + 3)/(2x + 3)^2');
+    equal(cas.factor('2x^3 + 3x^2').text, 'x^2·(2x + 3)');
+  });
+
+  test('integrals: a fraction is canceled, and divided, before anything is multiplied out', () => {
+    equal(cas.integrate('(1 + 1/x)/(1 - 1/x)', 'x').text, 'x + 2ln(|x - 1|)');
+    equal(cas.integrate('(x + 1)/(x^2 + x)', 'x').steps[0].id, 'integrate.cancel');
+    equal(cas.integrate('(x + 1)/(x - 1)', 'x').steps[0].id, 'integrate.divide');
+  });
+});
+
+table('cas: solving a fraction, brackets, and letters beside the unknown', (x, v) => cas.solve(x, v, { steps: false }).text, [
+  ['x/(x + 1) = 2', 'x = -2'],
+  ['(x - 1)/(x + 2) = 3', 'x = -7/2'],
+  ['x/(x - 1) = 1', 'no solution'],
+  ['x/(x - 2) = 2/(x - 2)', 'no solution'],
+  ['sqrt(x)/(x + 1) = 1/2', 'x = 1'],
+  ['1/(1 + 1/x) = 2', 'x = -2'],
+  ['x(x - 2) = 3', 'x = -1 or x = 3'],
+  ['(x + 1)(x - 1) = 8', 'x = -3 or x = 3'],
+  ['x(x + 1)(x + 2) = 6', 'x = 1'],
+  ['a x + b x = c', 'x = c/(a + b)', 'x'],
+  ['a x + b = c x + d', 'x = (-b + d)/(a - c)', 'x'],
+  ['2x + pi x = 1', 'x = 1/(π + 2)'],
+  ['x y + x = y', 'y = -x/(x - 1)', 'y'],
+  ['a x/(x + b) = c', 'x = b·c/(a - c)', 'x'],
+  ['x - c x/a = 1', 'x = a/(a - c)', 'x'],
+]);
+
+table('cas: fractions inside fractions are one fraction', (x, how) => text(cas[how](x, { steps: false })), [
+  ['(1 + 1/x)/(1 - 1/x)', '(x + 1)/(x - 1)', 'cancel'],
+  ['(1 + 1/x)/(1 - 1/x)', '(x + 1)/(x - 1)', 'simplify'],
+  ['1/(1 - 1/x)', 'x/(x - 1)', 'simplify'],
+  ['b c/(a(1 - c/a))', 'b·c/(a - c)', 'simplify'],
+  ['((2x + 3)^2 - 2x^2 - 6x)/(2x + 3)^2', '(2x^2 + 6x + 9)/(2x + 3)^2', 'cancel'],
+  ['((x^2 + 1)^3 + (x^2 + 1)^2)/(x^2 + 1)', '(x^2 + 1)·(x^2 + 2)', 'cancel'],
+]);
+
+table('cas: a derivative is canceled or multiplied out when that is shorter, never factored', (x) => text(cas.diff(x, 'x', { steps: false })), [
+  ['(2x + 3)/x^2', '-2·(x + 3)/x^3'],
+  ['x^3/(1 - x)', '-x^2·(2x - 3)/(x - 1)^2'],
+  ['(x^2 + 3x)/(2x + 3)', '(2x^2 + 6x + 9)/(2x + 3)^2'],
+  ['(x^3 + x^2)/(x + 1)^2', 'x·(x + 2)/(x + 1)^2'],
+  ['x^2(2x + 3)', '6x^2 + 6x'],
+  ['x^2 sin(3x)', '3x^2·cos(3x) + 2x·sin(3x)'],
+  ['x^2 e^(-x)', '-x^2·e^(-x) + 2x·e^(-x)'],
+]);

@@ -34,8 +34,8 @@ written by `format`), and takes `{ steps, approximate }` (below).
 | --- | --- |
 | `simplify(x)` | the normal form, then the simplify rules to a fixed point; then canceled, multiplied out, factored or rewritten with the trig identities if that is shorter (see below) |
 | `expand(x)`, `factor(x)`, `cancel(x)` | multiplied out; factored over the rationals; one fraction with common factors canceled |
-| `diff(x, v, { order })` | the differentiate rules (rules/calculus.yaml + rules/cas/derivatives.yaml), then simplify |
-| `integrate(x, v, { from, to, constant })` | the integrate rules, then (when no rule fits) multiplying out, taking a number out, a linear substitution, polynomial division and partial fractions (linear factors and one irreducible quadratic, by completing the square: ln and arctan), odd powers of sin and cos, the reduction formula for secⁿ and cscⁿ, eᵃˣ·sin bx (by parts twice), sin A cos B (product to sum), √(c − kx²) (a trig substitution), u-substitution (∫ f(g)·g′: x e^(x²), ln x / x, x/(x² + 1)), integration by parts (also ∫ arctan x, arcsin x alone). `from`/`to` (or an `int` with limits) gives F(b) − F(a), refused when the integrand has no value between the limits |
+| `diff(x, v, { order })` | the differentiate rules (rules/calculus.yaml + rules/cas/derivatives.yaml), then the simplify rules; the answer is canceled or multiplied out when that is shorter (never factored: x²·cos x + 2x·sin x stays) |
+| `integrate(x, v, { from, to, constant })` | the integrate rules, then (when no rule fits) one canceled fraction, dividing the polynomials, multiplying out, taking a number out, a linear substitution, polynomial division and partial fractions (linear factors and one irreducible quadratic, by completing the square: ln and arctan), odd powers of sin and cos, the reduction formula for secⁿ and cscⁿ, eᵃˣ·sin bx (by parts twice), sin A cos B (product to sum), √(c − kx²) (a trig substitution), u-substitution (∫ f(g)·g′: x e^(x²), ln x / x, x/(x² + 1)), integration by parts (also ∫ arctan x, arcsin x alone). `from`/`to` (or an `int` with limits) gives F(b) − F(a), refused when the integrand has no value between the limits. `{ constant: true }` adds `+ C` (`{ constant: 'k' }` names it); `integrate(x, options)` works too |
 | `solve(eq, v)` | `{ solutions, result, text, steps, unsolved, always }` — see below; an inequality (`<` `>` `≤` `≥`, or a chain `-1 < 2x + 1 < 5`) gives `{ pieces, intervals, text }`: `'x < -2 or x > 2'`, `'(-∞, -2) ∪ (2, ∞)'` |
 | `solveSystem(eqs, vars)` | linear equations, exact elimination: `{ solution: { x, y }, status: 'one' \| 'none' \| 'many' }` |
 | `limit(x, v, to, { side })` | the limit as v → to (a number, `\\infty`, `-\\infty`; or a written `\\lim_{x \\to a} …`, one-sided `a^+`): a number, `∞`, `-∞`, or `does not exist` (`exists: false`, `reason`) — see below |
@@ -50,7 +50,9 @@ divide by its constant factors, then undo its outer function with an isolate
 rule (rules/cas/solve.yaml) and repeat; several terms → a polynomial (factor
 over the rationals, the quadratic formula), a product equal to 0, a fraction
 (clear the denominator), one root among polynomial terms (isolate and undo it),
-or a polynomial in e^x, sin x, ln x … (substitute). Every answer is checked in
+or a polynomial in e^x, sin x, ln x … (substitute); letters beside the unknown are
+collected (a·x + b·x = c → x·(a + b) = c), x/(x + 1) = 2 is multiplied by what is
+below, and x(x − 2) = 3 is multiplied out. Every answer is checked in
 the original equation, and one that doesn't fit is dropped with a step saying
 why. `{ approximate: true }` finds real roots numerically when there is no
 exact method (x⁵ + x + 1 = 0). Trigonometric equations give the solutions in one
@@ -148,7 +150,11 @@ cas.approximate('cos(1 + i)').text        // '0.833730025131149 - 0.988897705762
 
 Every step is `{ id, name, tags, from, to, path, before, after, explanation }`:
 `from`/`to` are the whole expression (postfix) before and after, `path` the
-part a rule rewrote (a Inline Math `{ path }`), `before`/`after` that part.
+part a rule rewrote (a Inline Math `{ path }`; `null` when the step was worked on a
+part and put back in the line), `before`/`after` that part. The steps of an
+integral or a derivative are a chain: each `from` is the `to` before it, and the
+last `to` is the answer (before `+ C`). A linear substitution's 1/a stands in
+front from the substitution on: ∫ e^(2x) dx → (∫ e^u du)/2 → e^u/2 → e^(2x)/2.
 
 ```js
 cas.diff(f, 'x', { steps: true })        // every step, explained (default)

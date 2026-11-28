@@ -15,7 +15,7 @@ import { op, sym, isOp, walk, replaceAt, exactNum } from '../expr.js';
 import {
   N, isN, add, mul, neg, div, pow, canon, display, normal, termsOf, splitCoef, factorsOf, freeSymbols, keyOf, Q, CasError, settings, imaginaryUnit,
 } from './form.js';
-import { coefficients, rationalCoefficients, factorForm, drawFactored, together, mentions, rationalRoots } from './poly.js';
+import { coefficients, rationalCoefficients, factorForm, drawFactored, together, mentions, rationalRoots, expand } from './poly.js';
 import { rewrite } from './rules.js';
 import { approximate } from './approx.js';
 
@@ -43,7 +43,8 @@ export function solveEquation(cas, input, v, options = {}) {
   // Check each answer in the original equation, and keep each once.
   const out = [];
   const seen = new Set();
-  const tidy = (n) => rewrite(n, cas.set.view('simplify'), { format: cas.format }).node;
+  // an answer in letters is written as one canceled fraction when that is shorter (b·c/(a - c), not b·c/(a·(1 - c/a)))
+  const tidy = (n) => (freeSymbols(n).size && cas.simplify ? cas.simplify(n, { steps: false }).result : rewrite(n, cas.set.view('simplify'), { format: cas.format }).node);
   // numeric roots stay as their decimals (the normal form would make them fractions)
   for (const value of found.map((n) => (numericFound.has(n) ? n : tidy(n)))) {
     const k = value.s;
@@ -155,6 +156,15 @@ function solveBranch(cas, equation, v, options, record, found, unsolved, depth) 
     if (zero.s !== equation.s) record('solve.one-side', 'Everything on one side', ['move'], equation, zero, { v });
     return solvePolynomial(cas, E, cs, v, options, record, found, unsolved, depth, zero);
   }
+  // the unknown to the first power in several terms, with letters or π beside it (a·x + b·x = c): collect them
+  if (cs && Math.max(...cs.keys()) === 1 && [...cs.values()].every((c) => !mentions(c, v))) {
+    const a = cs.get(1);
+    const D1 = mul([a, canon(sym(v))]);
+    const F1 = neg(cs.get(0) ?? N(Q.ZERO));
+    const collected = eq(display(D1), display(F1));
+    record('solve.collect', 'Collect the terms', ['move'], equation, collected, { v, a: display(a) });
+    return isolate(cas, collected, D1, F1, v, options, record, found, unsolved, depth);
+  }
   // a product is 0 when a factor is
   const f = factorForm(E);
   const vFactors = f.factors.filter((g) => mentions(g.base, v) && !(isN(g.exp) && g.exp.q.sign < 0));
@@ -234,6 +244,23 @@ function isolate(cas, equation, D, F, v, options, record, found, unsolved, depth
   if (r.steps.length) {
     steps(record, r.steps);
     return solveBranch(cas, r.node, v, options, record, found, unsolved, depth + 1);
+  }
+  // the unknown above and below, x/(x + 1) = 2: multiply both sides by what is below
+  const below = factorsOf(canon(current.args[0])).filter((f) => mentions(f, v) && isDenominator(f));
+  if (below.length && !(isN(rhs) && rhs.q.isZero)) {
+    const den = pow(mul(below), N(Q.MINUS_ONE));
+    const cleared = eq(display(mul([canon(current.args[0]), den])), display(expand(mul([rhs, den]))));
+    record('solve.clear-denominator', 'Clear the denominator', ['move'], current, cleared, { den: display(den) });
+    return solveBranch(cas, cleared, v, options, record, found, unsolved, depth + 1);
+  }
+  // brackets round the unknown, x(x - 2) = 3: multiplied out it is a polynomial
+  const lhs = canon(current.args[0]);
+  const open = expand(lhs);
+  const cs = keyOf(open) !== keyOf(lhs) ? coefficients(open, v) : null;
+  if (cs && [...cs.values()].every((c) => !mentions(c, v)) && termsOf(open).length > 1) {
+    const opened = eq(display(open), current.args[1]);
+    record('solve.expand', 'Multiply out', ['expand'], current, opened, { v });
+    return solveBranch(cas, opened, v, options, record, found, unsolved, depth + 1);
   }
   // the unknown in a power's exponent and base, inside an unknown function …
   return giveUp(cas, current, v, options, record, found, unsolved);

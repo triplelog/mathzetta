@@ -50,6 +50,8 @@ export const MESSAGES = {
   'together': 'Write it as one fraction over a common denominator.',
   cancel: 'Cancel the factors the top and bottom share: {canceled}.',
   'solve.move': 'Keep the terms with {v} on the left and move the others to the right.',
+  'solve.collect': 'Collect the terms with {v} on the left, where {v} is multiplied by {a} in all, and move the others to the right.',
+  'solve.expand': 'Multiply out the brackets.',
   'solve.divide': 'Divide both sides by {by}.',
   'solve.multiply': 'Multiply both sides by {by}.',
   'solve.one-side': 'Move everything to one side, so the equation reads … = 0.',
@@ -81,8 +83,9 @@ export const MESSAGES = {
   'solve.unsolved': 'There is no exact method here for solving for {v}; try { approximate: true }.',
   'solve.numeric': 'Found {count} solution(s) numerically.',
   'system.eliminate': 'Use one equation to remove {v} from the others.',
+  'integrate.cancel': 'Write the integrand as one fraction and cancel what the top and bottom share.',
   'integrate.expand': 'Multiply out, then integrate term by term.',
-  'integrate.substitute': 'Let {u} = {inside}, so d{u} = {a} d{v}.',
+  'integrate.substitute': 'Let {u} = {inside}, so d{u} = {du}.',
   'integrate.back': 'Put {inside} back for {u}.',
   'integrate.parts': 'By parts with u = {u} and dv = {dv} d{v}: ∫ u dv = u·v - ∫ v du, where v = {V} and du = {du} d{v}.',
   'integrate.constant': 'The number {c} comes out of the integral.',
@@ -271,6 +274,18 @@ class CAS {
       raw.push(...r.steps, ...tidy.steps);
       node = tidy.node;
     }
+    // a quotient rule's answer canceled, a product rule's multiplied out, when that is shorter
+    // ((2x² - 2x(2x + 3))/x⁴ is -2(x + 3)/x³); sums are not factored: x²·cos x + 2x·sin x stays
+    const x = canon(node);
+    const c = freeSymbols(node).size ? cancelForm(x) : null;
+    const shorter = [
+      c && { node: drawFactored(c), id: 'simplify.cancel', name: 'Cancel' },
+      { node: display(expandForm(x)), id: 'simplify.expand', name: 'Multiply out' },
+    ].find((t) => t && nodeCount(t.node) < nodeCount(node));
+    if (shorter) {
+      raw.push(this.step(shorter.id, shorter.name, ['shorter'], node, shorter.node));
+      node = shorter.node;
+    }
     return this.result(node, raw, options, { variable });
   }
 
@@ -281,10 +296,12 @@ class CAS {
   }
 
   /**
-   * ∫ input dv; { from, to } for a definite integral, { constant: 'C' } to add + C.
+   * ∫ input dv; { from, to } for a definite integral, { constant: true } (or a name, 'C') to add + C.
    * An `int` node (∫ x² dx as MathZetta writes it, with or without limits) is read as such.
    */
   integrate(input, v, options = {}) {
+    // integrate(f, { constant: true }): the options may come second
+    if (v && typeof v === 'object') { options = v; v = undefined; }
     let start = this.node(input);
     // a limit is a number, postfix text, tokens or a node
     const limit = (x) => (x === undefined ? null : this.node(typeof x === 'number' ? String(x) : x));
@@ -304,11 +321,16 @@ class CAS {
       const d = definite(this, tidy.node, variable, from, to, start);
       raw.push(d.step);
       const value = rewrite(d.value, this.set.view('simplify'), { format: this.format });
-      raw.push(...value.steps);
+      raw.push(...this.tidyStep(d.shown, d.value), ...value.steps);
       return this.result(value.node, raw, options, { antiderivative: tidy.node, variable });
     }
     let out = tidy.node;
-    if (options.constant) out = op('+', [out, sym(String(options.constant))]);
+    // { constant: true } is + C (c, then K, when the integrand has a C of its own); { constant: 'k' } names it
+    if (options.constant) {
+      const taken = new Set([...freeSymbols(start), variable]);
+      const name = options.constant === true ? ['C', 'c', 'K'].find((k) => !taken.has(k)) ?? 'C' : String(options.constant);
+      out = op('+', [out, sym(name)]);
+    }
     return this.result(out, raw, options, { variable });
   }
 

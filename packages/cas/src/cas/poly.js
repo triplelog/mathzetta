@@ -2,7 +2,7 @@
 // polynomial pieces solve() uses (coefficients in a variable, rational roots).
 // All exact. Factoring is over the rationals: x² - 2 stays as it is.
 
-import { op, sym } from '../expr.js';
+import { op, sym, nodeCount } from '../expr.js';
 import {
   N, isN, add, mul, pow, neg, fn, powFactor, splitCoef, display, keyOf, termsOf, factorsOf, canon, freeSymbols, Q, CasError,
 } from './form.js';
@@ -267,7 +267,14 @@ function factorSum(s) {
     rest = add(terms.map((t) => mul([t, pow(divisor, N(Q.MINUS_ONE))])));
     notes.push({ id: 'factor.common', values: { common: divisor } });
   }
-  const tail = rest.k === 'add' ? factorPolynomial(rest, notes) : factorForm(rest);
+  // dividing can collapse the sum (x(2x + 3) - x² over -x is x - (2x + 3) = -x - 3): what is left is then
+  // factored from the start, so its own sign and common factors come out too (x(x + 3), not -x(-x - 3))
+  const again = rest.k === 'add' && keyOf(rest) !== keyOf(s);
+  const tail = rest.k !== 'add' ? factorForm(rest) : again ? factorSum(rest) : factorPolynomial(rest, notes);
+  if (again && notes.length) {   // one note for all that came out: x, not -x and then -1
+    const more = tail.notes.findIndex((n) => n.id === 'factor.common');
+    if (more >= 0) notes[0].values.common = mul([notes[0].values.common, tail.notes.splice(more, 1)[0].values.common]);
+  }
   return merge(common.mul(tail.coef), [...shared, ...tail.factors], [...notes, ...tail.notes.filter((n) => !notes.includes(n))]);
 }
 
@@ -400,10 +407,30 @@ export function numerDenom(x) {
   return { num: mul(top), den: mul(bottom) };
 }
 
+/**
+ * A term as one fraction, fractions inside its sums too: (1 + 1/x)/(1 - 1/x) is ((x + 1)/x) / ((x - 1)/x),
+ * so num (x + 1)·x and den x·(x - 1), for cancel to finish.
+ */
+function fractionOf(x) {
+  if (x.k !== 'mul' || !x.fs.some((f) => f.b.k === 'add' && isN(f.e) && f.e.q.isInteger)) return numerDenom(x);
+  const top = [N(new Q(x.c.n))];
+  const bottom = [N(new Q(x.c.d))];
+  for (const f of x.fs) {
+    const below = isN(f.e) && f.e.q.sign < 0;
+    const e = below ? N(f.e.q.neg()) : f.e;
+    const inner = f.b.k === 'add' && isN(f.e) && f.e.q.isInteger ? together(f.b) : null;
+    if (inner && !(isN(inner.den) && inner.den.q.isOne)) {
+      (below ? bottom : top).push(powFactor(inner.num, e));
+      (below ? top : bottom).push(powFactor(inner.den, e));
+    } else (below ? bottom : top).push(powFactor(f.b, e));
+  }
+  return { num: mul(top), den: mul(bottom) };
+}
+
 /** One fraction over a common denominator: 1/x + 1/y → (x + y)/(x y). Held as num/den. */
 export function together(x) {
-  if (x.k !== 'add') return numerDenom(x);
-  const parts = termsOf(x).map(numerDenom);
+  if (x.k !== 'add') return fractionOf(x);
+  const parts = termsOf(x).map(fractionOf);
   // least common denominator: each base with its largest power
   const lcd = new Map();
   let lcdCoef = 1n;
@@ -429,13 +456,20 @@ export function together(x) {
 export function cancel(x) {
   const { num, den } = together(x);
   if (isN(den) && den.q.isOne) return null;
-  const a = factorForm(num);
   const b = factorForm(den);
-  const keysA = new Set(a.factors.map((f) => keyOf(f.base)));
-  const shared = b.factors.filter((f) => keysA.has(keyOf(f.base)));
-  const factors = [...a.factors, ...b.factors.map((f) => ({ base: f.base, exp: neg(f.exp) }))];
-  const merged = merge(a.coef.div(b.coef), factors, [...a.notes, ...b.notes]);
-  return { ...merged, canceled: shared.map((f) => f.base) };
+  const over = (a) => {
+    const keysA = new Set(a.factors.map((f) => keyOf(f.base)));
+    const shared = b.factors.filter((f) => keysA.has(keyOf(f.base)));
+    const factors = [...a.factors, ...b.factors.map((f) => ({ base: f.base, exp: neg(f.exp) }))];
+    const merged = merge(a.coef.div(b.coef), factors, [...a.notes, ...b.notes]);
+    return { ...merged, canceled: shared.map((f) => f.base) };
+  };
+  const held = over(factorForm(num));
+  // a top with brackets among its terms, (2x + 3)² - 2x² - 6x: multiplied out and collected, when that is shorter
+  const open = num.k === 'add' ? expand(num) : num;
+  if (keyOf(open) === keyOf(num)) return held;
+  const opened = over(factorForm(open));
+  return nodeCount(drawFactored(opened)) < nodeCount(drawFactored(held)) ? opened : held;
 }
 
 export { CasError };

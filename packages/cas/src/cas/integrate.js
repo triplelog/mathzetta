@@ -11,10 +11,10 @@
 //                   ∫ p·ln x, p·arctan x (p may be 1): the other way round
 // A definite integral is the antiderivative's change between the limits.
 
-import { op, sym, isOp, isNum, walk, replaceAt, exactNum } from '../expr.js';
+import { op, sym, isOp, isNum, walk, replaceAt, exactNum, parse, nodeCount } from '../expr.js';
 import { approximate } from './approx.js';
 import { N, isN, add, mul, neg, div, canon, display, normal, factorsOf, freeSymbols, powFactor, Q, CasError } from './form.js';
-import { expand, coefficients, mentions, together, factorForm, rationalCoefficients, fromCoefficients, polyDivide, polyDerivative, rationalRoots, evaluateAt } from './poly.js';
+import { expand, coefficients, mentions, together, factorForm, cancel, drawFactored, rationalCoefficients, fromCoefficients, polyDivide, polyDerivative, rationalRoots, evaluateAt } from './poly.js';
 import { rewrite } from './rules.js';
 import { substitute } from './solve.js';
 import { pointOf } from './limit.js';
@@ -33,7 +33,8 @@ export function antiderivative(cas, f, v, depth = 0) {
   const set = cas.set.view('integrate');
   // the integrand simplified first (sin² + cos² is 1)
   const tidy = rewrite(f, cas.set.view('simplify'), { format: cas.format });
-  steps.push(...tidy.steps);
+  // every step's from and to are the whole line: the integrand's own steps are shown under the integral sign
+  steps.push(...lift(tidy.steps, (n) => normal(integral(n, v))));
   let current = normal(integral(tidy.node, v));
   for (let round = 0; round < 40; round++) {
     const r = rewrite(current, set, { format: cas.format });
@@ -45,10 +46,24 @@ export function antiderivative(cas, f, v, depth = 0) {
     if (!done) {
       throw new CasError(`no rule for ∫ ${cas.format(open.node.args[0])} d${open.node.args[1].token}`);
     }
-    steps.push(...done.steps);
+    // a strategy works on one integral: its steps are put back in the line around it
+    const around = current;
+    steps.push(...lift(done.steps, (n) => normal(replaceAt(around, open.path, n))));
     current = normal(replaceAt(current, open.path, done.node));
   }
   throw new CasError('integration did not finish');
+}
+
+/**
+ * Steps worked on a part, rewritten as steps of the whole line: `whole(part)` puts a part back in it.
+ * before/after stay the part; the path is dropped (null) where the line around it changed.
+ */
+function lift(steps, whole) {
+  return steps.map((s) => {
+    const from = whole(parse(s.from)).s;
+    const to = whole(parse(s.to)).s;
+    return from === s.from && to === s.to ? s : { ...s, from, to, path: null };
+  });
 }
 
 function strategy(cas, node, depth) {
@@ -61,6 +76,16 @@ function strategy(cas, node, depth) {
     const next = op('*', [display(N(content.c)), integral(display(content.rest), w)]);
     return { node: next, steps: [cas.step('integrate.constant', 'Take the number out', ['split'], node, next, { c: display(N(content.c)) })] };
   }
+  // fractions inside a fraction, or factors to cancel: one canceled fraction first, when that is shorter
+  const canceled = cancel(x);
+  const simpler = canceled && drawFactored(canceled);
+  if (simpler && nodeCount(simpler) < nodeCount(g) && freeSymbols(simpler).has(v)) {
+    const next = integral(simpler, w);
+    return { node: next, steps: [cas.step('integrate.cancel', 'One fraction', ['cancel'], node, next, {})] };
+  }
+  // a top of at least the bottom's degree, (x + 1)/(x - 1): divided before anything is multiplied out
+  const divided = rationalFunction(cas, node, x, v, true);
+  if (divided) return divided;
   // 1. multiply out
   const expanded = expand(x);
   if (display(expanded).s !== g.s && expanded.k === 'add') {
@@ -76,12 +101,14 @@ function strategy(cas, node, depth) {
       const sub = antiderivative(cas, normal(inner), u, depth + 1);
       const back = normal(substitute(sub.node, u, linear.node));
       const result = display(div(canon(back), linear.a));
+      // dx = du/a: the 1/a stands in front of the integral in u from the substitution on (∫ e^(2x) dx = ½ ∫ e^u du)
+      const overA = (n) => display(div(canon(n), linear.a));
       return {
         node: result,
         steps: [
-          cas.step('integrate.substitute', 'Substitute', ['substitute'], node, normal(integral(inner, u)), { u: sym(u), inside: linear.node, a: display(linear.a), v }),
-          ...sub.steps,
-          cas.step('integrate.back', 'Substitute back', ['substitute'], sub.node, result, { u: sym(u), inside: linear.node }),
+          cas.step('integrate.substitute', 'Substitute', ['substitute'], node, overA(normal(integral(normal(inner), u))), { u: sym(u), inside: linear.node, a: display(linear.a), v, du: differential(cas, linear.a, v) }),
+          ...lift(sub.steps, overA),
+          cas.step('integrate.back', 'Substitute back', ['substitute'], overA(sub.node), result, { u: sym(u), inside: linear.node }),
         ],
       };
     }
@@ -98,6 +125,9 @@ function strategy(cas, node, depth) {
   // 6. by parts
   return byParts(cas, node, x, v, depth);
 }
+
+/** a dx as it is said: dx, -dx, 2 dx. */
+const differential = (cas, a, v) => (isN(a) && a.q.isOne ? `d${v}` : isN(a) && a.q.neg().isOne ? `-d${v}` : `${cas.format(display(a))} d${v}`);
 
 const qn = (q) => display(N(q));   // a rational number as a node
 const whole = (k) => exactNum(String(k));
@@ -268,7 +298,7 @@ function specialForms(cas, node, v) {
  * p/q with exact coefficients: when deg p ≥ deg q, long division (x²/(x² + 1) = 1 - 1/(x² + 1));
  * when q has distinct rational roots, partial fractions (1/(x² - 1) = ½/(x - 1) - ½/(x + 1)).
  */
-function rationalFunction(cas, node, x, v) {
+function rationalFunction(cas, node, x, v, divideOnly = false) {
   const { num, den } = together(x);
   if (!mentions(den, v)) return null;
   const p = rationalCoefficients(coefficients(num, v));
@@ -281,6 +311,7 @@ function rationalFunction(cas, node, x, v) {
     const next = integral(display(add([poly(quotient), div(poly(r), poly(q))])), sym(v));
     return { node: next, steps: [cas.step('integrate.divide', 'Divide the polynomials', ['divide'], node, next, {})] };
   }
+  if (divideOnly) return null;
   const { roots, rest } = rationalRoots(q);
   const distinct = new Set(roots.map(String)).size === roots.length;
   // what is left after the rational roots: nothing, or one quadratic with no real roots
@@ -451,7 +482,7 @@ export function definite(cas, F, v, a, b, f) {
   const at = (bound) => normal(substitute(F, v, bound));
   const value = normal(op('-', [at(b), at(a)]));
   const shown = op('-', [at(b), at(a)]);
-  return { value, step: cas.step('integrate.evaluate', 'Between the limits', ['evaluate'], F, shown, { a, b, F, v }) };
+  return { value, shown, step: cas.step('integrate.evaluate', 'Between the limits', ['evaluate'], F, shown, { a, b, F, v }) };
 }
 
 /**
@@ -489,7 +520,7 @@ function improper(cas, F, v, a, b, f) {
   const [Fa, Fb] = [valueAt(a, ends[0], ascending ? 'right' : 'left'), valueAt(b, ends[1], ascending ? 'left' : 'right')];
   const value = normal(op('-', [Fb, Fa]));
   const shown = op('-', [Fb, Fa]);
-  return { value, step: cas.step('integrate.improper', 'Limits at the ends', ['evaluate'], F, shown, { a, b, F, v }) };
+  return { value, shown, step: cas.step('integrate.improper', 'Limits at the ends', ['evaluate'], F, shown, { a, b, F, v }) };
 }
 
 /** The parts of f that divide (a denominator, a negative power's base, tan's cos …) and mention v. */
